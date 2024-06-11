@@ -1,0 +1,11 @@
+[package]
+name = "showtimes-db"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "MongoDB models mapping for Showtimes Database"
+
+[dependencies]

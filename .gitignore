@@ -1,0 +1,28 @@
+# Rust
+/target
+build/
+dist/
+
+# Coverage
+.coverage
+coverage.*
+.config-test
+*.profraw
+lcov.info
+cobertura.xml
+
+# Config
+.env
+.env.development
+.env.production
+
+config.toml
+config.toml.development
+config.toml.production
+
+# Others
+_dumps/
+_tests/
+_test/
+_data_test/
+/**/tests/*.json

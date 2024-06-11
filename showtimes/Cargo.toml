@@ -1,0 +1,11 @@
+[package]
+name = "showtimes"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "The Showtimes API backend for naoTimes. A full-featured group management for translating a foreign-media to your languages!"
+
+[dependencies]

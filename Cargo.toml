@@ -1,0 +1,41 @@
+[workspace]
+resolver = "2"
+members = [
+    "showtimes_db",
+    "showtimes_models",
+    "showtimes_migrate",
+    "showtimes",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["noaione <noaione@n4o.xyz>"]
+license = "MIT"
+repository = "https://github.com/naoTimesdev/showtimes-rs"
+homepage = "https://naoti.me"
+
+[workspace.dependencies]
+# Essential stuff
+tokio = { version = "1.38.0", features = ["full"] }
+serde = { version = "1.0.203", features = ["derive"] }
+lazy_static = "1"
+anyhow = "1"
+
+# Web server
+axum = { version = "0.7.5", features = ["ws", "tracing"] }
+async-graphql = { version = "7.0.6", features = ["uuid", "tracing", "bson", "password-strength-validator"] }
+async-graphql-axum = "7.0.6"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tower-http = { version = "0.5.2", features = ["cors", "trace"] }
+
+# Database
+mongodb = { version = "2.8.2", features = ["bson-uuid-1"] }
+redis = { version = "0.25", features = ["tokio-comp"] }
+
+# FansubRSS
+reqwest = "0.12.4"
+feed-rs = "2.0.0"
+
+# CI-PROFILE-MARK
