@@ -1,0 +1,11 @@
+[package]
+name = "showtimes-metadata"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "A library to fetch metadata information of a shows or books, data provided by Anilist and TMDB"
+
+[dependencies]
