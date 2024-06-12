@@ -1,0 +1,3 @@
+# showtimes-rs
+
+A big rewrite in progress...

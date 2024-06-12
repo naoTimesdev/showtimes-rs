@@ -17,7 +17,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 authors = ["noaione <noaione@n4o.xyz>"]
-license = "MIT"
+license = "AGPL-3.0"
 repository = "https://github.com/naoTimesdev/showtimes-rs"
 homepage = "https://naoti.me"
 
