@@ -4,8 +4,8 @@ members = [
     # Library
     "showtimes_db",
     "showtimes_fs",
+    "showtimes_gql",
     "showtimes_metadata",
-    "showtimes_models",
     "showtimes_search",
 
     # Binary

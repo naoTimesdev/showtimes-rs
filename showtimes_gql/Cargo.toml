@@ -1,5 +1,5 @@
 [package]
-name = "showtimes-models"
+name = "showtimes-gql"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

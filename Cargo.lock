@@ -1196,15 +1196,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "showtimes-gql"
+version = "0.1.0"
+
+[[package]]
 name = "showtimes-metadata"
 version = "0.1.0"
 
 [[package]]
 name = "showtimes-migrate"
-version = "0.1.0"
-
-[[package]]
-name = "showtimes-models"
 version = "0.1.0"
 
 [[package]]
