@@ -1,0 +1,14 @@
+[package]
+name = "showtimes-shared"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Shared utility for Showtimes API"
+
+[dependencies]
+uuid.workspace = true
+ulid.workspace = true
+serde.workspace = true

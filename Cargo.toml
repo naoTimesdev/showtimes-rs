@@ -7,6 +7,7 @@ members = [
     "showtimes_gql",
     "showtimes_metadata",
     "showtimes_search",
+    "showtimes_shared",
 
     # Binary
     "showtimes_migrate",
@@ -26,6 +27,8 @@ homepage = "https://naoti.me"
 tokio = { version = "1.38.0", features = ["full"] }
 serde = { version = "1.0.203", features = ["derive"] }
 toml = { version = "0.8.14", features = ["preserve_order"] }
+uuid = { version = "1.8.0", features = ["v7", "fast-rng"] }
+ulid = "1.1.2"
 chrono = "0.4.38"
 lazy_static = "1"
 anyhow = "1"
