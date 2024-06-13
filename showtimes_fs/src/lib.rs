@@ -1,12 +1,13 @@
 use tokio::io::{AsyncRead, AsyncWrite};
 
+pub mod local;
 pub mod s3;
 
 /// The list of "pool" type of the filesystems.
 ///
 /// Currently only `LocalFs` and `S3Fs` are supported.
 pub enum FsPool {
-    LocalFs,
+    LocalFs(crate::local::LocalFs),
     S3Fs(crate::s3::S3Fs),
 }
 
