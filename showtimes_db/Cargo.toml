@@ -9,3 +9,11 @@ homepage.workspace = true
 description = "MongoDB models mapping for Showtimes Database"
 
 [dependencies]
+anyhow.workspace = true
+serde.workspace = true
+chrono.workspace = true
+
+mongodb.workspace = true
+
+showtimes-shared = { path = "../showtimes_shared" }
+tosho-macros = "0.3"

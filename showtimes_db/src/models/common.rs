@@ -1,0 +1,135 @@
+use serde::{Deserialize, Serialize};
+
+/// A metadata struct for an image
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageMetadata {
+    /// The type of the image
+    pub kind: String,
+    /// The key of the image
+    pub key: String,
+    /// The filename of the image
+    pub filename: String,
+    /// The format of the image
+    pub format: String,
+    /// The parent of the image
+    pub parent: Option<String>,
+}
+
+impl ImageMetadata {
+    /// Create a URL or path to the image
+    pub fn as_url(&self) -> String {
+        match &self.parent {
+            Some(parent) => format!(
+                "/{}/{}/{}/{}",
+                &self.kind, &self.key, parent, &self.filename
+            ),
+            None => format!("/{}/{}/{}", &self.kind, &self.key, &self.filename),
+        }
+    }
+}
+
+impl Default for ImageMetadata {
+    fn default() -> Self {
+        ImageMetadata {
+            kind: "image".to_string(),
+            key: "default".to_string(),
+            filename: "default.png".to_string(),
+            format: "png".to_string(),
+            parent: None,
+        }
+    }
+}
+
+/// The list of possible integration types.
+#[derive(Debug, Clone, tosho_macros::DeserializeEnum, tosho_macros::SerializeEnum)]
+pub enum IntegrationType {
+    DiscordRole,
+    DiscordUser,
+    DiscordChannel,
+    DiscordGuild,
+    FansubDB,
+    FansubDBProject,
+    FansubDBShows,
+}
+
+tosho_macros::enum_error!(IntegrationTypeFromStrError);
+
+impl std::str::FromStr for IntegrationType {
+    type Err = IntegrationTypeFromStrError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // lowercase the string
+        let s_lower = s.to_lowercase();
+        match s_lower.as_str() {
+            "discordrole" | "discord_role" => Ok(IntegrationType::DiscordRole),
+            "discorduser" | "discord_user" => Ok(IntegrationType::DiscordUser),
+            "discordchannel" | "discord_channel" | "discord_text_channel" => {
+                Ok(IntegrationType::DiscordChannel)
+            }
+            "discordguild" | "discord_guild" => Ok(IntegrationType::DiscordGuild),
+            "fansubdb" | "fansubdb_id" => Ok(IntegrationType::FansubDB),
+            "fansubdbproject" | "fansubdb_project" | "fansubdb_project_id" => {
+                Ok(IntegrationType::FansubDBProject)
+            }
+            "fansubdbshows" | "fansubdb_shows" | "fansubdb_shows_id" => {
+                Ok(IntegrationType::FansubDBShows)
+            }
+            _ => Err(IntegrationTypeFromStrError {
+                original: s.to_string(),
+            }),
+        }
+    }
+}
+
+impl std::fmt::Display for IntegrationType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IntegrationType::DiscordRole => write!(f, "DISCORD_ROLE"),
+            IntegrationType::DiscordUser => write!(f, "DISCORD_USER"),
+            IntegrationType::DiscordChannel => write!(f, "DISCORD_TEXT_CHANNEL"),
+            IntegrationType::DiscordGuild => write!(f, "DISCORD_GUILD"),
+            IntegrationType::FansubDB => write!(f, "FANSUBDB_ID"),
+            IntegrationType::FansubDBProject => write!(f, "FANSUBDB_PROJECT_ID"),
+            IntegrationType::FansubDBShows => write!(f, "FANSUBDB_SHOWS_ID"),
+        }
+    }
+}
+
+/// Model to hold the ID of an integration.
+///
+/// This can be used to denote Discord Integration IDs, etc.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntegrationId {
+    id: String,
+    kind: IntegrationType,
+}
+
+impl IntegrationId {
+    /// Create a new integration ID
+    pub fn new(id: impl Into<String>, kind: IntegrationType) -> Self {
+        IntegrationId {
+            id: id.into(),
+            kind,
+        }
+    }
+
+    /// Getter for the ID
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// Getter for the kind
+    pub fn kind(&self) -> &IntegrationType {
+        &self.kind
+    }
+
+    /// Set the ID
+    pub fn set_id(&mut self, id: impl Into<String>) {
+        self.id = id.into();
+    }
+
+    /// Set the kind
+    pub fn set_kind(&mut self, kind: IntegrationType) {
+        self.kind = kind;
+    }
+}
