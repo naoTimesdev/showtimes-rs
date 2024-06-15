@@ -3,6 +3,9 @@
 use serde::Deserialize;
 use uuid::{Timestamp, Uuid};
 
+/// Re-exports of the [`ulid`] crate
+pub use ulid;
+
 /// Generate v7 UUID for the current timestamp
 ///
 /// # Examples
@@ -49,6 +52,13 @@ pub fn ulid_to_uuid(ulid: ulid::Ulid) -> Uuid {
     Uuid::from_bytes(bita)
 }
 
+/// Default value for [`ulid::Ulid`]
+///
+/// Used for serde
+pub fn def_ulid() -> ulid::Ulid {
+    uuid_to_ulid(generate_uuid())
+}
+
 /// Serialize [`ulid::Ulid`] to string
 ///
 /// Used for serde serialization
@@ -57,6 +67,19 @@ where
     S: serde::Serializer,
 {
     serializer.serialize_str(&ulid.to_string())
+}
+
+/// Serialize an optional [`ulid::Ulid`] to string
+///
+/// Used for serde serialization
+pub fn ser_opt_ulid<S>(ulid: &Option<ulid::Ulid>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    match ulid {
+        Some(ulid) => serializer.serialize_str(&ulid.to_string()),
+        None => serializer.serialize_none(),
+    }
 }
 
 /// Deserialize string to [`ulid::Ulid`]
@@ -68,6 +91,54 @@ where
 {
     let s = String::deserialize(deserializer)?;
     ulid::Ulid::from_string(&s).map_err(serde::de::Error::custom)
+}
+
+/// Deserialize optional string to optional [`ulid::Ulid`]
+///
+/// Used for serde deserialization
+pub fn de_opt_ulid<'de, D>(deserializer: D) -> Result<Option<ulid::Ulid>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = Option::<String>::deserialize(deserializer)?;
+    match s {
+        Some(s) => ulid::Ulid::from_string(&s)
+            .map(Some)
+            .map_err(serde::de::Error::custom),
+        None => Ok(None),
+    }
+}
+
+pub fn ser_opt_unix<S>(
+    date: &Option<chrono::DateTime<chrono::Utc>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    match date {
+        Some(date) => {
+            let ts = date.timestamp();
+            serializer.serialize_i64(ts)
+        }
+        None => serializer.serialize_none(),
+    }
+}
+
+pub fn de_opt_unix<'de, D>(
+    deserializer: D,
+) -> Result<Option<chrono::DateTime<chrono::Utc>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    match i64::deserialize(deserializer) {
+        Ok(s) => {
+            // unwrap now!
+            let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(s, 0).unwrap();
+            Ok(Some(dt))
+        }
+        Err(_) => Ok(None),
+    }
 }
 
 #[cfg(test)]

@@ -12,3 +12,4 @@ description = "Shared utility for Showtimes API"
 uuid.workspace = true
 ulid.workspace = true
 serde.workspace = true
+chrono.workspace = true
