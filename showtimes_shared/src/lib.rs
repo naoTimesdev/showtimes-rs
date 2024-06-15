@@ -1,6 +1,6 @@
 //! Shared utilities for Showtimes
 
-use serde::Deserialize;
+use serde::{ser::SerializeSeq, Deserialize};
 use uuid::{Timestamp, Uuid};
 
 /// Re-exports of the [`ulid`] crate
@@ -82,6 +82,20 @@ where
     }
 }
 
+/// Serialize a list of [`ulid::Ulid`] to a list of strings
+///
+/// Used for serde serialization
+pub fn ser_ulid_list<S>(ulids: &[ulid::Ulid], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let mut seq = serializer.serialize_seq(Some(ulids.len()))?;
+    for ulid in ulids {
+        seq.serialize_element(&ulid.to_string())?;
+    }
+    seq.end()
+}
+
 /// Deserialize string to [`ulid::Ulid`]
 ///
 /// Used for serde deserialization
@@ -107,6 +121,19 @@ where
             .map_err(serde::de::Error::custom),
         None => Ok(None),
     }
+}
+
+/// Deserialize list of strings to list of [`ulid::Ulid`]
+///
+/// Used for serde deserialization
+pub fn de_ulid_list<'de, D>(deserializer: D) -> Result<Vec<ulid::Ulid>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = Vec::<String>::deserialize(deserializer)?;
+    s.iter()
+        .map(|s| ulid::Ulid::from_string(s).map_err(serde::de::Error::custom))
+        .collect()
 }
 
 pub fn ser_opt_unix<S>(
