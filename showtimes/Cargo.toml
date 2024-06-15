@@ -9,3 +9,20 @@ homepage.workspace = true
 description = "The Showtimes API backend for naoTimes. A full-featured group management for translating a foreign-media to your languages!"
 
 [dependencies]
+# Essentials
+tokio.workspace = true
+serde.workspace = true
+toml.workspace = true
+anyhow.workspace = true
+
+# Web server
+axum.workspace = true
+async-graphql-axum.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tower-http.workspace = true
+
+# Showtimes related
+showtimes-shared = { path = "../showtimes_shared" }
+showtimes-db = { path = "../showtimes_db" }
+showtimes-fs = { path = "../showtimes_fs" }
