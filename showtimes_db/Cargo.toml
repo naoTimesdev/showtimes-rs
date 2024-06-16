@@ -12,6 +12,7 @@ description = "MongoDB models mapping for Showtimes Database"
 anyhow.workspace = true
 serde.workspace = true
 chrono.workspace = true
+futures = "0.3.30"
 
 mongodb.workspace = true
 
