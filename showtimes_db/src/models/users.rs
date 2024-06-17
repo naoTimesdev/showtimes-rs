@@ -32,7 +32,8 @@ pub struct DiscordUser {
 /// A model to hold user authentication information
 ///
 /// User is logged in via Discord OAuth2
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, showtimes_derive::ShowModelHandler)]
+#[col_name("ShowtimesUsers")]
 pub struct User {
     /// The user's ID
     #[serde(
@@ -55,6 +56,8 @@ pub struct User {
     pub kind: UserKind,
     /// The user discord information
     pub discord_meta: DiscordUser,
+    #[serde(skip_serializing)]
+    _id: Option<mongodb::bson::oid::ObjectId>,
 }
 
 impl User {
@@ -67,6 +70,7 @@ impl User {
             api_key: generate_uuid().to_string(),
             kind: UserKind::User,
             discord_meta,
+            _id: None,
         }
     }
 
@@ -79,6 +83,7 @@ impl User {
             api_key: generate_uuid().to_string(),
             kind: UserKind::Admin,
             discord_meta,
+            _id: None,
         }
     }
 }

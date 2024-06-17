@@ -2126,8 +2126,19 @@ dependencies = [
  "futures",
  "mongodb",
  "serde",
+ "showtimes-derive",
  "showtimes-shared",
+ "tokio",
  "tosho-macros",
+]
+
+[[package]]
+name = "showtimes-derive"
+version = "0.1.0"
+dependencies = [
+ "mongodb",
+ "quote",
+ "syn 2.0.66",
 ]
 
 [[package]]

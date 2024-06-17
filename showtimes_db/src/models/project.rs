@@ -344,7 +344,8 @@ impl EpisodeProgress {
 }
 
 /// The model holding project information.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, showtimes_derive::ShowModelHandler)]
+#[col_name("ShowtimesProjects")]
 pub struct Project {
     /// The ID of the project.
     #[serde(
@@ -378,6 +379,8 @@ pub struct Project {
     pub creator: showtimes_shared::ulid::Ulid,
     /// The type of the project.
     pub kind: ProjectType,
+    #[serde(skip_serializing)]
+    _id: Option<mongodb::bson::oid::ObjectId>,
 }
 
 impl Project {
@@ -393,14 +396,9 @@ impl Project {
         Ok(Project {
             id: def_ulid(),
             title,
-            poster: Poster::default(),
-            roles: Vec::new(),
-            assignees: Vec::new(),
-            progress: Vec::new(),
-            aliases: Vec::new(),
-            integrations: Vec::new(),
             creator,
             kind,
+            ..Default::default()
         })
     }
 
@@ -418,13 +416,9 @@ impl Project {
             id: def_ulid(),
             title,
             poster,
-            roles: Vec::new(),
-            assignees: Vec::new(),
-            progress: Vec::new(),
-            aliases: Vec::new(),
-            integrations: Vec::new(),
             creator,
             kind,
+            ..Default::default()
         })
     }
 
@@ -448,11 +442,9 @@ impl Project {
             poster,
             roles,
             assignees,
-            progress: Vec::new(),
-            aliases: Vec::new(),
-            integrations: Vec::new(),
             creator,
             kind,
+            ..Default::default()
         })
     }
 
@@ -474,11 +466,9 @@ impl Project {
             poster,
             roles,
             assignees,
-            progress: Vec::new(),
-            aliases: Vec::new(),
-            integrations: Vec::new(),
             creator,
             kind,
+            ..Default::default()
         })
     }
 

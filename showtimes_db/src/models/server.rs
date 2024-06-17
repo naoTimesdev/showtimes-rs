@@ -45,7 +45,8 @@ pub struct ServerUser {
 ///
 /// The original account is called "server" as a caddy over from the original
 /// project. This is a server in the sense of a project server, not a physical
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, showtimes_derive::ShowModelHandler)]
+#[col_name("ShowtimesServers")]
 pub struct Server {
     /// The server's ID
     #[serde(serialize_with = "ser_ulid", deserialize_with = "de_ulid")]
@@ -58,10 +59,13 @@ pub struct Server {
     pub owners: Vec<ServerUser>,
     /// The server's avatar/icon
     pub avatar: Option<ImageMetadata>,
+    #[serde(skip_serializing)]
+    _id: Option<mongodb::bson::oid::ObjectId>,
 }
 
 /// A model to hold server synchronization information on a project
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, showtimes_derive::ShowModelHandler)]
+#[col_name("ShowtimesCollaborationSync")]
 pub struct ServerCollaborationSync {
     /// The collaboration ID
     #[serde(serialize_with = "ser_ulid", deserialize_with = "de_ulid")]
@@ -72,6 +76,8 @@ pub struct ServerCollaborationSync {
     /// The list of servers
     #[serde(serialize_with = "ser_ulid_list", deserialize_with = "de_ulid_list")]
     pub servers: Vec<showtimes_shared::ulid::Ulid>,
+    #[serde(skip_serializing)]
+    _id: Option<mongodb::bson::oid::ObjectId>,
 }
 
 /// An information for a collaboration invite
@@ -86,7 +92,8 @@ pub struct ServerCollaborationInviteInfo {
 }
 
 /// A model to hold server collaboration invite on a project
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, showtimes_derive::ShowModelHandler)]
+#[col_name("ShowtimesCollaborationInvite")]
 pub struct ServerCollaborationInvite {
     /// The collab invite ID (unique, and used as invite code too)
     #[serde(serialize_with = "ser_ulid", deserialize_with = "de_ulid")]
@@ -95,4 +102,6 @@ pub struct ServerCollaborationInvite {
     pub source: ServerCollaborationInviteInfo,
     /// The target server
     pub target: ServerCollaborationInviteInfo,
+    #[serde(skip_serializing)]
+    _id: Option<mongodb::bson::oid::ObjectId>,
 }

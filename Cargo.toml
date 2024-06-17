@@ -8,6 +8,7 @@ members = [
     "showtimes_metadata",
     "showtimes_search",
     "showtimes_shared",
+    "showtimes_derive",
 
     # Binary
     "showtimes_migrate",

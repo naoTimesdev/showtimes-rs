@@ -12,9 +12,11 @@ description = "MongoDB models mapping for Showtimes Database"
 anyhow.workspace = true
 serde.workspace = true
 chrono.workspace = true
+tokio.workspace = true
 futures = "0.3.30"
 
 mongodb.workspace = true
 
 showtimes-shared = { path = "../showtimes_shared" }
+showtimes-derive = { path = "../showtimes_derive" }
 tosho-macros = "0.3"
