@@ -72,10 +72,7 @@ impl FsImpl for LocalFs {
         let key = make_file_path(base_key, filename, parent_id, kind);
         let path = self.directory.join(key);
 
-        let is_exists = match tokio::fs::try_exists(&path).await {
-            Ok(a) => a,
-            Err(_) => false,
-        };
+        let is_exists = (tokio::fs::try_exists(&path).await).unwrap_or(false);
 
         Ok(is_exists)
     }

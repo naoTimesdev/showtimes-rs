@@ -136,7 +136,7 @@ impl syn::parse::Parse for CreateHandler {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let name = input.parse()?;
         let mut handler_name: Option<syn::Ident> = None;
-        if let Ok(_) = input.parse::<syn::Token![,]>() {
+        if input.parse::<syn::Token![,]>().is_ok() {
             if let Ok(ident) = input.parse() {
                 handler_name = Some(ident);
             };

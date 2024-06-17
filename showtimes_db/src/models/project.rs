@@ -124,7 +124,7 @@ fn validate_key(key: &str) -> anyhow::Result<()> {
     if !key.is_ascii() {
         anyhow::bail!("`key` must be ASCII");
     }
-    if !key.contains(" ") && key.to_ascii_uppercase() == key {
+    if !key.contains(' ') && key.to_ascii_uppercase() == key {
         anyhow::bail!("`key` must be uppercase and have no spaces");
     }
     Ok(())
