@@ -56,7 +56,7 @@ pub struct User {
     pub kind: UserKind,
     /// The user discord information
     pub discord_meta: DiscordUser,
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
 }
 

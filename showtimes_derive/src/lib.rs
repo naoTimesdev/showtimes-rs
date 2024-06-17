@@ -46,19 +46,29 @@ fn impl_db_model(ast: &syn::DeriveInput) -> TokenStream {
                     );
                 }
 
-                // Check if the field has the `#[serde(skip_serializing)]` attribute
+                // Check if the field has the `#[serde(skip_serializing_if = "Object::is_none")]` attribute
                 let has_skip_serializing = id_field.attrs.iter().any(|attr| {
                     attr.path().is_ident("serde")
-                        && attr
-                            .parse_args::<syn::Meta>()
-                            .map_or(false, |meta| meta.path().is_ident("skip_serializing"))
+                        && attr.parse_args::<syn::Meta>().map_or(false, |meta| {
+                            if let syn::Meta::NameValue(meta) = meta {
+                                if let syn::Expr::Lit(lit) = &meta.value {
+                                    if let syn::Lit::Str(litstr) = &lit.lit {
+                                        return litstr.token().to_string() == "\"Option::is_none\""
+                                            && meta.path.is_ident("skip_serializing_if");
+                                    }
+                                }
+                                return false;
+                            } else {
+                                false
+                            }
+                        })
                 });
 
                 if !has_skip_serializing {
                     return TokenStream::from(
                         syn::Error::new_spanned(
                             id_field,
-                            "The `_id` field must have the `#[serde(skip_serializing)]` attribute",
+                            r#"The `_id` field must have the `#[serde(skip_serializing_if = "Object::is_none")]` attribute"#,
                         )
                         .to_compile_error(),
                     );
@@ -115,6 +125,14 @@ fn impl_db_model(ast: &syn::DeriveInput) -> TokenStream {
         impl #name {
             pub fn id(&self) -> Option<mongodb::bson::oid::ObjectId> {
                 self._id.clone()
+            }
+
+            pub fn set_id(&mut self, id: mongodb::bson::oid::ObjectId) {
+                self._id = Some(id);
+            }
+
+            pub fn unset_id(&mut self) {
+                self._id = None;
             }
 
             pub fn collection_name() -> &'static str {

@@ -379,7 +379,7 @@ pub struct Project {
     pub creator: showtimes_shared::ulid::Ulid,
     /// The type of the project.
     pub kind: ProjectType,
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
 }
 

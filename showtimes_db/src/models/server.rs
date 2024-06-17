@@ -59,7 +59,7 @@ pub struct Server {
     pub owners: Vec<ServerUser>,
     /// The server's avatar/icon
     pub avatar: Option<ImageMetadata>,
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
 }
 
@@ -76,7 +76,7 @@ pub struct ServerCollaborationSync {
     /// The list of servers
     #[serde(serialize_with = "ser_ulid_list", deserialize_with = "de_ulid_list")]
     pub servers: Vec<showtimes_shared::ulid::Ulid>,
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
 }
 
@@ -102,6 +102,6 @@ pub struct ServerCollaborationInvite {
     pub source: ServerCollaborationInviteInfo,
     /// The target server
     pub target: ServerCollaborationInviteInfo,
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
 }
