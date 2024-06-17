@@ -9,6 +9,7 @@ homepage.workspace = true
 description = "Shared utility for Showtimes API"
 
 [dependencies]
+anyhow.workspace = true
 uuid.workspace = true
 ulid.workspace = true
 serde.workspace = true

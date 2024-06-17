@@ -2175,6 +2175,7 @@ version = "0.1.0"
 name = "showtimes-shared"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "serde",
  "ulid",
