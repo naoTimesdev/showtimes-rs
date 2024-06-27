@@ -225,7 +225,7 @@ pub fn create_handler(input: TokenStream) -> TokenStream {
             #[doc = "collection"]
             pub async fn find_all(&self) -> anyhow::Result<Vec<#model_ident>> {
                 let col = self.col.lock().await;
-                let mut cursor = col.find(None, None).await?;
+                let mut cursor = col.find(mongodb::bson::doc! {}).await?;
                 let mut results = Vec::new();
 
                 while let Some(result) = cursor.try_next().await? {
@@ -240,8 +240,7 @@ pub fn create_handler(input: TokenStream) -> TokenStream {
             #[doc = "collection"]
             pub async fn find_by_oid(&self, id: &mongodb::bson::oid::ObjectId) -> anyhow::Result<Option<#model_ident>> {
                 let col = self.col.lock().await;
-                let filter = mongodb::bson::doc! { "_id": id };
-                let result = col.find_one(filter, None).await?;
+                let result = col.find_one(mongodb::bson::doc! { "_id": id }).await?;
                 Ok(result)
             }
 
@@ -250,8 +249,7 @@ pub fn create_handler(input: TokenStream) -> TokenStream {
             #[doc = "collection"]
             pub async fn find_by_id(&self, id: &str) -> anyhow::Result<Option<#model_ident>> {
                 let col = self.col.lock().await;
-                let filter = mongodb::bson::doc! { "id": id };
-                let result = col.find_one(filter, None).await?;
+                let result = col.find_one(mongodb::bson::doc! { "id": id }).await?;
                 Ok(result)
             }
 
@@ -263,7 +261,7 @@ pub fn create_handler(input: TokenStream) -> TokenStream {
                 filter: mongodb::bson::Document,
             ) -> anyhow::Result<Option<#model_ident>> {
                 let col = self.col.lock().await;
-                let result = col.find_one(filter, None).await?;
+                let result = col.find_one(filter).await?;
                 Ok(result)
             }
 
@@ -275,7 +273,7 @@ pub fn create_handler(input: TokenStream) -> TokenStream {
                 filter: mongodb::bson::Document,
             ) -> anyhow::Result<Vec<#model_ident>> {
                 let col = self.col.lock().await;
-                let mut cursor = col.find(filter, None).await?;
+                let mut cursor = col.find(filter).await?;
                 let mut results = Vec::new();
 
                 while let Some(result) = cursor.try_next().await? {
@@ -296,7 +294,7 @@ pub fn create_handler(input: TokenStream) -> TokenStream {
                         doc.set_id(mongodb::bson::oid::ObjectId::new());
                     }
                 }
-                col.insert_many(docs, None).await?;
+                col.insert_many(docs).await?;
                 Ok(())
             }
 
@@ -323,7 +321,7 @@ pub fn create_handler(input: TokenStream) -> TokenStream {
                 wc.journal = Some(true);
                 options.write_concern = Some(wc);
 
-                match col.find_one_and_update(filter, update, Some(options)).await? {
+                match col.find_one_and_update(filter, update).with_options(options).await? {
                     Some(result) => Ok(result),
                     None => anyhow::bail!("Failed to update document"),
                 }
@@ -358,7 +356,7 @@ pub fn create_handler(input: TokenStream) -> TokenStream {
                     .return_document(Some(mongodb::options::ReturnDocument::After))
                     .build();
 
-                match col.find_one_and_replace(filter, &(*doc), Some(options)).await? {
+                match col.find_one_and_replace(filter, &(*doc)).with_options(options).await? {
                     Some(result) => {
                         match mongodb::bson::to_bson(&result)? {
                             mongodb::bson::Bson::Document(dd) => {
@@ -385,7 +383,7 @@ pub fn create_handler(input: TokenStream) -> TokenStream {
                 }
 
                 let filter = mongodb::bson::doc! { "_id": doc.id().unwrap() };
-                Ok(col.delete_one(filter, None).await?)
+                Ok(col.delete_one(filter).await?)
             }
 
             #[doc = "Delete documents in the"]
@@ -393,7 +391,7 @@ pub fn create_handler(input: TokenStream) -> TokenStream {
             #[doc = "collection by filter"]
             pub async fn delete_by(&self, filter: mongodb::bson::Document) -> anyhow::Result<mongodb::results::DeleteResult> {
                 let col = self.col.lock().await;
-                Ok(col.delete_one(filter, None).await?)
+                Ok(col.delete_one(filter).await?)
             }
         }
     };
