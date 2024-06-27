@@ -85,3 +85,12 @@ impl VndbNovel {
             .map(|t| t.title.clone())
     }
 }
+
+/// The VNDB API results
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct VndbResult {
+    /// The results itself
+    pub results: Vec<VndbNovel>,
+    /// Is there more results?
+    pub more: bool,
+}
