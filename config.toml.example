@@ -1,0 +1,46 @@
+# Host and port for the server
+host = "127.0.0.1"
+port = 5560
+# Master key for the server
+master_key = "masterkey"
+
+# Database connection string
+[database]
+# MongoDB connection string
+mongodb = "mongodb://localhost:27017"
+# Name of the database
+mongodb_db = "naotimes"
+# Redis-adjacent (Valkey, etc) connecting string
+redis = "redis://localhost:6379/0"
+
+# Meilisearch config
+[search]
+# Meilisearch URL
+meili_url = "https://your.meilisearch.instance"
+# Meilisearch key, allow write access to the index
+meili_key = "meilisearch-api-key-or-master-key"
+
+# Discord OAuth2
+[discord]
+client_id = "00000000000000000000"
+client_secret = "supersecretdiscordclientsecret"
+
+# External or metadata services API key
+[external]
+# VNDB Token
+vndb = "your-valid-token-for-vndb"
+# TMDB Token
+tmdb = "your-valid-token-for-tmdb"
+
+# Local storage path
+[storages.local]
+path = "./storages"
+
+# S3 storage
+# This can be commented out if you don't want to use S3
+[storages.s3]
+bucket = "naotimes"
+access_key = ""
+secret_key = ""
+# Full URL to the endpoint, without the protocol
+region = "ap-southeast-1"
