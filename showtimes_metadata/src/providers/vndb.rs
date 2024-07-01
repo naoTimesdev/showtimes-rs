@@ -16,7 +16,7 @@ impl VndbProvider {
     /// * `token` - The VNDB API token
     pub fn new(token: impl Into<String>) -> Self {
         let ua_bind = reqwest::header::HeaderValue::from_str(&format!(
-            "showtimes-rs-ext/{}",
+            "showtimes-rs-metadata/{}",
             env!("CARGO_PKG_VERSION")
         ))
         .unwrap();
