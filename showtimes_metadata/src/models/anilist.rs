@@ -88,6 +88,7 @@ pub struct AnilistMedia {
     pub format: AnilistMediaFormat,
     #[serde(rename = "type")]
     pub kind: AnilistMediaType,
+    pub description: Option<String>,
     #[serde(rename = "isAdult")]
     pub is_adult: bool,
 }
@@ -129,6 +130,12 @@ impl AnilistPaginatedNodes {
             _ => None,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct AnilistAiringSchedulePaged {
+    pub airing_schedules: Vec<AnilistAiringSchedule>,
+    pub page_info: AnilistPageInfo,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
