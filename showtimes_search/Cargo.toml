@@ -9,3 +9,9 @@ homepage.workspace = true
 description = "A simple wrapper for Showtimes API Meilisearch instance"
 
 [dependencies]
+serde.workspace = true
+meilisearch-sdk.workspace = true
+
+showtimes-shared = { path = "../showtimes_shared" }
+showtimes-derive = { path = "../showtimes_derive" }
+showtimes-db = { path = "../showtimes_db" }
