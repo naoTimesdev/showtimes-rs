@@ -29,7 +29,7 @@ impl Default for SearchModelAttr {
 fn extract_array_ident(
     value: Expr,
     name: &str,
-    fields: &Vec<String>,
+    fields: &[String],
 ) -> Result<Vec<String>, syn::Error> {
     let mut result = Vec::new();
     if let Expr::Array(ref filterable) = value {
@@ -67,46 +67,39 @@ fn get_searchmodel_attr(
             let nested = attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
 
             for meta in nested {
-                match meta {
-                    Meta::NameValue(nameval) => {
-                        if nameval.path.is_ident("name") && model_name.is_empty() {
-                            if let Expr::Lit(name) = nameval.value {
-                                if let Lit::Str(name) = name.lit {
-                                    model_name = name.value();
-                                }
+                if let Meta::NameValue(nameval) = meta {
+                    if nameval.path.is_ident("name") && model_name.is_empty() {
+                        if let Expr::Lit(name) = nameval.value {
+                            if let Lit::Str(name) = name.lit {
+                                model_name = name.value();
                             }
-                        } else if nameval.path.is_ident("filterable") {
-                            let filterable =
-                                extract_array_ident(nameval.value, "filterable", fields)?;
-                            model_filters = filterable;
-                        } else if nameval.path.is_ident("searchable") {
-                            let searchable =
-                                extract_array_ident(nameval.value, "searchable", fields)?;
-                            if searchable.is_empty() {
-                                // Default to all fields
-                                model_searchable = fields.clone();
-                            } else {
-                                model_searchable = searchable;
-                            }
-                        } else if nameval.path.is_ident("sortable") {
-                            let sortable = extract_array_ident(nameval.value, "sortable", fields)?;
-                            model_sortable = sortable;
-                        } else if nameval.path.is_ident("displayed") {
-                            let displayed =
-                                extract_array_ident(nameval.value, "displayed", fields)?;
-                            if !displayed.is_empty() {
-                                model_displayed = displayed;
-                            }
-                        } else if nameval.path.is_ident("distinct") {
-                            if let Expr::Lit(name) = nameval.value {
-                                if let Lit::Str(name) = name.lit {
-                                    model_distinct = Some(name.value());
-                                }
+                        }
+                    } else if nameval.path.is_ident("filterable") {
+                        let filterable = extract_array_ident(nameval.value, "filterable", fields)?;
+                        model_filters = filterable;
+                    } else if nameval.path.is_ident("searchable") {
+                        let searchable = extract_array_ident(nameval.value, "searchable", fields)?;
+                        if searchable.is_empty() {
+                            // Default to all fields
+                            model_searchable = fields.clone();
+                        } else {
+                            model_searchable = searchable;
+                        }
+                    } else if nameval.path.is_ident("sortable") {
+                        let sortable = extract_array_ident(nameval.value, "sortable", fields)?;
+                        model_sortable = sortable;
+                    } else if nameval.path.is_ident("displayed") {
+                        let displayed = extract_array_ident(nameval.value, "displayed", fields)?;
+                        if !displayed.is_empty() {
+                            model_displayed = displayed;
+                        }
+                    } else if nameval.path.is_ident("distinct") {
+                        if let Expr::Lit(name) = nameval.value {
+                            if let Lit::Str(name) = name.lit {
+                                model_distinct = Some(name.value());
                             }
                         }
                     }
-
-                    _ => {}
                 }
             }
         }

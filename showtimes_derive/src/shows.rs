@@ -37,7 +37,7 @@ pub(crate) fn expand_showmodel(ast: &syn::DeriveInput) -> TokenStream {
                                             && meta.path.is_ident("skip_serializing_if");
                                     }
                                 }
-                                return false;
+                                false
                             } else {
                                 false
                             }
