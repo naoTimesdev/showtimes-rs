@@ -1,5 +1,6 @@
 use proc_macro::TokenStream;
 
+mod search;
 mod shows;
 
 /// Derive the `DbModel` trait for a struct
@@ -39,4 +40,26 @@ pub fn create_handler(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as shows::CreateHandler);
 
     shows::expand_handler(&input)
+}
+
+/// Derive the `SearchModel` trait for a struct
+///
+/// # Examples
+/// ```
+/// #[derive(SearchModel)]
+/// #[search(name = "Project", filterable = ["id"], searchable = ["name"], sortable = ["created"])]
+/// pub struct Project {
+///    #[primary_key]
+///    id: String,
+///    name: String,
+///    created: i64,
+/// }
+/// ```
+#[proc_macro_derive(SearchModel, attributes(search, primary_key))]
+pub fn derive_search_model(input: TokenStream) -> TokenStream {
+    // Parse the input tokens into a syntax tree
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+
+    // Generate the implementation of the trait
+    search::expand_searchmodel(&input)
 }
