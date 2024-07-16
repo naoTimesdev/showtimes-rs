@@ -210,23 +210,23 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
             }
 
             /// Get the filterable attributes of the model
-            pub fn search_filterable() -> Vec<&'static str> {
-                vec![#(#model_attr_filter),*]
+            pub fn search_filterable() -> &'static [&'static str] {
+                &[#(#model_attr_filter),*]
             }
 
             /// Get the searchable attributes of the model
-            pub fn search_searchable() -> Vec<&'static str> {
-                vec![#(#model_attr_search),*]
+            pub fn search_searchable() -> &'static [&'static str] {
+                &[#(#model_attr_search),*]
             }
 
             /// Get the sortable attributes of the model
-            pub fn search_sortable() -> Vec<&'static str> {
-                vec![#(#model_attr_sort),*]
+            pub fn search_sortable() -> &'static [&'static str] {
+                &[#(#model_attr_sort),*]
             }
 
             /// Get the displayed attributes of the model
-            pub fn search_displayed() -> Vec<&'static str> {
-                vec![#(#model_attr_display),*]
+            pub fn search_displayed() -> &'static [&'static str] {
+                &[#(#model_attr_display),*]
             }
 
             /// Get the distinct attribute of the model
