@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
-use showtimes_shared::{
-    de_opt_ulid, de_opt_unix, de_ulid, def_ulid, ser_opt_ulid, ser_opt_unix, ser_ulid,
-};
+use showtimes_shared::{bson_datetime_opt_serializer, ulid_opt_serializer, ulid_serializer};
 
 use super::common::{ImageMetadata, IntegrationId};
 
@@ -240,7 +238,7 @@ pub struct RoleAssignee {
     /// The key associated with the assignee.
     key: String,
     /// The assignee itself, if null then it's not assigned.
-    #[serde(serialize_with = "ser_opt_ulid", deserialize_with = "de_opt_ulid")]
+    #[serde(with = "ulid_opt_serializer")]
     actor: Option<showtimes_shared::ulid::Ulid>,
 }
 
@@ -323,7 +321,7 @@ pub struct EpisodeProgress {
     /// Is the episode/chapter finished/released.
     pub finished: bool,
     /// The airing/release date of the episode/chapter.
-    #[serde(serialize_with = "ser_opt_unix", deserialize_with = "de_opt_unix")]
+    #[serde(with = "bson_datetime_opt_serializer")]
     pub aired: Option<chrono::DateTime<chrono::Utc>>,
     /// The list of roles in the episode/chapter.
     pub statuses: Vec<RoleStatus>,
@@ -348,11 +346,7 @@ impl EpisodeProgress {
 #[col_name("ShowtimesProjects")]
 pub struct Project {
     /// The ID of the project.
-    #[serde(
-        serialize_with = "ser_ulid",
-        deserialize_with = "de_ulid",
-        default = "def_ulid"
-    )]
+    #[serde(with = "ulid_serializer", default = "ulid_serializer::default")]
     pub id: showtimes_shared::ulid::Ulid,
     /// The title of the project.
     pub title: String,
@@ -371,11 +365,7 @@ pub struct Project {
     /// Can be used to link to other services like Discord or FansubDB.
     pub integrations: Vec<IntegrationId>,
     /// The server ID creator of the project.
-    #[serde(
-        serialize_with = "ser_ulid",
-        deserialize_with = "de_ulid",
-        default = "def_ulid"
-    )]
+    #[serde(with = "ulid_serializer", default = "ulid_serializer::default")]
     pub creator: showtimes_shared::ulid::Ulid,
     /// The type of the project.
     pub kind: ProjectType,
@@ -394,7 +384,7 @@ impl Project {
         validate_name(&title)?;
 
         Ok(Project {
-            id: def_ulid(),
+            id: ulid_serializer::default(),
             title,
             creator,
             kind,
@@ -413,7 +403,7 @@ impl Project {
         validate_name(&title)?;
 
         Ok(Project {
-            id: def_ulid(),
+            id: ulid_serializer::default(),
             title,
             poster,
             creator,
@@ -437,7 +427,7 @@ impl Project {
         let assignees: Vec<RoleAssignee> = roles.iter().map(RoleAssignee::from).collect();
 
         Ok(Project {
-            id: def_ulid(),
+            id: ulid_serializer::default(),
             title,
             poster,
             roles,
@@ -461,7 +451,7 @@ impl Project {
         validate_name(&title)?;
 
         Ok(Project {
-            id: def_ulid(),
+            id: ulid_serializer::default(),
             title,
             poster,
             roles,

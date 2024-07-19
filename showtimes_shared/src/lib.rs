@@ -66,7 +66,7 @@ impl PrefixUlid {
         Self::verify_prefix(&prefix)?;
         Ok(Self {
             prefix,
-            ulid: def_ulid(),
+            ulid: ulid_serializer::default(),
         })
     }
 
@@ -128,88 +128,136 @@ impl<'de> serde::Deserialize<'de> for PrefixUlid {
     }
 }
 
-/// Default value for [`ulid::Ulid`]
-///
-/// Used for serde
-pub fn def_ulid() -> ulid::Ulid {
-    uuid_to_ulid(generate_uuid())
-}
+pub mod ulid_serializer {
+    use super::*;
 
-/// Serialize [`ulid::Ulid`] to string
-///
-/// Used for serde serialization
-pub fn ser_ulid<S>(ulid: &ulid::Ulid, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    serializer.serialize_str(&ulid.to_string())
-}
+    /// Default value for [`ulid::Ulid`]
+    ///
+    /// Used for serde
+    pub fn default() -> ulid::Ulid {
+        uuid_to_ulid(generate_uuid())
+    }
 
-/// Serialize an optional [`ulid::Ulid`] to string
-///
-/// Used for serde serialization
-pub fn ser_opt_ulid<S>(ulid: &Option<ulid::Ulid>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    match ulid {
-        Some(ulid) => serializer.serialize_str(&ulid.to_string()),
-        None => serializer.serialize_none(),
+    /// Serialize [`ulid::Ulid`] to string
+    ///
+    /// Used for serde serialization
+    pub fn serialize<S>(ulid: &ulid::Ulid, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&ulid.to_string())
+    }
+
+    /// Deserialize string to [`ulid::Ulid`]
+    ///
+    /// Used for serde deserialization
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<ulid::Ulid, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        ulid::Ulid::from_string(&s).map_err(serde::de::Error::custom)
     }
 }
 
-/// Serialize a list of [`ulid::Ulid`] to a list of strings
-///
-/// Used for serde serialization
-pub fn ser_ulid_list<S>(ulids: &[ulid::Ulid], serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    let mut seq = serializer.serialize_seq(Some(ulids.len()))?;
-    for ulid in ulids {
-        seq.serialize_element(&ulid.to_string())?;
+pub mod ulid_opt_serializer {
+    use super::*;
+
+    /// Serialize an optional [`ulid::Ulid`] to string
+    ///
+    /// Used for serde serialization
+    pub fn serialize<S>(ulid: &Option<ulid::Ulid>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match ulid {
+            Some(ulid) => serializer.serialize_str(&ulid.to_string()),
+            None => serializer.serialize_none(),
+        }
     }
-    seq.end()
-}
 
-/// Deserialize string to [`ulid::Ulid`]
-///
-/// Used for serde deserialization
-pub fn de_ulid<'de, D>(deserializer: D) -> Result<ulid::Ulid, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    ulid::Ulid::from_string(&s).map_err(serde::de::Error::custom)
-}
-
-/// Deserialize optional string to optional [`ulid::Ulid`]
-///
-/// Used for serde deserialization
-pub fn de_opt_ulid<'de, D>(deserializer: D) -> Result<Option<ulid::Ulid>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let s = Option::<String>::deserialize(deserializer)?;
-    match s {
-        Some(s) => ulid::Ulid::from_string(&s)
-            .map(Some)
-            .map_err(serde::de::Error::custom),
-        None => Ok(None),
+    /// Deserialize optional string to optional [`ulid::Ulid`]
+    ///
+    /// Used for serde deserialization
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<ulid::Ulid>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = Option::<String>::deserialize(deserializer)?;
+        match s {
+            Some(s) => ulid::Ulid::from_string(&s)
+                .map(Some)
+                .map_err(serde::de::Error::custom),
+            None => Ok(None),
+        }
     }
 }
 
-/// Deserialize list of strings to list of [`ulid::Ulid`]
-///
-/// Used for serde deserialization
-pub fn de_ulid_list<'de, D>(deserializer: D) -> Result<Vec<ulid::Ulid>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let s = Vec::<String>::deserialize(deserializer)?;
-    s.iter()
-        .map(|s| ulid::Ulid::from_string(s).map_err(serde::de::Error::custom))
-        .collect()
+pub mod ulid_list_serializer {
+    use super::*;
+
+    /// Serialize a list of [`ulid::Ulid`] to a list of strings
+    ///
+    /// Used for serde serialization
+    pub fn serialize<S>(ulids: &[ulid::Ulid], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(ulids.len()))?;
+        for ulid in ulids {
+            seq.serialize_element(&ulid.to_string())?;
+        }
+        seq.end()
+    }
+
+    /// Deserialize list of strings to list of [`ulid::Ulid`]
+    ///
+    /// Used for serde deserialization
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<ulid::Ulid>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = Vec::<String>::deserialize(deserializer)?;
+        s.iter()
+            .map(|s| ulid::Ulid::from_string(s).map_err(serde::de::Error::custom))
+            .collect()
+    }
+}
+
+pub mod bson_datetime_opt_serializer {
+    use super::*;
+    use bson::DateTime;
+    use chrono::Utc;
+    use serde::Serialize;
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<chrono::DateTime<Utc>>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match DateTime::deserialize(deserializer) {
+            Ok(dt) => {
+                let dt = dt.to_chrono();
+                Ok(Some(dt))
+            }
+            Err(_) => Ok(None),
+        }
+    }
+
+    pub fn serialize<S>(
+        date: &Option<chrono::DateTime<Utc>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match date {
+            Some(date) => {
+                let dt = DateTime::from_chrono(*date);
+                dt.serialize(serializer)
+            }
+            None => serializer.serialize_none(),
+        }
+    }
 }
 
 pub fn ser_opt_unix<S>(

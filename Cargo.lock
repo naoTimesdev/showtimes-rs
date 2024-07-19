@@ -361,6 +361,7 @@ dependencies = [
  "ahash",
  "base64 0.13.1",
  "bitvec",
+ "chrono",
  "hex",
  "indexmap",
  "js-sys",
@@ -2512,6 +2513,7 @@ name = "showtimes-db"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bson",
  "chrono",
  "futures",
  "mongodb",
@@ -2581,6 +2583,7 @@ name = "showtimes-shared"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bson",
  "chrono",
  "serde",
  "ulid",

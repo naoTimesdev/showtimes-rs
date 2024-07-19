@@ -14,3 +14,4 @@ uuid.workspace = true
 ulid.workspace = true
 serde.workspace = true
 chrono.workspace = true
+bson.workspace = true

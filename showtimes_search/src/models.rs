@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use showtimes_derive::SearchModel;
-use showtimes_shared::{de_ulid, def_ulid, ser_ulid};
+use showtimes_shared::ulid_serializer;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
@@ -10,11 +10,7 @@ use showtimes_shared::{de_ulid, def_ulid, ser_ulid};
 )]
 pub struct Project {
     /// The unique identifier of the project
-    #[serde(
-        serialize_with = "ser_ulid",
-        deserialize_with = "de_ulid",
-        default = "def_ulid"
-    )]
+    #[serde(with = "ulid_serializer", default = "ulid_serializer::default")]
     #[primary_key]
     pub id: showtimes_shared::ulid::Ulid,
     /// The title of the project
@@ -26,11 +22,7 @@ pub struct Project {
     /// The aliases of the project
     pub aliases: Vec<String>,
     /// The parent server or creator
-    #[serde(
-        serialize_with = "ser_ulid",
-        deserialize_with = "de_ulid",
-        default = "def_ulid"
-    )]
+    #[serde(with = "ulid_serializer", default = "ulid_serializer::default")]
     pub parent: showtimes_shared::ulid::Ulid,
 }
 

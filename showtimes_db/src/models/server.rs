@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use showtimes_shared::{de_opt_ulid, de_ulid, de_ulid_list, ser_opt_ulid, ser_ulid, ser_ulid_list};
+use showtimes_shared::{ulid_list_serializer, ulid_opt_serializer, ulid_serializer};
 
 use super::{ImageMetadata, IntegrationId};
 
@@ -31,7 +31,7 @@ pub enum UserPrivilege {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerUser {
     /// The associated user ID
-    #[serde(serialize_with = "ser_ulid", deserialize_with = "de_ulid")]
+    #[serde(with = "ulid_serializer")]
     pub id: showtimes_shared::ulid::Ulid,
     /// The user's privilege
     pub privilege: UserPrivilege,
@@ -49,7 +49,7 @@ pub struct ServerUser {
 #[col_name("ShowtimesServers")]
 pub struct Server {
     /// The server's ID
-    #[serde(serialize_with = "ser_ulid", deserialize_with = "de_ulid")]
+    #[serde(with = "ulid_serializer")]
     pub id: showtimes_shared::ulid::Ulid,
     /// The server's name
     pub name: String,
@@ -68,13 +68,13 @@ pub struct Server {
 #[col_name("ShowtimesCollaborationSync")]
 pub struct ServerCollaborationSync {
     /// The collaboration ID
-    #[serde(serialize_with = "ser_ulid", deserialize_with = "de_ulid")]
+    #[serde(with = "ulid_serializer")]
     pub id: showtimes_shared::ulid::Ulid,
     /// The list of projects
-    #[serde(serialize_with = "ser_ulid_list", deserialize_with = "de_ulid_list")]
+    #[serde(with = "ulid_list_serializer")]
     pub projects: Vec<showtimes_shared::ulid::Ulid>,
     /// The list of servers
-    #[serde(serialize_with = "ser_ulid_list", deserialize_with = "de_ulid_list")]
+    #[serde(with = "ulid_list_serializer")]
     pub servers: Vec<showtimes_shared::ulid::Ulid>,
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
@@ -84,10 +84,10 @@ pub struct ServerCollaborationSync {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerCollaborationInviteInfo {
     /// The server ID
-    #[serde(serialize_with = "ser_ulid", deserialize_with = "de_ulid")]
+    #[serde(with = "ulid_serializer")]
     pub server: showtimes_shared::ulid::Ulid,
     /// The project ID (can be null)
-    #[serde(serialize_with = "ser_opt_ulid", deserialize_with = "de_opt_ulid")]
+    #[serde(with = "ulid_opt_serializer")]
     pub project: Option<showtimes_shared::ulid::Ulid>,
 }
 
@@ -96,7 +96,7 @@ pub struct ServerCollaborationInviteInfo {
 #[col_name("ShowtimesCollaborationInvite")]
 pub struct ServerCollaborationInvite {
     /// The collab invite ID (unique, and used as invite code too)
-    #[serde(serialize_with = "ser_ulid", deserialize_with = "de_ulid")]
+    #[serde(with = "ulid_serializer")]
     pub id: showtimes_shared::ulid::Ulid,
     /// The source server
     pub source: ServerCollaborationInviteInfo,

@@ -45,6 +45,7 @@ tower-http = { version = "0.5.2", features = ["cors", "trace"] }
 
 # Database
 mongodb = { version = "3.0.1", features = ["rustls-tls"] }
+bson = { version = "2.11.0", features = ["chrono-0_4"] }
 redis = { version = "0.25.4", features = ["tokio-comp"] }
 s3-tokio = { version = "0.39.4", features = ["tracing"] }
 meilisearch-sdk = "0.27.0"

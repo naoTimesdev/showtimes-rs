@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use showtimes_shared::{de_ulid, def_ulid, generate_uuid, ser_ulid};
+use showtimes_shared::{generate_uuid, ulid_serializer};
 
 use super::ImageMetadata;
 
@@ -36,11 +36,7 @@ pub struct DiscordUser {
 #[col_name("ShowtimesUsers")]
 pub struct User {
     /// The user's ID
-    #[serde(
-        serialize_with = "ser_ulid",
-        deserialize_with = "de_ulid",
-        default = "def_ulid"
-    )]
+    #[serde(with = "ulid_serializer", default = "ulid_serializer::default")]
     pub id: showtimes_shared::ulid::Ulid,
     /// The user's username
     ///
@@ -64,7 +60,7 @@ impl User {
     /// Create a new user
     pub fn new(username: String, discord_meta: DiscordUser) -> Self {
         Self {
-            id: def_ulid(),
+            id: ulid_serializer::default(),
             username,
             avatar: None,
             api_key: generate_uuid().to_string(),
@@ -77,7 +73,7 @@ impl User {
     /// Create a new admin user
     pub fn new_admin(username: String, discord_meta: DiscordUser) -> Self {
         Self {
-            id: def_ulid(),
+            id: ulid_serializer::default(),
             username,
             avatar: None,
             api_key: generate_uuid().to_string(),
