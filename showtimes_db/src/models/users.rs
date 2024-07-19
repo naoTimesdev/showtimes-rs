@@ -5,9 +5,10 @@ use showtimes_shared::{generate_uuid, ulid_serializer};
 use super::{ImageMetadata, ShowModelHandler};
 
 /// Enum to hold user kinds
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum UserKind {
     /// A normal user
+    #[default]
     User,
     /// An admin user
     Admin,

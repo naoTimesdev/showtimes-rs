@@ -2571,11 +2571,14 @@ version = "0.1.0"
 name = "showtimes-search"
 version = "0.1.0"
 dependencies = [
+ "bson",
+ "chrono",
  "meilisearch-sdk",
  "serde",
  "showtimes-db",
  "showtimes-derive",
  "showtimes-shared",
+ "tokio",
 ]
 
 [[package]]
