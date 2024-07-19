@@ -57,7 +57,7 @@ fn get_searchmodel_attr(
 ) -> Result<SearchModelAttr, syn::Error> {
     let mut model_name = String::new();
     let mut model_filters = Vec::new();
-    let mut model_searchable = Vec::new();
+    let mut model_searchable = vec!["*".to_string()];
     let mut model_sortable = Vec::new();
     let mut model_displayed = vec!["*".to_string()];
     let mut model_distinct = None;
@@ -79,10 +79,7 @@ fn get_searchmodel_attr(
                         model_filters = filterable;
                     } else if nameval.path.is_ident("searchable") {
                         let searchable = extract_array_ident(nameval.value, "searchable", fields)?;
-                        if searchable.is_empty() {
-                            // Default to all fields
-                            model_searchable = fields.clone();
-                        } else {
+                        if !searchable.is_empty() {
                             model_searchable = searchable;
                         }
                     } else if nameval.path.is_ident("sortable") {
