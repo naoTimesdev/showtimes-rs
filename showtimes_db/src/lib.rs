@@ -27,6 +27,11 @@ pub struct Connection {
     pub db: DatabaseMutex,
 }
 
+/// Create a connection to the MongoDB server
+///
+/// # Arguments
+/// - `url` - The URL of the MongoDB server.
+///           This is formatted as `mongodb://<host>:<port>`
 pub async fn create_connection(url: &str) -> anyhow::Result<Connection> {
     let mut options = ClientOptions::parse(url).await?;
     let client_name = format!("showtimes-rs-db/{}", env!("CARGO_PKG_VERSION"));
