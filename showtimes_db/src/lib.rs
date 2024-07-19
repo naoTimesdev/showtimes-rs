@@ -1,5 +1,6 @@
 pub mod models;
 
+use bson::doc;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -33,15 +34,23 @@ pub struct Connection {
 /// - `url` - The URL of the MongoDB server.
 ///           This is formatted as `mongodb://<host>:<port>`
 pub async fn create_connection(url: &str) -> anyhow::Result<Connection> {
+    // Parse the connection string
     let mut options = ClientOptions::parse(url).await?;
-    let client_name = format!("showtimes-rs-db/{}", env!("CARGO_PKG_VERSION"));
 
+    // Attach our client name
+    let client_name = format!("showtimes-rs-db/{}", env!("CARGO_PKG_VERSION"));
     options.app_name = Some(client_name);
 
+    // Create the client
     let client = mongodb::Client::with_options(options)?;
 
-    // get showtimes_db database
+    // Get the `showtimes_db` database
     let db = client.database("showtimes_db");
+
+    // Test the connection
+    db.run_command(doc! { "ping": 1 }).await?;
+
+    // It works! Return the client and db with Arc<Mutex<T>>
     Ok(Connection {
         client: Arc::new(Mutex::new(client)),
         db: Arc::new(Mutex::new(db)),
