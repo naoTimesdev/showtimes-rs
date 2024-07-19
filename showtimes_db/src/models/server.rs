@@ -1,3 +1,4 @@
+use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
 use showtimes_shared::{ulid_list_serializer, ulid_opt_serializer, ulid_serializer};
 
@@ -61,6 +62,16 @@ pub struct Server {
     pub avatar: Option<ImageMetadata>,
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
+    #[serde(
+        with = "chrono_datetime_as_bson_datetime",
+        default = "chrono::Utc::now"
+    )]
+    pub created: chrono::DateTime<chrono::Utc>,
+    #[serde(
+        with = "chrono_datetime_as_bson_datetime",
+        default = "chrono::Utc::now"
+    )]
+    pub updated: chrono::DateTime<chrono::Utc>,
 }
 
 /// A model to hold server synchronization information on a project
@@ -78,6 +89,16 @@ pub struct ServerCollaborationSync {
     pub servers: Vec<showtimes_shared::ulid::Ulid>,
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
+    #[serde(
+        with = "chrono_datetime_as_bson_datetime",
+        default = "chrono::Utc::now"
+    )]
+    pub created: chrono::DateTime<chrono::Utc>,
+    #[serde(
+        with = "chrono_datetime_as_bson_datetime",
+        default = "chrono::Utc::now"
+    )]
+    pub updated: chrono::DateTime<chrono::Utc>,
 }
 
 /// An information for a collaboration invite
@@ -104,4 +125,14 @@ pub struct ServerCollaborationInvite {
     pub target: ServerCollaborationInviteInfo,
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
+    #[serde(
+        with = "chrono_datetime_as_bson_datetime",
+        default = "chrono::Utc::now"
+    )]
+    pub created: chrono::DateTime<chrono::Utc>,
+    #[serde(
+        with = "chrono_datetime_as_bson_datetime",
+        default = "chrono::Utc::now"
+    )]
+    pub updated: chrono::DateTime<chrono::Utc>,
 }

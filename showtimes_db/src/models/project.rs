@@ -1,3 +1,4 @@
+use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
 use showtimes_shared::{bson_datetime_opt_serializer, ulid_opt_serializer, ulid_serializer};
 
@@ -371,6 +372,16 @@ pub struct Project {
     pub kind: ProjectType,
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
+    #[serde(
+        with = "chrono_datetime_as_bson_datetime",
+        default = "chrono::Utc::now"
+    )]
+    pub created: chrono::DateTime<chrono::Utc>,
+    #[serde(
+        with = "chrono_datetime_as_bson_datetime",
+        default = "chrono::Utc::now"
+    )]
+    pub updated: chrono::DateTime<chrono::Utc>,
 }
 
 impl Project {
@@ -383,11 +394,15 @@ impl Project {
         let title: String = title.into();
         validate_name(&title)?;
 
+        let now = chrono::Utc::now();
+
         Ok(Project {
             id: ulid_serializer::default(),
             title,
             creator,
             kind,
+            created: now,
+            updated: now,
             ..Default::default()
         })
     }
@@ -402,12 +417,16 @@ impl Project {
         let title: String = title.into();
         validate_name(&title)?;
 
+        let now = chrono::Utc::now();
+
         Ok(Project {
             id: ulid_serializer::default(),
             title,
             poster,
             creator,
             kind,
+            created: now,
+            updated: now,
             ..Default::default()
         })
     }
@@ -425,6 +444,7 @@ impl Project {
 
         // generate assignee from roles
         let assignees: Vec<RoleAssignee> = roles.iter().map(RoleAssignee::from).collect();
+        let now = chrono::Utc::now();
 
         Ok(Project {
             id: ulid_serializer::default(),
@@ -434,6 +454,8 @@ impl Project {
             assignees,
             creator,
             kind,
+            created: now,
+            updated: now,
             ..Default::default()
         })
     }
@@ -450,6 +472,8 @@ impl Project {
         let title: String = title.into();
         validate_name(&title)?;
 
+        let now = chrono::Utc::now();
+
         Ok(Project {
             id: ulid_serializer::default(),
             title,
@@ -458,6 +482,8 @@ impl Project {
             assignees,
             creator,
             kind,
+            created: now,
+            updated: now,
             ..Default::default()
         })
     }

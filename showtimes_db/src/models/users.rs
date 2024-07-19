@@ -1,3 +1,4 @@
+use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
 use showtimes_shared::{generate_uuid, ulid_serializer};
 
@@ -54,11 +55,23 @@ pub struct User {
     pub discord_meta: DiscordUser,
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
+    #[serde(
+        with = "chrono_datetime_as_bson_datetime",
+        default = "chrono::Utc::now"
+    )]
+    pub created: chrono::DateTime<chrono::Utc>,
+    #[serde(
+        with = "chrono_datetime_as_bson_datetime",
+        default = "chrono::Utc::now"
+    )]
+    pub updated: chrono::DateTime<chrono::Utc>,
 }
 
 impl User {
     /// Create a new user
     pub fn new(username: String, discord_meta: DiscordUser) -> Self {
+        let now = chrono::Utc::now();
+
         Self {
             id: ulid_serializer::default(),
             username,
@@ -67,11 +80,15 @@ impl User {
             kind: UserKind::User,
             discord_meta,
             _id: None,
+            created: now,
+            updated: now,
         }
     }
 
     /// Create a new admin user
     pub fn new_admin(username: String, discord_meta: DiscordUser) -> Self {
+        let now = chrono::Utc::now();
+
         Self {
             id: ulid_serializer::default(),
             username,
@@ -80,6 +97,8 @@ impl User {
             kind: UserKind::Admin,
             discord_meta,
             _id: None,
+            created: now,
+            updated: now,
         }
     }
 }
