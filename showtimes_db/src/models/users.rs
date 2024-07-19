@@ -2,7 +2,7 @@ use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
 use showtimes_shared::{generate_uuid, ulid_serializer};
 
-use super::ImageMetadata;
+use super::{ImageMetadata, ShowModelHandler};
 
 /// Enum to hold user kinds
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -2,7 +2,7 @@ use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
 use showtimes_shared::{ulid_list_serializer, ulid_opt_serializer, ulid_serializer};
 
-use super::{ImageMetadata, IntegrationId};
+use super::{ImageMetadata, IntegrationId, ShowModelHandler};
 
 /// Enum to hold user privileges on a server.
 ///

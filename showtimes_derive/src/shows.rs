@@ -102,21 +102,25 @@ pub(crate) fn expand_showmodel(ast: &syn::DeriveInput) -> TokenStream {
 
     // Generate the implementation of the trait
     let expanded = quote::quote! {
-        impl #name {
-            pub fn id(&self) -> Option<mongodb::bson::oid::ObjectId> {
+        impl ShowModelHandler for #name {
+            fn id(&self) -> Option<mongodb::bson::oid::ObjectId> {
                 self._id.clone()
             }
 
-            pub fn set_id(&mut self, id: mongodb::bson::oid::ObjectId) {
+            fn set_id(&mut self, id: mongodb::bson::oid::ObjectId) {
                 self._id = Some(id);
             }
 
-            pub fn unset_id(&mut self) {
+            fn unset_id(&mut self) {
                 self._id = None;
             }
 
-            pub fn collection_name() -> &'static str {
+            fn collection_name() -> &'static str {
                 #col_name
+            }
+
+            fn updated(&mut self) {
+                self.updated = chrono::Utc::now();
             }
         }
     };
@@ -257,6 +261,8 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
                 for doc in docs.iter_mut() {
                     if doc.id().is_none() {
                         doc.set_id(mongodb::bson::oid::ObjectId::new());
+                    } else {
+                        doc.updated();
                     }
                 }
                 col.insert_many(docs).await?;
@@ -300,6 +306,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
 
                 let mut wc = mongodb::options::WriteConcern::default();
                 wc.journal = Some(true);
+                doc.updated();
 
                 let mut id_needs_update = false;
                 let filter = match (doc.id(), filter) {

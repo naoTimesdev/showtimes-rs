@@ -2,7 +2,7 @@ use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
 use showtimes_shared::{bson_datetime_opt_serializer, ulid_opt_serializer, ulid_serializer};
 
-use super::common::{ImageMetadata, IntegrationId};
+use super::{ImageMetadata, IntegrationId, ShowModelHandler};
 
 /// The list of enums holding the project kinds.
 #[derive(Debug, Clone, tosho_macros::SerializeEnum, tosho_macros::DeserializeEnum)]

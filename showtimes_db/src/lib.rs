@@ -3,6 +3,7 @@ pub mod models;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use crate::models::ShowModelHandler;
 use futures::stream::TryStreamExt;
 /// A shorthand for the models module
 pub use models as m;
