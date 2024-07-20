@@ -13,11 +13,11 @@ anyhow.workspace = true
 serde.workspace = true
 chrono.workspace = true
 tokio.workspace = true
-futures = "0.3.30"
+futures.workspace = true
 
 mongodb.workspace = true
 bson.workspace = true
 
 showtimes-shared = { path = "../showtimes_shared" }
 showtimes-derive = { path = "../showtimes_derive" }
-tosho-macros = "0.3"
+tosho-macros.workspace = true

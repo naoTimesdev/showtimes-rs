@@ -11,9 +11,10 @@ description = "File storage handler for Showtimes API"
 [dependencies]
 tokio.workspace = true
 anyhow.workspace = true
-s3-tokio.workspace = true
 chrono.workspace = true
-tosho-macros = "0.3"
-futures = "0.3.30"
-bytes = "1"
-mime_guess = "2.0.5"
+futures.workspace = true
+tosho-macros.workspace = true
+
+bytes.workspace = true
+mime_guess.workspace = true
+s3-tokio.workspace = true
