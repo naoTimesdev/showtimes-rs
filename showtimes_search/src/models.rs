@@ -5,7 +5,7 @@ use std::ops::Deref;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
-    name = "nt:projects",
+    name = "nt-projects",
     filterable = ["id", "parent", "created", "title", "aliases"],
     searchable = ["id", "title", "aliases", "parent"], // integrations
     sortable = ["id", "created", "updated"],
@@ -57,7 +57,7 @@ impl From<showtimes_db::m::Project> for Project {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
-    name = "nt:servers",
+    name = "nt-servers",
     filterable = ["id", "created", "name"],
     searchable = ["id", "name"], // integrations
     sortable = ["id", "created", "updated"],
@@ -111,7 +111,7 @@ impl From<showtimes_db::m::Server> for Server {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
-    name = "nt:users",
+    name = "nt-users",
     filterable = ["id", "created", "username", "discord_id", "discord_username", "api_key", "kind"],
     searchable = ["id", "username", "discord_id", "discord_username", "api_key"], // integrations
     sortable = ["id", "created", "updated"],
