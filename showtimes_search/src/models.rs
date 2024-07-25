@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use showtimes_derive::SearchModel;
 use showtimes_shared::{ulid_list_serializer, ulid_serializer};
+use std::ops::Deref;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(

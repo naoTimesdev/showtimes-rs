@@ -287,15 +287,16 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
             }
 
             /// Update the schema of the index according to the model attributes
-            pub async fn update_schema(client: &meilisearch_sdk::client::Client) -> Result<(), meilisearch_sdk::errors::Error> {
-                let index = client.index(#model_attr_name);
+            pub async fn update_schema(client: &std::sync::Arc<tokio::sync::Mutex<meilisearch_sdk::client::Client>>) -> Result<(), meilisearch_sdk::errors::Error> {
+                let client_ref = client.lock().await;
+                let index = client_ref.index(#model_attr_name);
 
-                #name::set_filterable_attributes(&index, client).await?;
-                #name::set_searchable_attributes(&index, client).await?;
-                #name::set_sortable_attributes(&index, client).await?;
-                #name::set_displayed_attributes(&index, client).await?;
-                #name::set_distinct_attribute(&index, client).await?;
-                #name::set_primary_key(client).await?;
+                #name::set_filterable_attributes(&index, client_ref.deref()).await?;
+                #name::set_searchable_attributes(&index, client_ref.deref()).await?;
+                #name::set_sortable_attributes(&index, client_ref.deref()).await?;
+                #name::set_displayed_attributes(&index, client_ref.deref()).await?;
+                #name::set_distinct_attribute(&index, client_ref.deref()).await?;
+                #name::set_primary_key(client_ref.deref()).await?;
 
                 Ok(())
             }
@@ -304,15 +305,16 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
             ///
             /// Arguments:
             /// - `client`: The MeiliSearch client
-            pub async fn get_index(client: &meilisearch_sdk::client::Client) -> Result<meilisearch_sdk::indexes::Index, meilisearch_sdk::errors::Error> {
-                let index = client.get_index(#model_attr_name).await;
+            pub async fn get_index(client: &std::sync::Arc<tokio::sync::Mutex<meilisearch_sdk::client::Client>>) -> Result<meilisearch_sdk::indexes::Index, meilisearch_sdk::errors::Error> {
+                let client_ref = client.lock().await;
+                let index = client_ref.get_index(#model_attr_name).await;
                 match index {
                     Ok(index) => Ok(index),
                     Err(meilisearch_sdk::errors::Error::Meilisearch(error)) => {
                         if error.error_code == meilisearch_sdk::errors::ErrorCode::IndexNotFound {
-                            let task = client.create_index(#model_attr_name, Some(#pk_name)).await?;
-                            task.wait_for_completion(client, None, None).await?;
-                            let index = client.get_index(#model_attr_name).await?;
+                            let task = client_ref.create_index(#model_attr_name, Some(#pk_name)).await?;
+                            task.wait_for_completion(client_ref.deref(), None, None).await?;
+                            let index = client_ref.get_index(#model_attr_name).await?;
                             Ok(index)
                         } else {
                             // trickle down the error
