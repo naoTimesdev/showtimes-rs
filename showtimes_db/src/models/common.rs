@@ -43,13 +43,31 @@ impl Default for ImageMetadata {
 /// The list of possible integration types.
 #[derive(Debug, Clone, tosho_macros::DeserializeEnum, tosho_macros::SerializeEnum)]
 pub enum IntegrationType {
+    // Related to Discord
+    /// A Discord Role ID
     DiscordRole,
+    /// A Discord User ID
     DiscordUser,
+    /// A Discord Text Channel ID
     DiscordChannel,
+    /// A Discord Guild ID
     DiscordGuild,
+    // Related to FansubDB
+    /// Your group FansubDB ID
     FansubDB,
+    /// A FansubDB Project ID
     FansubDBProject,
+    /// A FansubDB Shows ID
     FansubDBShows,
+    // Related to Providers
+    /// Anilist ID
+    ProviderAnilist,
+    /// Anilist MAL ID mapping
+    ProviderAnilistMal,
+    /// VNDB ID
+    ProviderVndb,
+    /// TMDB ID
+    ProviderTmdb,
 }
 
 tosho_macros::enum_error!(IntegrationTypeFromStrError);
@@ -74,6 +92,11 @@ impl std::str::FromStr for IntegrationType {
             "fansubdbshows" | "fansubdb_shows" | "fansubdb_shows_id" => {
                 Ok(IntegrationType::FansubDBShows)
             }
+            "provideranilist" | "pvd_anilist" | "anilist" => Ok(IntegrationType::ProviderAnilist),
+            "provideranilistmal" | "pvd_anilistmal" | "pvd_anilist_mal" | "anilistmal"
+            | "anilist_mal" => Ok(IntegrationType::ProviderAnilistMal),
+            "providervndb" | "pvd_vndb" | "vndb" => Ok(IntegrationType::ProviderVndb),
+            "providertmdb" | "pvd_tmdb" | "tmdb" => Ok(IntegrationType::ProviderTmdb),
             _ => Err(IntegrationTypeFromStrError {
                 original: s.to_string(),
             }),
@@ -91,6 +114,10 @@ impl std::fmt::Display for IntegrationType {
             IntegrationType::FansubDB => write!(f, "FANSUBDB_ID"),
             IntegrationType::FansubDBProject => write!(f, "FANSUBDB_PROJECT_ID"),
             IntegrationType::FansubDBShows => write!(f, "FANSUBDB_SHOWS_ID"),
+            IntegrationType::ProviderAnilist => write!(f, "PVD_ANILIST"),
+            IntegrationType::ProviderAnilistMal => write!(f, "PVD_ANILIST_MAL"),
+            IntegrationType::ProviderVndb => write!(f, "PVD_VNDB"),
+            IntegrationType::ProviderTmdb => write!(f, "PVD_TMDB"),
         }
     }
 }
