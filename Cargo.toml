@@ -41,7 +41,9 @@ async-trait = "0.1.81"
 # File server
 bytes = "1"
 mime_guess = "2.0.5"
-s3-tokio = { version = "0.39.4", features = ["tracing"] }
+aws-config = { version = "1.5.4", features = ["behavior-version-latest"] }
+aws-credential-types = "1.2.0"
+aws-sdk-s3 = "1.42.0"
 
 # Web server
 axum = { version = "0.7.5", features = ["ws", "tracing"] }

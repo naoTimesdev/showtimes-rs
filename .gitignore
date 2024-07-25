@@ -26,3 +26,5 @@ _tests/
 _test/
 _data_test/
 /**/tests/*.json
+
+/storages

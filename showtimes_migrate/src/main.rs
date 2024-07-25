@@ -31,7 +31,9 @@ async fn main() -> anyhow::Result<()> {
 
     let cli = cli::MigrationCli::parse();
 
+    tracing::info!("Connecting to MongoDB...");
     let connection = create_connection(&mongodb_uri).await.unwrap();
+    tracing::info!("Connected to MongoDB");
     let mut migrations = get_migrations(&connection.client, &connection.db);
     migrations.sort_by(|a, b| a.timestamp().cmp(&b.timestamp()));
 
@@ -60,6 +62,7 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
                     None => {
+                        tracing::info!("Running migrations...");
                         let unmigrated = migrations
                             .iter()
                             .filter(|m| !all_migrations.iter().any(|db_m| db_m.name == m.name()))
@@ -93,6 +96,7 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
                     None => {
+                        tracing::info!("Rolling back migrations...");
                         let migrated = migration_db.find_all().await.unwrap();
                         let last_migration = migrations
                             .iter()

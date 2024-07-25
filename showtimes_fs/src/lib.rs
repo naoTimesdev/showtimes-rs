@@ -1,9 +1,7 @@
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub mod local;
 pub mod s3;
-
-pub use ::s3::Region;
 
 /// The list of "pool" type of the filesystems.
 ///
@@ -59,7 +57,7 @@ pub trait FsImpl {
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<bool>;
     /// Upload a file to the filesystem.
-    async fn file_stream_upload<R: AsyncRead + Unpin + Send>(
+    async fn file_stream_upload<R: AsyncReadExt + Unpin + Send>(
         &self,
         base_key: &str,
         filename: &str,
@@ -68,7 +66,7 @@ pub trait FsImpl {
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<FsFileObject>;
     /// Download a file from the filesystem.
-    async fn file_stream_download<W: AsyncWrite + Unpin + Send>(
+    async fn file_stream_download<W: AsyncWriteExt + Unpin + Send>(
         &self,
         base_key: &str,
         filename: &str,
@@ -140,7 +138,7 @@ impl FsPool {
         }
     }
     /// Upload a file to the filesystem.
-    pub async fn file_stream_upload<R: AsyncRead + Unpin + Send>(
+    pub async fn file_stream_upload<R: AsyncReadExt + Unpin + Send>(
         &self,
         base_key: &str,
         filename: &str,
@@ -160,7 +158,7 @@ impl FsPool {
         }
     }
     /// Download a file from the filesystem.
-    pub async fn file_stream_download<W: AsyncWrite + Unpin + Send>(
+    pub async fn file_stream_download<W: AsyncWriteExt + Unpin + Send>(
         &self,
         base_key: &str,
         filename: &str,

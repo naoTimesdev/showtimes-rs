@@ -1,0 +1,251 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'showtimes_db'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=showtimes-db"
+                ],
+                "filter": {
+                    "name": "showtimes_db",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'showtimes_shared'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=showtimes-shared"
+                ],
+                "filter": {
+                    "name": "showtimes_shared",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'showtimes_fs'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=showtimes-fs"
+                ],
+                "filter": {
+                    "name": "showtimes_fs",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'showtimes_gql'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=showtimes-gql"
+                ],
+                "filter": {
+                    "name": "showtimes_gql",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'showtimes_metadata'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=showtimes-metadata"
+                ],
+                "filter": {
+                    "name": "showtimes_metadata",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in library 'showtimes_search'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--package=showtimes-search"
+                ],
+                "filter": {
+                    "name": "showtimes_search",
+                    "kind": "lib"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'showtimes-migrate' (up)",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=showtimes-migrate",
+                    "--package=showtimes-migrate"
+                ],
+                "filter": {
+                    "name": "showtimes-migrate",
+                    "kind": "bin"
+                }
+            },
+            "args": ["up"],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'showtimes-migrate' (down)",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=showtimes-migrate",
+                    "--package=showtimes-migrate"
+                ],
+                "filter": {
+                    "name": "showtimes-migrate",
+                    "kind": "bin"
+                }
+            },
+            "args": ["down"],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'showtimes-migrate'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=showtimes-migrate",
+                    "--package=showtimes-migrate"
+                ],
+                "filter": {
+                    "name": "showtimes-migrate",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'showtimes-migrate-create'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=showtimes-migrate-create",
+                    "--package=showtimes-migrate"
+                ],
+                "filter": {
+                    "name": "showtimes-migrate-create",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'showtimes-migrate-create'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=showtimes-migrate-create",
+                    "--package=showtimes-migrate"
+                ],
+                "filter": {
+                    "name": "showtimes-migrate-create",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'showtimes'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=showtimes",
+                    "--package=showtimes"
+                ],
+                "filter": {
+                    "name": "showtimes",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'showtimes'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=showtimes",
+                    "--package=showtimes"
+                ],
+                "filter": {
+                    "name": "showtimes",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

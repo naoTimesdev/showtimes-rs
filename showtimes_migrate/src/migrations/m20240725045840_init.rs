@@ -1,4 +1,4 @@
-use std::{collections::HashMap, str::FromStr};
+use std::collections::HashMap;
 
 use bson::doc;
 use chrono::TimeZone;
@@ -7,7 +7,10 @@ use showtimes_db::{
     m::{DiscordUser, User},
     ClientMutex, DatabaseMutex, UserHandler,
 };
-use showtimes_fs::{local::LocalFs, s3::S3Fs};
+use showtimes_fs::{
+    local::LocalFs,
+    s3::{S3Fs, S3FsCredentialsProvider, S3FsRegionProvider},
+};
 
 use crate::{common::env_or_exit, models::projects::ProjectAssignee};
 
@@ -45,6 +48,7 @@ impl Migration for M20240725045840Init {
             .unwrap()
     }
 
+    #[inline(never)]
     async fn up(&self) -> anyhow::Result<()> {
         let meili_url = env_or_exit("MEILI_URL");
         let meili_key = env_or_exit("MEILI_KEY");
@@ -55,20 +59,35 @@ impl Migration for M20240725045840Init {
         tracing::info!("Setting up filesystem...");
         let s3_bucket = std::env::var("S3_BUCKET").ok();
         let s3_region = std::env::var("S3_REGION").ok();
+        let s3_endpoint_url = std::env::var("S3_REGION").ok();
         let s3_access_key = std::env::var("S3_ACCESS_KEY").ok();
         let s3_secret_key = std::env::var("S3_SECRET_KEY").ok();
         let local_storage = std::env::var("LOCAL_STORAGE").ok();
 
+        let region_info = match (s3_region, s3_endpoint_url) {
+            (Some(region), Some(endpoint)) => {
+                Some(S3FsRegionProvider::new(&region, Some(&endpoint)))
+            }
+            (Some(region), None) => Some(S3FsRegionProvider::new(&region, None)),
+            _ => None,
+        };
+
         let storages: showtimes_fs::FsPool = match (
             s3_bucket,
-            s3_region,
+            region_info,
             s3_access_key,
             s3_secret_key,
             local_storage,
         ) {
             (Some(bucket), Some(region), Some(access_key), Some(secret_key), _) => {
-                let region = showtimes_fs::Region::from_str(&region)?;
-                showtimes_fs::FsPool::S3Fs(S3Fs::new(&bucket, &access_key, &secret_key, region))
+                tracing::info!(
+                    " Creating S3Fs with region/bucket: {}/{}",
+                    region.region(),
+                    bucket
+                );
+
+                let credentials = S3FsCredentialsProvider::new(&access_key, &secret_key);
+                showtimes_fs::FsPool::S3Fs(S3Fs::new(&bucket, credentials, region).await)
             }
             (_, _, _, _, Some(directory)) => {
                 let dir_path = std::path::PathBuf::from(directory);
@@ -115,6 +134,9 @@ impl Migration for M20240725045840Init {
         m_use_commit
             .wait_for_completion(&*meilisearch.lock().await, None, None)
             .await?;
+
+        tracing::info!("Updating Meilisearch indexes schema information...");
+        M20240725045840Init::setup_meilisearch_index(&meilisearch).await?;
 
         Ok(())
     }
@@ -167,12 +189,16 @@ impl M20240725045840Init {
         showtimes_search::models::Server::get_index(&client).await?;
         showtimes_search::models::User::get_index(&client).await?;
 
-        tracing::info!("Updating Meilisearch indexes schema information...");
-        showtimes_search::models::Project::update_schema(&client).await?;
-        showtimes_search::models::Server::update_schema(&client).await?;
-        showtimes_search::models::User::update_schema(&client).await?;
-
         Ok(client)
+    }
+
+    async fn setup_meilisearch_index(client: &showtimes_search::ClientMutex) -> anyhow::Result<()> {
+        tracing::info!("Updating Meilisearch indexes schema information...");
+        showtimes_search::models::Project::update_schema(client).await?;
+        showtimes_search::models::Server::update_schema(client).await?;
+        showtimes_search::models::User::update_schema(client).await?;
+
+        Ok(())
     }
 
     async fn collect_servers(

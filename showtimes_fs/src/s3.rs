@@ -1,11 +1,79 @@
-use s3::{creds::Credentials, Bucket};
-use tokio::io::{AsyncRead, AsyncWrite};
+use std::sync::Arc;
 
 use crate::{make_file_path, FsFileKind, FsFileObject, FsImpl};
+use aws_config::AppName;
+use aws_credential_types::provider::{self, error::CredentialsError, future, ProvideCredentials};
+use aws_credential_types::Credentials;
+use aws_sdk_s3::primitives::{ByteStream, DateTimeFormat, SdkBody};
+use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::sync::Mutex;
+
+#[derive(Debug, Clone)]
+pub struct S3FsCredentialsProvider {
+    access_key: String,
+    secret_key: String,
+}
+
+impl S3FsCredentialsProvider {
+    pub fn new(access_key: &str, secret_key: &str) -> Self {
+        Self {
+            access_key: access_key.to_string(),
+            secret_key: secret_key.to_string(),
+        }
+    }
+
+    fn credentials(&self) -> provider::Result {
+        if self.access_key.is_empty() {
+            return Err(CredentialsError::not_loaded("Access key is empty"));
+        }
+        if self.secret_key.is_empty() {
+            return Err(CredentialsError::not_loaded("Secret key is empty"));
+        };
+
+        Ok(Credentials::new(
+            self.access_key.clone(),
+            self.secret_key.clone(),
+            None,
+            None,
+            ENV_PROVIDER,
+        ))
+    }
+}
+
+const ENV_PROVIDER: &str = "S3FsCredentialsProvider";
+
+impl ProvideCredentials for S3FsCredentialsProvider {
+    fn provide_credentials<'a>(&'a self) -> future::ProvideCredentials<'a>
+    where
+        Self: 'a,
+    {
+        future::ProvideCredentials::ready(self.credentials())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct S3FsRegionProvider {
+    region: String,
+    endpoint_url: Option<String>,
+}
+
+impl S3FsRegionProvider {
+    pub fn new(region: &str, endpoint_url: Option<&str>) -> Self {
+        Self {
+            region: region.to_string(),
+            endpoint_url: endpoint_url.map(|s| s.to_string()),
+        }
+    }
+
+    pub fn region(&self) -> &str {
+        &self.region
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct S3Fs {
-    bucket: Bucket,
+    bucket_name: String,
+    client: Arc<Mutex<aws_sdk_s3::Client>>,
 }
 
 impl S3Fs {
@@ -13,27 +81,96 @@ impl S3Fs {
     ///
     /// # Parameters
     /// * `bucket`: The name of the bucket.
-    /// * `access_key`: The access key for the bucket.
-    /// * `secret_key`: The secret key for the bucket.
+    /// * `credentials`: The credentials provider.
     /// * `region`: The region of the bucket.
-    pub fn new(bucket: &str, access_key: &str, secret_key: &str, region: ::s3::Region) -> Self {
-        let credentials =
-            Credentials::new(Some(access_key), Some(secret_key), None, None, None).unwrap();
-        let bucket = Bucket::new(bucket, region.clone(), credentials).unwrap();
+    pub async fn new(
+        bucket: &str,
+        credentials: S3FsCredentialsProvider,
+        region: S3FsRegionProvider,
+    ) -> Self {
+        // Test if the bucket exists
+        let config_loader = aws_config::from_env()
+            .app_name(AppName::new("showtimes-fs-rs").unwrap())
+            .region(aws_types::region::Region::new(region.region))
+            .credentials_provider(credentials);
+        let config_loader = match &region.endpoint_url {
+            Some(endpoint_url) => config_loader.endpoint_url(endpoint_url),
+            None => config_loader,
+        };
 
-        Self { bucket }
+        let config = config_loader.load().await;
+
+        let client = aws_sdk_s3::Client::new(&config);
+
+        Self {
+            bucket_name: bucket.to_string(),
+            client: Arc::new(Mutex::new(client)),
+        }
+    }
+}
+
+struct CustomS3Writer {
+    temp_bytes: bytes::BytesMut,
+}
+
+impl CustomS3Writer {
+    fn new() -> Self {
+        Self {
+            temp_bytes: bytes::BytesMut::new(),
+        }
+    }
+
+    fn as_bytes(&self) -> bytes::Bytes {
+        self.temp_bytes.clone().freeze()
+    }
+}
+
+impl AsyncWrite for CustomS3Writer {
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<Result<usize, std::io::Error>> {
+        let this = std::pin::Pin::into_inner(self);
+        let len = buf.len();
+        this.temp_bytes.extend_from_slice(buf);
+        std::task::Poll::Ready(Ok(len))
+    }
+
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), std::io::Error>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        _: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), std::io::Error>> {
+        std::task::Poll::Ready(Ok(()))
     }
 }
 
 #[async_trait::async_trait]
 impl FsImpl for S3Fs {
     async fn init(&self) -> anyhow::Result<()> {
-        // Test if the bucket exists
-        self.bucket
-            .list("/".to_string(), Some("/".to_string()))
-            .await?;
+        let bucket = self.bucket_name.clone();
+        let client = self.client.lock().await;
+        let buckets = client.list_buckets().send().await?;
 
-        Ok(())
+        let matched = buckets
+            .buckets()
+            .iter()
+            .find(|&b| b.name() == Some(&bucket));
+        match matched {
+            Some(_) => Ok(()),
+            None => {
+                // Create the bucket
+                client.create_bucket().bucket(&bucket).send().await?;
+                Ok(())
+            }
+        }
     }
 
     async fn file_stat(
@@ -44,7 +181,13 @@ impl FsImpl for S3Fs {
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<FsFileObject> {
         let key = make_file_path(base_key, filename, parent_id, kind);
-        let (object, _) = self.bucket.head_object(&key).await?;
+        let client = self.client.lock().await;
+        let object = client
+            .head_object()
+            .bucket(&self.bucket_name)
+            .key(&key)
+            .send()
+            .await?;
 
         let content_type = match object.content_type {
             Some(content_type) => content_type,
@@ -54,14 +197,14 @@ impl FsImpl for S3Fs {
             }
         };
 
-        let last_modified = match object.last_modified {
-            Some(last_modified) => {
-                // last_modified is HTTP Last-Modified header
-                match chrono::DateTime::parse_from_rfc2822(&last_modified) {
+        let last_mod = match object.last_modified {
+            Some(last_mod) => match last_mod.fmt(DateTimeFormat::DateTime) {
+                Ok(s) => match chrono::DateTime::parse_from_rfc3339(&s) {
                     Ok(dt) => Some(dt.with_timezone(&chrono::Utc)),
                     Err(_) => None,
-                }
-            }
+                },
+                Err(_) => None,
+            },
             None => None,
         };
 
@@ -69,7 +212,7 @@ impl FsImpl for S3Fs {
             filename: key,
             content_type,
             size: object.content_length.unwrap_or(-1),
-            last_modified,
+            last_modified: last_mod,
         })
     }
 
@@ -81,12 +224,18 @@ impl FsImpl for S3Fs {
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<bool> {
         let key = make_file_path(base_key, filename, parent_id, kind);
-        let (object, _) = self.bucket.head_object(&key).await?;
+        let client = self.client.lock().await;
+        let object = client
+            .head_object()
+            .bucket(&self.bucket_name)
+            .key(&key)
+            .send()
+            .await?;
 
         Ok(object.content_length.unwrap_or(-1) > 0)
     }
 
-    async fn file_stream_upload<R: AsyncRead + Unpin + Send>(
+    async fn file_stream_upload<R: AsyncReadExt + Unpin + Send>(
         &self,
         base_key: &str,
         filename: &str,
@@ -95,12 +244,24 @@ impl FsImpl for S3Fs {
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<FsFileObject> {
         let key = make_file_path(base_key, filename, parent_id, kind.clone());
-        self.bucket.put_object_stream(stream, &key).await?;
+        let client = self.client.lock().await;
+        // Create a temporary writer since AWS SDK s3 FUCKING SUCKS!
+        let mut target = CustomS3Writer::new();
+        tokio::io::copy(stream, &mut target).await?;
+        let body = ByteStream::new(SdkBody::from(target.as_bytes()));
+
+        client
+            .put_object()
+            .bucket(&self.bucket_name)
+            .key(&key)
+            .body(body)
+            .send()
+            .await?;
 
         self.file_stat(base_key, filename, parent_id, kind).await
     }
 
-    async fn file_stream_download<W: AsyncWrite + Unpin + Send>(
+    async fn file_stream_download<W: AsyncWriteExt + Unpin + Send>(
         &self,
         base_key: &str,
         filename: &str,
@@ -109,7 +270,17 @@ impl FsImpl for S3Fs {
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()> {
         let key = make_file_path(base_key, filename, parent_id, kind);
-        self.bucket.get_object_to_writer(&key, writer).await?;
+        let client = self.client.lock().await;
+        let mut resp = client
+            .get_object()
+            .bucket(&self.bucket_name)
+            .key(&key)
+            .send()
+            .await?;
+
+        while let Some(bytes) = resp.body.try_next().await? {
+            writer.write(&bytes).await?;
+        }
 
         Ok(())
     }
@@ -122,7 +293,13 @@ impl FsImpl for S3Fs {
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()> {
         let key = make_file_path(base_key, filename, parent_id, kind);
-        self.bucket.delete_object(&key).await?;
+        let client = self.client.lock().await;
+        client
+            .delete_object()
+            .bucket(&self.bucket_name)
+            .key(&key)
+            .send()
+            .await?;
 
         Ok(())
     }
