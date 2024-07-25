@@ -62,3 +62,4 @@ create_handler!(m::User, UserHandler);
 create_handler!(m::Server, ServerHandler);
 create_handler!(m::ServerCollaborationSync, CollaborationSyncHandler);
 create_handler!(m::ServerCollaborationInvite, CollaborationInviteHandler);
+create_handler!(m::Migration, MigrationHandler);

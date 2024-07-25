@@ -1,9 +1,11 @@
 pub mod common;
+pub mod migrations;
 pub mod project;
 pub mod server;
 pub mod users;
 
 pub use common::*;
+pub use migrations::*;
 pub use project::*;
 pub use server::*;
 pub use users::*;

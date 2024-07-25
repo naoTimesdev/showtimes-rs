@@ -9,3 +9,26 @@ homepage.workspace = true
 description = "A tools to migrate Showtimes database models and more"
 
 [dependencies]
+tokio.workspace = true
+serde.workspace = true
+chrono.workspace = true
+futures.workspace = true
+anyhow.workspace = true
+async-trait = "0.1.81"
+
+clap = { version = "4", features = ["derive"] }
+
+mongodb.workspace = true
+bson.workspace = true
+
+showtimes-db = { path = "../showtimes_db" }
+showtimes-search = { path = "../showtimes_search" }
+showtimes-shared = { path = "../showtimes_shared" }
+
+[[bin]]
+name = "showtimes-migrate"
+path = "src/main.rs"
+
+[[bin]]
+name = "showtimes-migrate-create"
+path = "src/create.rs"

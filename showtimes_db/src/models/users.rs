@@ -10,7 +10,7 @@ pub enum UserKind {
     /// A normal user
     #[default]
     User,
-    /// An admin user
+    /// An admin user, can see all users and manage all servers
     Admin,
 }
 
