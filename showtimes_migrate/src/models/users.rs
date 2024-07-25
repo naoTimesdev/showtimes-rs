@@ -9,6 +9,7 @@ pub struct DiscordMeta {
     pub expires_at: i64,
 }
 
+/// The user model, mapped into ``
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: String,

@@ -1,10 +1,10 @@
-use showtimes_db::ClientMutex;
+use showtimes_db::{ClientMutex, DatabaseMutex};
 
 pub(crate) mod m20240725045840_init;
 
 #[async_trait::async_trait]
 pub trait Migration {
-    fn init(client: &ClientMutex) -> Self
+    fn init(client: &ClientMutex, db: &DatabaseMutex) -> Self
     where
         Self: Sized;
     fn name(&self) -> &'static str;
@@ -14,8 +14,8 @@ pub trait Migration {
     fn clone_box(&self) -> Box<dyn Migration>;
 }
 
-pub fn get_migrations(client: &ClientMutex) -> Vec<Box<dyn Migration>> {
+pub fn get_migrations(client: &ClientMutex, db: &DatabaseMutex) -> Vec<Box<dyn Migration>> {
     vec![Box::new(m20240725045840_init::M20240725045840Init::init(
-        client,
+        client, db,
     ))]
 }

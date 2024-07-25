@@ -32,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
     let cli = cli::MigrationCli::parse();
 
     let connection = create_connection(&mongodb_uri).await.unwrap();
-    let mut migrations = get_migrations(&connection.client);
+    let mut migrations = get_migrations(&connection.client, &connection.db);
     migrations.sort_by(|a, b| a.timestamp().cmp(&b.timestamp()));
 
     let migration_db = showtimes_db::MigrationHandler::new(connection.db).await;

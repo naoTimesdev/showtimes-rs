@@ -15,7 +15,7 @@ pub struct Server {
     pub id: String,
     pub name: Option<String>,
     pub fsdb_id: Option<u32>,
-    pub serverowner: String,
+    pub serverowner: Vec<String>,
     pub announce_channel: Option<String>,
     pub anime: Vec<Project>,
     pub konfirmasi: Vec<ServerCollabConfirm>,
@@ -26,7 +26,7 @@ pub struct Server {
 /// Mapped into `showtimesadmin` collection
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerAdmin {
-    pub admin_id: String,
+    pub id: String,
     #[serde(default)]
     pub servers: Vec<String>,
 }

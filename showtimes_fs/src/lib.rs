@@ -192,4 +192,12 @@ impl FsPool {
             Self::S3Fs(fs) => fs.file_delete(base_key, filename, parent_id, kind).await,
         }
     }
+
+    /// Get the current filesystem name.
+    pub fn get_name(&self) -> &'static str {
+        match self {
+            Self::LocalFs(_) => "Local",
+            Self::S3Fs(_) => "S3",
+        }
+    }
 }

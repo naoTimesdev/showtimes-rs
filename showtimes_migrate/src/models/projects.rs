@@ -62,19 +62,19 @@ pub struct ProjectAssigneeCustom {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ProjectAssignements {
     #[serde(default, rename = "TL")]
-    pub translation: ProjectAssignee,
+    pub translator: ProjectAssignee,
     #[serde(default, rename = "TLC")]
-    pub translation_check: ProjectAssignee,
+    pub translation_checker: ProjectAssignee,
     #[serde(default, rename = "ENC")]
-    pub encoding: ProjectAssignee,
+    pub encoder: ProjectAssignee,
     #[serde(default, rename = "ED")]
-    pub editing: ProjectAssignee,
+    pub editor: ProjectAssignee,
     #[serde(default, rename = "TM")]
-    pub timing: ProjectAssignee,
+    pub timer: ProjectAssignee,
     #[serde(default, rename = "TS")]
-    pub typesetting: ProjectAssignee,
+    pub typesetter: ProjectAssignee,
     #[serde(default, rename = "QC")]
-    pub quality_check: ProjectAssignee,
+    pub quality_checker: ProjectAssignee,
     #[serde(default)]
     pub custom: Vec<ProjectAssigneeCustom>,
 }
