@@ -14,14 +14,19 @@ serde.workspace = true
 chrono.workspace = true
 futures.workspace = true
 anyhow.workspace = true
-async-trait = "0.1.81"
+async-trait.workspace = true
 
-clap = { version = "4", features = ["derive"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+clap = { version = "4.5.10", features = ["derive"] }
+dotenvy = "0.15.7"
 
 mongodb.workspace = true
 bson.workspace = true
 
 showtimes-db = { path = "../showtimes_db" }
+showtimes-fs = { path = "../showtimes_fs" }
 showtimes-search = { path = "../showtimes_search" }
 showtimes-shared = { path = "../showtimes_shared" }
 

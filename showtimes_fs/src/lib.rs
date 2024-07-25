@@ -3,6 +3,8 @@ use tokio::io::{AsyncRead, AsyncWrite};
 pub mod local;
 pub mod s3;
 
+pub use ::s3::Region;
+
 /// The list of "pool" type of the filesystems.
 ///
 /// Currently only `LocalFs` and `S3Fs` are supported.
@@ -34,53 +36,54 @@ pub struct FsFileObject {
 /// Base trait for the filesystem implementations.
 ///
 /// Implement some of the basic operations needed for it to work with Showtimes.
+#[async_trait::async_trait]
 pub trait FsImpl {
     /// Initialize the filesystem.
     ///
     /// This can be used to test if the filesystem is working correctly.
-    fn init(&self) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
+    async fn init(&self) -> anyhow::Result<()>;
     /// Stat or get a file information in the filesystem.
-    fn file_stat(
+    async fn file_stat(
         &self,
         base_key: &str,
         filename: &str,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> impl std::future::Future<Output = anyhow::Result<FsFileObject>> + Send;
+    ) -> anyhow::Result<FsFileObject>;
     /// Check if a file exists in the filesystem.
-    fn file_exists(
+    async fn file_exists(
         &self,
         base_key: &str,
         filename: &str,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> impl std::future::Future<Output = anyhow::Result<bool>> + Send;
+    ) -> anyhow::Result<bool>;
     /// Upload a file to the filesystem.
-    fn file_stream_upload<R: AsyncRead + Unpin + Send>(
+    async fn file_stream_upload<R: AsyncRead + Unpin + Send>(
         &self,
         base_key: &str,
         filename: &str,
         stream: &mut R,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> impl std::future::Future<Output = anyhow::Result<FsFileObject>> + Send;
+    ) -> anyhow::Result<FsFileObject>;
     /// Download a file from the filesystem.
-    fn file_stream_download<W: AsyncWrite + Unpin + Send>(
+    async fn file_stream_download<W: AsyncWrite + Unpin + Send>(
         &self,
         base_key: &str,
         filename: &str,
         writer: &mut W,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
+    ) -> anyhow::Result<()>;
     /// Delete a file from the filesystem.
-    fn file_delete(
+    async fn file_delete(
         &self,
         base_key: &str,
         filename: &str,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> impl std::future::Future<Output = anyhow::Result<()>> + Send;
+    ) -> anyhow::Result<()>;
 }
 
 /// Make a file path from the base key, filename, parent id, and kind.
@@ -98,4 +101,95 @@ pub(crate) fn make_file_path(
     }
     path.push_str(filename);
     path
+}
+
+impl FsPool {
+    /// Initialize the filesystem.
+    ///
+    /// This can be used to test if the filesystem is working correctly.
+    pub async fn init(&self) -> anyhow::Result<()> {
+        match self {
+            Self::LocalFs(fs) => fs.init().await,
+            Self::S3Fs(fs) => fs.init().await,
+        }
+    }
+    /// Stat or get a file information in the filesystem.
+    pub async fn file_stat(
+        &self,
+        base_key: &str,
+        filename: &str,
+        parent_id: Option<&str>,
+        kind: Option<FsFileKind>,
+    ) -> anyhow::Result<FsFileObject> {
+        match self {
+            Self::LocalFs(fs) => fs.file_stat(base_key, filename, parent_id, kind).await,
+            Self::S3Fs(fs) => fs.file_stat(base_key, filename, parent_id, kind).await,
+        }
+    }
+    /// Check if a file exists in the filesystem.
+    pub async fn file_exists(
+        &self,
+        base_key: &str,
+        filename: &str,
+        parent_id: Option<&str>,
+        kind: Option<FsFileKind>,
+    ) -> anyhow::Result<bool> {
+        match self {
+            Self::LocalFs(fs) => fs.file_exists(base_key, filename, parent_id, kind).await,
+            Self::S3Fs(fs) => fs.file_exists(base_key, filename, parent_id, kind).await,
+        }
+    }
+    /// Upload a file to the filesystem.
+    pub async fn file_stream_upload<R: AsyncRead + Unpin + Send>(
+        &self,
+        base_key: &str,
+        filename: &str,
+        stream: &mut R,
+        parent_id: Option<&str>,
+        kind: Option<FsFileKind>,
+    ) -> anyhow::Result<FsFileObject> {
+        match self {
+            Self::LocalFs(fs) => {
+                fs.file_stream_upload(base_key, filename, stream, parent_id, kind)
+                    .await
+            }
+            Self::S3Fs(fs) => {
+                fs.file_stream_upload(base_key, filename, stream, parent_id, kind)
+                    .await
+            }
+        }
+    }
+    /// Download a file from the filesystem.
+    pub async fn file_stream_download<W: AsyncWrite + Unpin + Send>(
+        &self,
+        base_key: &str,
+        filename: &str,
+        writer: &mut W,
+        parent_id: Option<&str>,
+        kind: Option<FsFileKind>,
+    ) -> anyhow::Result<()> {
+        match self {
+            Self::LocalFs(fs) => {
+                fs.file_stream_download(base_key, filename, writer, parent_id, kind)
+                    .await
+            }
+            Self::S3Fs(fs) => {
+                fs.file_stream_download(base_key, filename, writer, parent_id, kind)
+                    .await
+            }
+        }
+    }
+    /// Delete a file from the filesystem.
+    pub async fn file_delete(
+        &self,
+        base_key: &str,
+        filename: &str,
+        parent_id: Option<&str>,
+        kind: Option<FsFileKind>,
+    ) -> anyhow::Result<()> {
+        match self {
+            Self::LocalFs(fs) => fs.file_delete(base_key, filename, parent_id, kind).await,
+            Self::S3Fs(fs) => fs.file_delete(base_key, filename, parent_id, kind).await,
+        }
+    }
 }

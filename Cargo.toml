@@ -36,6 +36,7 @@ lazy_static = "1"
 anyhow = "1"
 futures = "0.3.30"
 tosho-macros = "0.3"
+async-trait = "0.1.81"
 
 # File server
 bytes = "1"

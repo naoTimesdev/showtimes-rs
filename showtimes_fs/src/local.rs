@@ -23,6 +23,7 @@ impl LocalFs {
     }
 }
 
+#[async_trait::async_trait]
 impl FsImpl for LocalFs {
     async fn init(&self) -> anyhow::Result<()> {
         // Test if the directory exists

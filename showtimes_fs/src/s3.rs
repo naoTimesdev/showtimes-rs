@@ -25,6 +25,7 @@ impl S3Fs {
     }
 }
 
+#[async_trait::async_trait]
 impl FsImpl for S3Fs {
     async fn init(&self) -> anyhow::Result<()> {
         // Test if the bucket exists
