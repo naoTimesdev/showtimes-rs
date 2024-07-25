@@ -136,7 +136,6 @@ impl Migration for M20240725045840Init {
             .wait_for_completion(&*meilisearch.lock().await, None, None)
             .await?;
 
-        tracing::info!("Updating Meilisearch indexes schema information...");
         M20240725045840Init::setup_meilisearch_index(&meilisearch).await?;
 
         Ok(())
@@ -261,7 +260,7 @@ impl M20240725045840Init {
                 let mut discord_user = DiscordUser::stub();
                 discord_user.id = admin.id.clone();
                 let created_user = User::new(admin.id.clone(), discord_user);
-                all_users.insert(admin.id.clone(), created_user);
+                all_users.insert(admin.id.clone(), created_user.with_unregistered());
             }
         }
 
@@ -273,7 +272,7 @@ impl M20240725045840Init {
                     let mut discord_user = DiscordUser::stub();
                     discord_user.id = owner.clone();
                     let created_user = User::new(owner.clone(), discord_user);
-                    all_users.insert(owner.clone(), created_user);
+                    all_users.insert(owner.clone(), created_user.with_unregistered());
                 }
             }
 
@@ -330,7 +329,7 @@ impl M20240725045840Init {
                         } else {
                             name
                         };
-                        all_users.insert(name, created_user);
+                        all_users.insert(name, created_user.with_unregistered());
                     }
                 }
             }

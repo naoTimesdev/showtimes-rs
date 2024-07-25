@@ -9,7 +9,7 @@ pub struct DiscordMeta {
     pub expires_at: i64,
 }
 
-/// The user model, mapped into ``
+/// The user model, mapped into `showtimesuilogin`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: String,
@@ -18,7 +18,9 @@ pub struct User {
     pub name: Option<String>,
     // owner, server (standard server user)
     pub privilege: String,
+    #[serde(default)]
     pub discord_meta: Option<DiscordMeta>,
     // DISCORD or PASSWORD
-    pub user_type: String,
+    #[serde(default)]
+    pub user_type: Option<String>,
 }

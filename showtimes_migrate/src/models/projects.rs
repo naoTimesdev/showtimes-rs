@@ -92,8 +92,15 @@ pub struct ProjectFSDB {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum LastUpdate {
+    Flat(i64),
+    Comma(f64),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Project {
-    pub id: u32,
+    pub id: String,
     pub mal_id: Option<u32>,
     pub title: String,
     pub role_id: Option<String>,
@@ -105,5 +112,5 @@ pub struct Project {
     pub fsdb_data: Option<ProjectFSDB>,
     pub aliases: Vec<String>,
     pub kolaborasi: Vec<String>,
-    pub last_update: i64,
+    pub last_update: LastUpdate,
 }
