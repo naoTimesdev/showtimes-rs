@@ -365,6 +365,16 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
                 let col = self.col.lock().await;
                 Ok(col.delete_one(filter).await?)
             }
+
+            #[doc = "Delete all documents in the"]
+            #[doc = #model_name_full]
+            #[doc = "collection"]
+            pub async fn delete_all(&self) -> anyhow::Result<()> {
+                let col = self.col.lock().await;
+                // Call .drop() to delete all documents in the collection
+                let col_copy = col.clone();
+                Ok(col_copy.drop().await?)
+            }
         }
     };
 
