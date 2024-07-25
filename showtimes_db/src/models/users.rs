@@ -124,4 +124,11 @@ impl User {
             updated: now,
         }
     }
+
+    pub fn with_unregistered(&self) -> Self {
+        Self {
+            registered: false,
+            ..self.clone()
+        }
+    }
 }

@@ -112,7 +112,7 @@ impl From<showtimes_db::m::Server> for Server {
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-users",
-    filterable = ["id", "created", "username", "discord_id", "discord_username", "api_key", "kind"],
+    filterable = ["id", "created", "username", "discord_id", "discord_username", "api_key", "kind", "registered"],
     searchable = ["id", "username", "discord_id", "discord_username", "api_key"], // integrations
     sortable = ["id", "created", "updated"],
     distinct = "id",
@@ -134,6 +134,8 @@ pub struct User {
     pub api_key: String,
     /// Their user kind
     pub kind: showtimes_db::m::UserKind,
+    /// Is the user registered or not
+    pub registered: bool,
     #[serde(
         with = "bson::serde_helpers::chrono_datetime_as_bson_datetime",
         default = "chrono::Utc::now"
@@ -163,6 +165,7 @@ impl From<showtimes_db::m::User> for User {
             discord_username,
             api_key: value.api_key,
             kind: value.kind,
+            registered: value.registered,
             created: value.created,
             updated: value.updated,
         }
