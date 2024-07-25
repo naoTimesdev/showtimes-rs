@@ -23,6 +23,20 @@ fn is_discord_snowflake(value: &str) -> bool {
     }
 }
 
+fn strip_discord_discriminator(value: &str) -> String {
+    // check 5 characters from the end
+    if value.len() < 5 {
+        return value.to_string();
+    }
+
+    let last_five = &value[value.len() - 5..];
+    if last_five.starts_with('#') && last_five[1..].parse::<u16>().is_ok() {
+        value[..value.len() - 5].to_string()
+    } else {
+        value.to_string()
+    }
+}
+
 #[derive(Clone)]
 pub struct M20240725045840Init {
     client: ClientMutex,
@@ -236,7 +250,7 @@ impl M20240725045840Init {
             let discord_meta = user.discord_meta.unwrap();
             let discord_user = DiscordUser {
                 id: discord_meta.id.clone(),
-                username: discord_meta.name,
+                username: strip_discord_discriminator(&discord_meta.name),
                 access_token: discord_meta.access_token,
                 refresh_token: discord_meta.refresh_token,
                 expires_at: discord_meta.expires_at,
