@@ -59,7 +59,7 @@ impl Migration for M20240725045840Init {
         tracing::info!("Setting up filesystem...");
         let s3_bucket = std::env::var("S3_BUCKET").ok();
         let s3_region = std::env::var("S3_REGION").ok();
-        let s3_endpoint_url = std::env::var("S3_REGION").ok();
+        let s3_endpoint_url = std::env::var("S3_ENDPOINT_URL").ok();
         let s3_access_key = std::env::var("S3_ACCESS_KEY").ok();
         let s3_secret_key = std::env::var("S3_SECRET_KEY").ok();
         let local_storage = std::env::var("LOCAL_STORAGE").ok();
@@ -81,9 +81,10 @@ impl Migration for M20240725045840Init {
         ) {
             (Some(bucket), Some(region), Some(access_key), Some(secret_key), _) => {
                 tracing::info!(
-                    " Creating S3Fs with region/bucket: {}/{}",
+                    " Creating S3Fs with region: {}, bucket: {}, endpoint: {:?}",
                     region.region(),
-                    bucket
+                    bucket,
+                    region.endpoint_url(),
                 );
 
                 let credentials = S3FsCredentialsProvider::new(&access_key, &secret_key);

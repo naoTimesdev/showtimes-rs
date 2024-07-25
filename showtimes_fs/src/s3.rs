@@ -68,6 +68,10 @@ impl S3FsRegionProvider {
     pub fn region(&self) -> &str {
         &self.region
     }
+
+    pub fn endpoint_url(&self) -> Option<&str> {
+        self.endpoint_url.as_deref()
+    }
 }
 
 #[derive(Debug, Clone)]
