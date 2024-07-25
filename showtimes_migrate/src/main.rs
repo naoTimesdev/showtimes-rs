@@ -2,18 +2,29 @@ use clap::Parser;
 use cli::MigrationCommands;
 use migrations::get_migrations;
 use showtimes_db::create_connection;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod cli;
+mod common;
 mod migrations;
 mod models;
 mod runner;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "showtimes-migrate=debug,showtimes_migrate=debug".into()),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    dotenvy::dotenv()?;
     let mongodb_uri = match std::env::var("MONGODB_URI") {
         Ok(uri) => uri,
         Err(_) => {
-            eprintln!("MONGODB_URI environment variable not set");
+            tracing::error!("MONGODB_URI environment variable not set");
             std::process::exit(1);
         }
     };
@@ -45,7 +56,7 @@ async fn main() {
                         if let Some(migration) = migration {
                             runner::run_migration_up(&migration_db, migration.clone_box()).await;
                         } else {
-                            println!("Migration {} not found", name);
+                            tracing::warn!("Migration {} not found", name);
                         }
                     }
                     None => {
@@ -58,7 +69,7 @@ async fn main() {
                         if let Some(&first) = first_migration {
                             runner::run_migration_up(&migration_db, first.clone_box()).await;
                         } else {
-                            println!("No migrations to run");
+                            tracing::warn!("No migrations to run");
                         }
                     }
                 }
@@ -78,7 +89,7 @@ async fn main() {
                         if let Some(migration) = migration {
                             runner::run_migration_down(&migration_db, migration.clone_box()).await;
                         } else {
-                            println!("Migration {} not found", name);
+                            tracing::warn!("Migration {} not found", name);
                         }
                     }
                     None => {
@@ -90,11 +101,13 @@ async fn main() {
                         if let Some(last) = last_migration {
                             runner::run_migration_down(&migration_db, last.clone_box()).await;
                         } else {
-                            println!("No migrations to rollback");
+                            tracing::warn!("No migrations to rollback");
                         }
                     }
                 }
             }
         }
     }
+
+    Ok(())
 }
