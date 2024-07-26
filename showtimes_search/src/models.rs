@@ -28,12 +28,12 @@ pub struct Project {
     #[serde(with = "ulid_serializer", default = "ulid_serializer::default")]
     pub parent: showtimes_shared::ulid::Ulid,
     #[serde(
-        with = "bson::serde_helpers::chrono_datetime_as_bson_datetime",
+        with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
     )]
     pub created: chrono::DateTime<chrono::Utc>,
     #[serde(
-        with = "bson::serde_helpers::chrono_datetime_as_bson_datetime",
+        with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
     )]
     pub updated: chrono::DateTime<chrono::Utc>,
@@ -78,12 +78,12 @@ pub struct Server {
     #[serde(with = "ulid_list_serializer")]
     pub owners: Vec<showtimes_shared::ulid::Ulid>,
     #[serde(
-        with = "bson::serde_helpers::chrono_datetime_as_bson_datetime",
+        with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
     )]
     pub created: chrono::DateTime<chrono::Utc>,
     #[serde(
-        with = "bson::serde_helpers::chrono_datetime_as_bson_datetime",
+        with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
     )]
     pub updated: chrono::DateTime<chrono::Utc>,
@@ -137,12 +137,12 @@ pub struct User {
     /// Is the user registered or not
     pub registered: bool,
     #[serde(
-        with = "bson::serde_helpers::chrono_datetime_as_bson_datetime",
+        with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
     )]
     pub created: chrono::DateTime<chrono::Utc>,
     #[serde(
-        with = "bson::serde_helpers::chrono_datetime_as_bson_datetime",
+        with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
     )]
     pub updated: chrono::DateTime<chrono::Utc>,

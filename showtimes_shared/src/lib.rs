@@ -260,35 +260,63 @@ pub mod bson_datetime_opt_serializer {
     }
 }
 
-pub fn ser_opt_unix<S>(
-    date: &Option<chrono::DateTime<chrono::Utc>>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    match date {
-        Some(date) => {
-            let ts = date.timestamp();
-            serializer.serialize_i64(ts)
-        }
-        None => serializer.serialize_none(),
+pub mod unix_timestamp_serializer {
+    use serde::Deserialize;
+
+    pub fn serialize<S>(
+        date: &chrono::DateTime<chrono::Utc>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let ts = date.timestamp();
+        serializer.serialize_i64(ts)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<chrono::DateTime<chrono::Utc>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let ts = i64::deserialize(deserializer)?;
+        let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(ts, 0).unwrap();
+        Ok(dt)
     }
 }
 
-pub fn de_opt_unix<'de, D>(
-    deserializer: D,
-) -> Result<Option<chrono::DateTime<chrono::Utc>>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    match i64::deserialize(deserializer) {
-        Ok(s) => {
-            // unwrap now!
-            let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(s, 0).unwrap();
-            Ok(Some(dt))
+pub mod unix_timestamp_opt_serializer {
+    use serde::Deserialize;
+
+    pub fn serialize<S>(
+        date: &Option<chrono::DateTime<chrono::Utc>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match date {
+            Some(date) => {
+                let ts = date.timestamp();
+                serializer.serialize_i64(ts)
+            }
+            None => serializer.serialize_none(),
         }
-        Err(_) => Ok(None),
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<Option<chrono::DateTime<chrono::Utc>>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match i64::deserialize(deserializer) {
+            Ok(s) => {
+                // unwrap now!
+                let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(s, 0).unwrap();
+                Ok(Some(dt))
+            }
+            Err(_) => Ok(None),
+        }
     }
 }
 
