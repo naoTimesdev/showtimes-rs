@@ -38,19 +38,21 @@ pub(crate) struct MigrationCli {
 }
 
 const MIGRATION_TEMPLATE: &str = r#"use chrono::TimeZone;
-use showtimes_db::ClientMutex;
+use showtimes_db::{ClientMutex, DatabaseMutex};
 
 use super::Migration;
 
 pub struct {{name}} {
     client: ClientMutex,
+    db: DatabaseMutex,
 }
 
 #[async_trait::async_trait]
 impl Migration for {{name}} {
-    fn init(client: &ClientMutex) -> Self {
+    fn init(client: &ClientMutex, db: &DatabaseMutex) -> Self {
         Self {
             client: client.clone(),
+            db: db.clone(),
         }
     }
 
@@ -64,14 +66,21 @@ impl Migration for {{name}} {
             .unwrap()
     }
 
+    fn clone_box(&self) -> Box<dyn Migration> {
+        Box::new(Self {
+            client: self.client.clone(),
+            db: self.db.clone(),
+        })
+    }
+
     async fn up(&self) -> anyhow::Result<()> {
         // TODO: Implement the up migration
-        Ok(())
+        anyhow::bail!("Not implemented")
     }
 
     async fn down(&self) -> anyhow::Result<()> {
         // TODO: Implement the down migration
-        Ok(())
+        anyhow::bail!("Not implemented")
     }
 }
 "#;
