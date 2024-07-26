@@ -281,11 +281,46 @@ impl Migration for M20240725045840Init {
 
         let meilisearch = M20240725045840Init::setup_meilisearch(&meili_url, &meili_key).await?;
 
+        // Remove projects from the database
+        let project_handler = showtimes_db::ProjectHandler::new(self.db.clone()).await;
+        tracing::info!("Dropping projects collection...");
+        project_handler.delete_all().await?;
+
+        // Remove servers from the database
+        let server_handler = showtimes_db::ServerHandler::new(self.db.clone()).await;
+        tracing::info!("Dropping servers collection...");
+        server_handler.delete_all().await?;
+
         // Remove users from the database
         let user_handler = UserHandler::new(self.db.clone()).await;
-
         tracing::info!("Dropping users collection...");
         user_handler.delete_all().await?;
+
+        // Remove projects from the search index
+        tracing::info!("Dropping projects search index...");
+        let m_project_index = meilisearch
+            .lock()
+            .await
+            .index(showtimes_search::models::Project::index_name());
+        let m_project_cm = m_project_index.delete_all_documents().await?;
+        tracing::info!(" Waiting for projects search index to be completely deleted...");
+        m_project_cm
+            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .await?;
+        tracing::info!("Projects search index has been deleted");
+
+        // Remove servers from the search index
+        tracing::info!("Dropping servers search index...");
+        let m_server_index = meilisearch
+            .lock()
+            .await
+            .index(showtimes_search::models::Server::index_name());
+        let m_server_cm = m_server_index.delete_all_documents().await?;
+        tracing::info!(" Waiting for servers search index to be completely deleted...");
+        m_server_cm
+            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .await?;
+        tracing::info!("Servers search index has been deleted");
 
         // Remove users from the search index
         tracing::info!("Dropping users search index...");
