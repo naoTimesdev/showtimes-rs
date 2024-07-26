@@ -4,15 +4,21 @@ use bson::doc;
 use chrono::TimeZone;
 use futures::TryStreamExt;
 use showtimes_db::{
-    m::{DiscordUser, User},
+    m::{
+        DiscordUser, EpisodeProgress, ImageMetadata, IntegrationId, RoleAssignee, RoleStatus, User,
+    },
     ClientMutex, DatabaseMutex, UserHandler,
 };
 use showtimes_fs::{
     local::LocalFs,
     s3::{S3Fs, S3FsCredentialsProvider, S3FsRegionProvider},
 };
+use showtimes_shared::ulid::Ulid;
 
-use crate::{common::env_or_exit, models::projects::ProjectAssignee};
+use crate::{
+    common::env_or_exit,
+    models::projects::{NumOrFloat, ProjectAssignee},
+};
 
 use super::Migration;
 
@@ -120,33 +126,147 @@ impl Migration for M20240725045840Init {
         tracing::info!("Found {} servers", servers.len());
 
         tracing::info!("Collecting valid users...");
-        let users = self.collect_valid_users(&old_db_name, &servers).await?;
+        let users_map = self.collect_valid_users(&old_db_name, &servers).await?;
 
         // Commit users
-        tracing::info!("Found {} valid users, committing to database", users.len());
-        let mut users = users
+        tracing::info!(
+            "Found {} valid users, committing to database",
+            users_map.len()
+        );
+        let mut users = users_map
             .iter()
             .map(|(_, user)| user.clone())
             .collect::<Vec<_>>();
         let user_handler = UserHandler::new(self.db.clone()).await;
         user_handler.insert(&mut users).await?;
-        tracing::info!("Committed all users data, creating search data for users");
+        tracing::info!("Committed all users data");
 
-        let mapped_users: Vec<showtimes_search::models::User> =
-            users.iter().map(|user| user.clone().into()).collect();
+        tracing::info!("Processing {} servers...", servers.len());
 
+        let mut mapped_servers: Vec<showtimes_db::m::Server> = vec![];
+        let mut transformed_projects = vec![];
+        for server in &servers {
+            tracing::info!("Processing server {}...", &server.id);
+            match M20240725045840Init::transform_server_data(server, &users_map) {
+                Ok(t_server) => {
+                    tracing::info!(
+                        " Transform server {} projects ({} total)...",
+                        &server.id,
+                        server.anime.len()
+                    );
+                    for project in &server.anime {
+                        match M20240725045840Init::transform_project_data(
+                            &t_server.id,
+                            project,
+                            &users_map,
+                        ) {
+                            Ok(t_project) => {
+                                transformed_projects.push(t_project.clone());
+                            }
+                            Err(e) => {
+                                tracing::error!(
+                                    "Error transforming project ({} srv {}): {}",
+                                    &project.id,
+                                    &server.id,
+                                    e
+                                );
+                                anyhow::bail!(
+                                    "Error transforming project ({} srv {}): {}",
+                                    &project.id,
+                                    &server.id,
+                                    e
+                                );
+                            }
+                        }
+                    }
+
+                    tracing::info!(
+                        " Server {} has {} projects, transformed all possible one!",
+                        &server.id,
+                        server.anime.len()
+                    );
+
+                    mapped_servers.push(t_server);
+                }
+                Err(e) => {
+                    tracing::error!("Error transforming server ({}): {}", &server.id, e);
+                    if !server.anime.is_empty() {
+                        tracing::warn!(" Server {} has an existing projects!", &server.id);
+                    }
+                    anyhow::bail!("Error transforming server ({}): {}", &server.id, e);
+                }
+            }
+        }
+
+        if !mapped_servers.is_empty() {
+            tracing::info!("Committing all servers to database...");
+            let server_handler = showtimes_db::ServerHandler::new(self.db.clone()).await;
+            server_handler.insert(&mut mapped_servers).await?;
+        } else {
+            tracing::warn!("No servers to commit");
+        }
+
+        if !transformed_projects.is_empty() {
+            tracing::info!("Committing all projects to database...");
+            let project_handler = showtimes_db::ProjectHandler::new(self.db.clone()).await;
+            project_handler.insert(&mut transformed_projects).await?;
+        }
+
+        tracing::info!("Comitting all users into search index...");
         let m_user_index = meilisearch
             .lock()
             .await
             .index(showtimes_search::models::User::index_name());
+        let m_users_docs: Vec<showtimes_search::models::User> =
+            users.iter().map(|user| user.clone().into()).collect();
         let m_use_commit = m_user_index
             .add_documents(
-                &mapped_users,
+                &m_users_docs,
                 Some(showtimes_search::models::User::primary_key()),
             )
             .await?;
-        tracing::info!("Committed all users search data, waiting for commit to finish");
+        tracing::info!("Waiting for users search index to be completely committed...");
         m_use_commit
+            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .await?;
+
+        tracing::info!("Comitting all servers into search index...");
+        let m_server_index = meilisearch
+            .lock()
+            .await
+            .index(showtimes_search::models::Server::index_name());
+        let m_server_docs: Vec<showtimes_search::models::Server> = mapped_servers
+            .iter()
+            .map(|server| server.clone().into())
+            .collect::<Vec<_>>();
+        let m_server_commit = m_server_index
+            .add_documents(
+                &m_server_docs,
+                Some(showtimes_search::models::Server::primary_key()),
+            )
+            .await?;
+        tracing::info!("Waiting for server search index to be completely committed...");
+        m_server_commit
+            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .await?;
+
+        tracing::info!("Comitting all projects into search index...");
+        let m_project_index = meilisearch
+            .lock()
+            .await
+            .index(showtimes_search::models::Project::index_name());
+        let m_project_docs: Vec<showtimes_search::models::Project> = transformed_projects
+            .iter()
+            .map(|project| project.clone().into())
+            .collect::<Vec<_>>();
+        let m_project_commit = m_project_index
+            .add_documents(
+                &m_project_docs,
+                Some(showtimes_search::models::Project::primary_key()),
+            )
+            .await?;
+        tracing::info!("Waiting for project search index to be completely committed...");
+        m_project_commit
             .wait_for_completion(&*meilisearch.lock().await, None, None)
             .await?;
 
@@ -334,22 +454,296 @@ impl M20240725045840Init {
                     if !all_users.contains_key(&assignee) && is_discord_snowflake(&assignee) {
                         let mut discord_user = DiscordUser::stub();
                         discord_user.id = assignee.clone();
-                        if !name.is_empty() {
-                            discord_user.username = name.clone();
-                        }
-                        let created_user = User::new(assignee.clone(), discord_user);
                         let name = if name.is_empty() {
                             assignee.clone()
                         } else {
                             name
                         };
-                        all_users.insert(name, created_user.with_unregistered());
+                        discord_user.username = name.clone();
+                        let created_user = User::new(name, discord_user);
+                        all_users.insert(assignee, created_user.with_unregistered());
                     }
                 }
             }
         }
 
         Ok(all_users)
+    }
+
+    fn transform_server_data(
+        server: &crate::models::servers::Server,
+        actors: &HashMap<String, User>,
+    ) -> anyhow::Result<showtimes_db::m::Server> {
+        let server_name = server
+            .name
+            .clone()
+            .unwrap_or(format!("Server {}", &server.id));
+        let mut integrations = vec![IntegrationId::new(
+            server.id.clone(),
+            showtimes_db::m::IntegrationType::DiscordGuild,
+        )];
+
+        let owners: Vec<showtimes_db::m::ServerUser> = server
+            .serverowner
+            .iter()
+            .filter_map(|owner| match actors.get(owner) {
+                Some(user) => Some(showtimes_db::m::ServerUser::new(
+                    user.id.clone(),
+                    showtimes_db::m::UserPrivilege::Admin,
+                )),
+                None => {
+                    tracing::warn!("Owner {} not found in {}", owner, &server.id);
+                    None
+                }
+            })
+            .collect();
+
+        if let Some(announce) = &server.announce_channel {
+            if is_discord_snowflake(&announce) {
+                integrations.push(IntegrationId::new(
+                    announce.clone(),
+                    showtimes_db::m::IntegrationType::DiscordChannel,
+                ));
+            }
+        }
+
+        if let Some(fsdb) = server.fsdb_id {
+            integrations.push(IntegrationId::new(
+                fsdb.to_string(),
+                showtimes_db::m::IntegrationType::FansubDB,
+            ));
+        }
+
+        let server_info =
+            showtimes_db::m::Server::new(server_name, owners).with_integrations(integrations);
+
+        Ok(server_info)
+    }
+
+    fn transform_project_data(
+        server_id: &Ulid,
+        project: &crate::models::projects::Project,
+        actors: &HashMap<String, User>,
+    ) -> anyhow::Result<showtimes_db::m::Project> {
+        let title = project.title.clone();
+        // NAIVE assumption
+        let project_kind = if project.status.len() > 1 {
+            showtimes_db::m::ProjectType::Series
+        } else {
+            showtimes_db::m::ProjectType::Movies
+        };
+        let poster_url = project.poster_data.url.clone();
+
+        let poster_info = if let Some(poster_col) = project.poster_data.color {
+            showtimes_db::m::Poster::new_with_color(
+                ImageMetadata::stub_with_name(poster_url),
+                poster_col,
+            )
+        } else {
+            showtimes_db::m::Poster::new(ImageMetadata::stub_with_name(poster_url))
+        };
+
+        let mut available_roles: HashMap<String, showtimes_db::m::Role> = vec![
+            showtimes_db::m::Role::new("TL", "Translator")?,
+            showtimes_db::m::Role::new("TLC", "Translation Checker")?,
+            showtimes_db::m::Role::new("ED", "Editor")?,
+            showtimes_db::m::Role::new("ENC", "Encoder")?,
+            showtimes_db::m::Role::new("TM", "Timer")?,
+            showtimes_db::m::Role::new("TS", "Typesetter")?,
+            showtimes_db::m::Role::new("QC", "Quality Checker")?,
+        ]
+        .iter()
+        .map(|role| (role.key().to_string(), role.clone()))
+        .collect();
+
+        for custom in &project.assignments.custom {
+            let role = showtimes_db::m::Role::new(&custom.key, &custom.name)?;
+            available_roles.insert(role.key().to_string(), role);
+        }
+
+        let mapped_progress = project
+            .status
+            .iter()
+            .map(|status| {
+                let mut role_status: Vec<RoleStatus> = available_roles
+                    .values()
+                    .map(|role| RoleStatus::from(role.clone()))
+                    .collect();
+
+                for new_status in role_status.iter_mut() {
+                    match new_status.key() {
+                        "TL" => new_status.set_finished(status.progress.translation),
+                        "TLC" => new_status.set_finished(status.progress.translation_check),
+                        "ED" => new_status.set_finished(status.progress.editing),
+                        "ENC" => new_status.set_finished(status.progress.encoding),
+                        "TM" => new_status.set_finished(status.progress.timing),
+                        "TS" => new_status.set_finished(status.progress.typesetting),
+                        "QC" => new_status.set_finished(status.progress.quality_check),
+                        _ => {
+                            let custom = status
+                                .progress
+                                .custom
+                                .iter()
+                                .find(|&c| c.key == new_status.key());
+                            if let Some(custom) = custom {
+                                new_status.set_finished(custom.done);
+                            }
+                        }
+                    };
+                }
+
+                let mut episode = EpisodeProgress::new(status.episode as u64, status.is_done)
+                    .with_statuses(role_status);
+                if let Some(airtime) = &status.airtime {
+                    match airtime {
+                        NumOrFloat::Num(num) => {
+                            match episode.set_aired_from_unix((*num) as i64) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    // FUCK!
+                                    tracing::warn!("  Project {} has invalid number when parsing timestamp {}: {e}", &project.id, num);
+                                }
+                            }
+                        }
+                        NumOrFloat::Float(num) => {
+                            // This is unix timestamp in seconds + some decimal which is milliseconds
+                            let num = *num as i64;
+                            match episode.set_aired_from_unix(num) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    // FUCK!
+                                    tracing::warn!("  Project {} has invalid number when parsing timestamp {}: {e}", &project.id, num);
+                                }
+                            }
+                        }
+                    };
+                }
+
+                if let Some(reason) = &status.delay_reason {
+                    episode.set_delay_reason(reason.clone());
+                }
+
+                episode
+            })
+            .collect();
+
+        let correct_roles = available_roles
+            .values()
+            .map(|role| role.clone())
+            .collect::<Vec<_>>();
+
+        let mut assignees: HashMap<String, RoleAssignee> = correct_roles
+            .iter()
+            .map(|role| {
+                let assignee = RoleAssignee::from(role);
+                (role.key().to_string(), assignee)
+            })
+            .collect();
+
+        assign_people(
+            &project.assignments.translator.id,
+            "TL",
+            actors,
+            &mut assignees,
+        );
+        assign_people(
+            &project.assignments.translation_checker.id,
+            "TLC",
+            actors,
+            &mut assignees,
+        );
+        assign_people(&project.assignments.editor.id, "ED", actors, &mut assignees);
+        assign_people(
+            &project.assignments.encoder.id,
+            "ENC",
+            actors,
+            &mut assignees,
+        );
+        assign_people(&project.assignments.timer.id, "TM", actors, &mut assignees);
+        assign_people(
+            &project.assignments.typesetter.id,
+            "TS",
+            actors,
+            &mut assignees,
+        );
+        assign_people(
+            &project.assignments.quality_checker.id,
+            "QC",
+            actors,
+            &mut assignees,
+        );
+        for custom in &project.assignments.custom {
+            assign_people(&custom.person.id, &custom.key, actors, &mut assignees);
+        }
+
+        let proper_assignee = assignees
+            .values()
+            .map(|assignee| assignee.clone())
+            .collect::<Vec<_>>();
+
+        let mut new_project = showtimes_db::m::Project::new_with_poster_roles_assignees(
+            title,
+            project_kind,
+            server_id.clone(),
+            poster_info,
+            correct_roles,
+            proper_assignee,
+        )?;
+        new_project.progress = mapped_progress;
+        new_project.aliases = project.aliases.clone();
+        let mut integrations = vec![IntegrationId::new(
+            project.id.clone(),
+            showtimes_db::m::IntegrationType::ProviderAnilist,
+        )];
+        if let Some(mal_id) = project.mal_id {
+            integrations.push(IntegrationId::new(
+                mal_id.to_string(),
+                showtimes_db::m::IntegrationType::ProviderAnilistMal,
+            ));
+        }
+        if let Some(fsdb_data) = &project.fsdb_data {
+            if let Some(fsdb_id) = fsdb_data.id {
+                integrations.push(IntegrationId::new(
+                    fsdb_id.to_string(),
+                    showtimes_db::m::IntegrationType::FansubDBProject,
+                ));
+            }
+            if let Some(fsdb_anime) = fsdb_data.ani_id {
+                integrations.push(IntegrationId::new(
+                    fsdb_anime.to_string(),
+                    showtimes_db::m::IntegrationType::FansubDBShows,
+                ));
+            }
+        }
+
+        new_project.integrations = integrations;
+
+        Ok(new_project)
+    }
+}
+
+fn assign_people(
+    id: &Option<String>,
+    key: &str,
+    actors: &HashMap<String, User>,
+    assignees: &mut HashMap<String, RoleAssignee>,
+) {
+    if let Some(id) = id {
+        if !is_discord_snowflake(id) {
+            // skip
+            return;
+        }
+
+        let assignee = assignees.get_mut(key).unwrap();
+        let creator_id = actors.get(id);
+        match creator_id {
+            Some(creator_id) => {
+                assignee.set_actor(Some(creator_id.id));
+            }
+            None => {
+                tracing::warn!("Assignee {} not found", id);
+            }
+        }
     }
 }
 
