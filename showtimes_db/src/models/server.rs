@@ -42,6 +42,17 @@ pub struct ServerUser {
     pub extras: Vec<String>,
 }
 
+impl ServerUser {
+    /// Create a new server user
+    pub fn new(id: showtimes_shared::ulid::Ulid, privilege: UserPrivilege) -> Self {
+        ServerUser {
+            id,
+            privilege,
+            extras: Vec::new(),
+        }
+    }
+}
+
 /// A model to hold server information
 ///
 /// The original account is called "server" as a caddy over from the original
@@ -72,6 +83,36 @@ pub struct Server {
         default = "chrono::Utc::now"
     )]
     pub updated: chrono::DateTime<chrono::Utc>,
+}
+
+impl Server {
+    pub fn new(name: impl Into<String>, owners: Vec<ServerUser>) -> Self {
+        Server {
+            id: showtimes_shared::ulid::Ulid::new(),
+            name: name.into(),
+            integrations: Vec::new(),
+            owners,
+            avatar: None,
+            _id: None,
+            created: chrono::Utc::now(),
+            updated: chrono::Utc::now(),
+        }
+    }
+
+    pub fn with_avatar(mut self, avatar: ImageMetadata) -> Self {
+        self.avatar = Some(avatar);
+        self
+    }
+
+    pub fn with_integration(mut self, integration: IntegrationId) -> Self {
+        self.integrations.push(integration);
+        self
+    }
+
+    pub fn with_integrations(mut self, integrations: Vec<IntegrationId>) -> Self {
+        self.integrations = integrations;
+        self
+    }
 }
 
 /// A model to hold server synchronization information on a project

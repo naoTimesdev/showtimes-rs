@@ -16,6 +16,16 @@ pub struct ImageMetadata {
 }
 
 impl ImageMetadata {
+    pub fn stub_with_name(name: impl Into<String>) -> Self {
+        ImageMetadata {
+            kind: "image".to_string(),
+            key: "stubbed".to_string(),
+            filename: name.into(),
+            format: "png".to_string(),
+            parent: None,
+        }
+    }
+
     /// Create a URL or path to the image
     pub fn as_url(&self) -> String {
         match &self.parent {

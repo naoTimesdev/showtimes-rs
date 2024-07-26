@@ -123,7 +123,7 @@ fn validate_key(key: &str) -> anyhow::Result<()> {
     if !key.is_ascii() {
         anyhow::bail!("`key` must be ASCII");
     }
-    if !key.contains(' ') && key.to_ascii_uppercase() == key {
+    if !key.contains(' ') && key.to_ascii_uppercase() != key {
         anyhow::bail!("`key` must be uppercase and have no spaces");
     }
     Ok(())
@@ -173,37 +173,21 @@ impl Role {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoleStatus {
     key: String,
-    name: String,
     finished: bool,
 }
 
 impl RoleStatus {
     /// Create a new role status
-    pub fn new(
-        key: impl Into<String>,
-        name: impl Into<String>,
-        finished: bool,
-    ) -> anyhow::Result<Self> {
+    pub fn new(key: impl Into<String>, finished: bool) -> anyhow::Result<Self> {
         let key: String = key.into();
         validate_key(&key)?;
-        let name: String = name.into();
-        validate_name(&name)?;
 
-        Ok(RoleStatus {
-            key,
-            name,
-            finished,
-        })
+        Ok(RoleStatus { key, finished })
     }
 
     /// Getter for the key
     pub fn key(&self) -> &str {
         &self.key
-    }
-
-    /// Getter for the name
-    pub fn name(&self) -> &str {
-        &self.name
     }
 
     /// Getter for the finished status
@@ -227,7 +211,6 @@ impl From<Role> for RoleStatus {
         let r = role.clone();
         RoleStatus {
             key: r.key,
-            name: r.name,
             finished: false,
         }
     }
@@ -331,7 +314,17 @@ pub struct EpisodeProgress {
 }
 
 impl EpisodeProgress {
-    pub fn new(number: u64, finished: bool, roles: Vec<Role>) -> Self {
+    pub fn new(number: u64, finished: bool) -> Self {
+        EpisodeProgress {
+            number,
+            finished,
+            aired: None,
+            statuses: vec![],
+            delay_reason: None,
+        }
+    }
+
+    pub fn new_with_roles(number: u64, finished: bool, roles: Vec<Role>) -> Self {
         EpisodeProgress {
             number,
             finished,
@@ -339,6 +332,38 @@ impl EpisodeProgress {
             statuses: roles.into_iter().map(RoleStatus::from).collect(),
             delay_reason: None,
         }
+    }
+
+    pub fn with_statuses(&self, statuses: Vec<RoleStatus>) -> Self {
+        EpisodeProgress {
+            number: self.number,
+            finished: self.finished,
+            aired: self.aired,
+            delay_reason: self.delay_reason.clone(),
+            statuses,
+        }
+    }
+
+    pub fn set_delay_reason(&mut self, reason: impl Into<String>) {
+        self.delay_reason = Some(reason.into());
+    }
+
+    pub fn clear_delay_reason(&mut self) {
+        self.delay_reason = None;
+    }
+
+    pub fn set_aired(&mut self, aired: Option<chrono::DateTime<chrono::Utc>>) {
+        self.aired = aired;
+    }
+
+    pub fn set_aired_from_unix(&mut self, aired: i64) -> anyhow::Result<()> {
+        let timestamp = match chrono::DateTime::<chrono::Utc>::from_timestamp(aired, 0) {
+            Some(t) => t,
+            None => anyhow::bail!("Failed to convert timestamp: {}", aired),
+        };
+
+        self.aired = Some(timestamp);
+        Ok(())
     }
 }
 
@@ -493,14 +518,14 @@ impl Project {
         let number = self.progress.len() as u64 + 1;
         let roles = self.roles.clone();
         self.progress
-            .push(EpisodeProgress::new(number, false, roles));
+            .push(EpisodeProgress::new_with_roles(number, false, roles));
     }
 
     /// Create a new episode/chapter progress with specific episode/chapter number.
     pub fn add_episode_with_number(&mut self, number: u64) {
         let roles = self.roles.clone();
         self.progress
-            .push(EpisodeProgress::new(number, false, roles));
+            .push(EpisodeProgress::new_with_roles(number, false, roles));
     }
 
     /// Remove an episode/chapter progress.
