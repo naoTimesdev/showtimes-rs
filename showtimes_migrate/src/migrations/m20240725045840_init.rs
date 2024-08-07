@@ -43,6 +43,16 @@ fn strip_discord_discriminator(value: &str) -> String {
     }
 }
 
+#[derive(Clone, Debug)]
+struct ServerCollab {
+    // Project ID (new ver)
+    id: Ulid,
+    // Project ID (old ver, Anilist)
+    old_id: String,
+    // old linked project ID
+    servers: Vec<String>,
+}
+
 #[derive(Clone)]
 pub struct M20240725045840Init {
     client: ClientMutex,
@@ -144,6 +154,14 @@ impl Migration for M20240725045840Init {
         tracing::info!("Processing {} servers...", servers.len());
 
         let mut mapped_servers: Vec<showtimes_db::m::Server> = vec![];
+        // This is mapped like this
+        // -> Old server ID -> ServerCollab
+        let mut temp_mapping_projects = HashMap::<String, Vec<ServerCollab>>::new();
+        // Target server -> source server
+        let mut project_id_maps = HashMap::<String, HashMap<String, Ulid>>::new();
+        let mut server_id_maps = HashMap::new();
+        let mut temp_invite_maps =
+            HashMap::<String, Vec<crate::models::servers::ServerCollabConfirm>>::new();
         let mut transformed_projects = vec![];
         for server in &servers {
             tracing::info!("Processing server {}...", &server.id);
@@ -154,6 +172,14 @@ impl Migration for M20240725045840Init {
                         &server.id,
                         server.anime.len()
                     );
+                    let temp_projects = temp_mapping_projects
+                        .entry(server.id.clone())
+                        .or_insert(Vec::new());
+                    temp_invite_maps.insert(server.id.clone(), server.konfirmasi.clone());
+                    server_id_maps.insert(server.id.clone(), t_server.id.clone());
+                    let server_maps = project_id_maps
+                        .entry(server.id.clone())
+                        .or_insert(HashMap::new());
                     for project in &server.anime {
                         match M20240725045840Init::transform_project_data(
                             &t_server.id,
@@ -161,6 +187,26 @@ impl Migration for M20240725045840Init {
                             &users_map,
                         ) {
                             Ok(t_project) => {
+                                let collab_data: Vec<String> = project
+                                    .kolaborasi
+                                    .iter()
+                                    .filter_map(|id| {
+                                        if id == &server.id {
+                                            None
+                                        } else {
+                                            Some(id.clone())
+                                        }
+                                    })
+                                    .collect();
+                                if !collab_data.is_empty() {
+                                    temp_projects.push(ServerCollab {
+                                        id: t_project.id.clone(),
+                                        old_id: project.id.clone(),
+                                        servers: collab_data,
+                                    })
+                                }
+
+                                server_maps.insert(project.id.clone(), t_project.id.clone());
                                 transformed_projects.push(t_project.clone());
                             }
                             Err(e) => {
@@ -210,6 +256,36 @@ impl Migration for M20240725045840Init {
             tracing::info!("Committing all projects to database...");
             let project_handler = showtimes_db::ProjectHandler::new(self.db.clone()).await;
             project_handler.insert(&mut transformed_projects).await?;
+        }
+
+        tracing::info!("Processing server collaborations...");
+        let mut transformed_collab_sync =
+            M20240725045840Init::create_collaboration_sync_maps(&temp_mapping_projects).await?;
+
+        if !transformed_collab_sync.is_empty() {
+            tracing::info!("Committing server collaborations to database...");
+            let collab_sync_handler =
+                showtimes_db::CollaborationSyncHandler::new(self.db.clone()).await;
+            collab_sync_handler
+                .insert(&mut transformed_collab_sync)
+                .await?;
+        }
+
+        tracing::info!("Processing collab invites...");
+        let mut transformed_invites = M20240725045840Init::create_collaboration_invite_maps(
+            &project_id_maps,
+            &temp_invite_maps,
+            &server_id_maps,
+        )
+        .await?;
+
+        if !transformed_invites.is_empty() {
+            tracing::info!("Committing collab invites to database...");
+            let collab_invite_handler =
+                showtimes_db::CollaborationInviteHandler::new(self.db.clone()).await;
+            collab_invite_handler
+                .insert(&mut transformed_invites)
+                .await?;
         }
 
         tracing::info!("Comitting all users into search index...");
@@ -270,6 +346,51 @@ impl Migration for M20240725045840Init {
             .wait_for_completion(&*meilisearch.lock().await, None, None)
             .await?;
 
+        tracing::info!("Comitting all server collaborations into search index...");
+        let m_collab_index = meilisearch
+            .lock()
+            .await
+            .index(showtimes_search::models::ServerCollabSync::index_name());
+        let m_collab_docs: Vec<showtimes_search::models::ServerCollabSync> =
+            transformed_collab_sync
+                .iter()
+                .map(|collab| collab.clone().into())
+                .collect::<Vec<_>>();
+        let m_collab_commit = m_collab_index
+            .add_documents(
+                &m_collab_docs,
+                Some(showtimes_search::models::ServerCollabSync::primary_key()),
+            )
+            .await?;
+        tracing::info!(
+            "Waiting for server collaboration search index to be completely committed..."
+        );
+        m_collab_commit
+            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .await?;
+
+        tracing::info!("Comitting all server collab invites into search index...");
+        let m_invite_index = meilisearch
+            .lock()
+            .await
+            .index(showtimes_search::models::ServerCollabInvite::index_name());
+        let m_invite_docs: Vec<showtimes_search::models::ServerCollabInvite> = transformed_invites
+            .iter()
+            .map(|invite| invite.clone().into())
+            .collect::<Vec<_>>();
+        let m_invite_commit = m_invite_index
+            .add_documents(
+                &m_invite_docs,
+                Some(showtimes_search::models::ServerCollabInvite::primary_key()),
+            )
+            .await?;
+        tracing::info!(
+            "Waiting for server collab invite search index to be completely committed..."
+        );
+        m_invite_commit
+            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .await?;
+
         M20240725045840Init::setup_meilisearch_index(&meilisearch).await?;
 
         Ok(())
@@ -295,6 +416,18 @@ impl Migration for M20240725045840Init {
         let user_handler = UserHandler::new(self.db.clone()).await;
         tracing::info!("Dropping users collection...");
         user_handler.delete_all().await?;
+
+        // Remove server collaborations from the database
+        let collab_sync_handler =
+            showtimes_db::CollaborationSyncHandler::new(self.db.clone()).await;
+        tracing::info!("Dropping server collaborations collection...");
+        collab_sync_handler.delete_all().await?;
+
+        // Remove server collab invites from the database
+        let collab_invite_handler =
+            showtimes_db::CollaborationInviteHandler::new(self.db.clone()).await;
+        tracing::info!("Dropping server collab invites collection...");
+        collab_invite_handler.delete_all().await?;
 
         // Remove projects from the search index
         tracing::info!("Dropping projects search index...");
@@ -335,6 +468,36 @@ impl Migration for M20240725045840Init {
             .wait_for_completion(&*meilisearch.lock().await, None, None)
             .await?;
         tracing::info!("Users search index has been deleted");
+
+        // Remove server collaborations from the search index
+        tracing::info!("Dropping server collaborations search index...");
+        let m_collab_index = meilisearch
+            .lock()
+            .await
+            .index(showtimes_search::models::ServerCollabSync::index_name());
+
+        let m_collab_cm = m_collab_index.delete_all_documents().await?;
+        tracing::info!(
+            " Waiting for server collaborations search index to be completely deleted..."
+        );
+        m_collab_cm
+            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .await?;
+
+        // Remove server collab invites from the search index
+        tracing::info!("Dropping server collab invites search index...");
+        let m_invite_index = meilisearch
+            .lock()
+            .await
+            .index(showtimes_search::models::ServerCollabInvite::index_name());
+
+        let m_invite_cm = m_invite_index.delete_all_documents().await?;
+        tracing::info!(
+            " Waiting for server collab invites search index to be completely deleted..."
+        );
+        m_invite_cm
+            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .await?;
 
         Ok(())
     }
@@ -754,6 +917,120 @@ impl M20240725045840Init {
         new_project.integrations = integrations;
 
         Ok(new_project)
+    }
+
+    async fn create_collaboration_sync_maps(
+        top_collab_info: &HashMap<String, Vec<ServerCollab>>,
+    ) -> anyhow::Result<Vec<showtimes_db::m::ServerCollaborationSync>> {
+        let mut mapped_temp = HashMap::new();
+        for (server_id, collab_info) in top_collab_info {
+            for collab in collab_info {
+                let mut merged_servers = vec![server_id.clone()];
+                merged_servers.extend_from_slice(&collab.servers);
+                merged_servers.sort();
+
+                // ProjectId-FirstServerId
+                let key = format!("{}-{}", &collab.old_id, &merged_servers[0]);
+
+                let all_project_ids: Vec<Ulid> = merged_servers
+                    .iter()
+                    .filter_map(|server_id| match top_collab_info.get(server_id) {
+                        Some(top_c) => match top_c.iter().find(|c| c.old_id == collab.old_id) {
+                            Some(c) => Some(c.id.clone()),
+                            None => None,
+                        },
+                        None => None,
+                    })
+                    .collect();
+
+                mapped_temp.insert(
+                    key,
+                    showtimes_db::m::ServerCollaborationSync::new(all_project_ids),
+                );
+            }
+        }
+
+        // get all values
+        let all_values = mapped_temp.values().map(|v| v.clone()).collect::<Vec<_>>();
+
+        Ok(all_values)
+    }
+
+    async fn create_collaboration_invite_maps(
+        project_maps: &HashMap<String, HashMap<String, Ulid>>,
+        confirm_maps: &HashMap<String, Vec<crate::models::servers::ServerCollabConfirm>>,
+        server_maps: &HashMap<String, Ulid>,
+    ) -> anyhow::Result<Vec<showtimes_db::m::ServerCollaborationInvite>> {
+        let mut all_invites = vec![];
+
+        for (target_server_id, collab_info) in confirm_maps {
+            let target_server = match server_maps.get(target_server_id) {
+                Some(p) => p.clone(),
+                None => {
+                    tracing::warn!("Target server {} not found", target_server_id);
+                    continue;
+                }
+            };
+
+            for collab in collab_info {
+                let project_id = collab.anime_id.clone();
+                let source_id = collab.server_id.clone();
+
+                let source_server = match server_maps.get(&source_id) {
+                    Some(p) => p.clone(),
+                    None => {
+                        tracing::warn!("Source server {} not found", &source_id);
+                        continue;
+                    }
+                };
+
+                let source_project_id = match project_maps.get(&source_id) {
+                    Some(p) => match p.get(&project_id) {
+                        Some(p) => p.clone(),
+                        None => {
+                            tracing::warn!(
+                                "Project {} not found in source server {}",
+                                &project_id,
+                                &source_id
+                            );
+                            continue;
+                        }
+                    },
+                    None => {
+                        tracing::warn!("Source server {} not found", &source_id);
+                        continue;
+                    }
+                };
+
+                let target_project_id = match project_maps.get(target_server_id) {
+                    Some(p) => match p.get(&project_id) {
+                        Some(p) => Some(p.clone()),
+                        None => None,
+                    },
+                    None => None,
+                };
+
+                let invite_source = showtimes_db::m::ServerCollaborationInviteSource::new(
+                    source_server,
+                    source_project_id,
+                );
+
+                let invite_target = match target_project_id {
+                    Some(p) => showtimes_db::m::ServerCollaborationInviteTarget::new_with_project(
+                        target_server,
+                        p,
+                    ),
+                    None => showtimes_db::m::ServerCollaborationInviteTarget::new(target_server),
+                };
+
+                all_invites.push(showtimes_db::m::ServerCollaborationInvite::new(
+                    invite_source,
+                    invite_target,
+                ));
+            }
+        }
+
+        Ok(all_invites)
     }
 }
 
