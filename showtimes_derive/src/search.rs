@@ -26,22 +26,12 @@ impl Default for SearchModelAttr {
     }
 }
 
-fn extract_array_ident(
-    value: Expr,
-    name: &str,
-    fields: &[String],
-) -> Result<Vec<String>, syn::Error> {
+fn extract_array_ident(value: Expr) -> Result<Vec<String>, syn::Error> {
     let mut result = Vec::new();
     if let Expr::Array(ref filterable) = value {
         for filter in &filterable.elems {
             if let Expr::Lit(filter) = filter {
                 if let Lit::Str(filter) = &filter.lit {
-                    if !fields.contains(&filter.value()) {
-                        return Err(syn::Error::new(
-                            filter.span(),
-                            format!("Field {} is not {}", filter.value(), name),
-                        ));
-                    }
                     result.push(filter.value());
                 }
             }
@@ -51,10 +41,7 @@ fn extract_array_ident(
     Ok(result)
 }
 
-fn get_searchmodel_attr(
-    attrs: Vec<Attribute>,
-    fields: &Vec<String>,
-) -> Result<SearchModelAttr, syn::Error> {
+fn get_searchmodel_attr(attrs: Vec<Attribute>) -> Result<SearchModelAttr, syn::Error> {
     let mut model_name = String::new();
     let mut model_filters = Vec::new();
     let mut model_searchable = vec!["*".to_string()];
@@ -75,18 +62,18 @@ fn get_searchmodel_attr(
                             }
                         }
                     } else if nameval.path.is_ident("filterable") {
-                        let filterable = extract_array_ident(nameval.value, "filterable", fields)?;
+                        let filterable = extract_array_ident(nameval.value)?;
                         model_filters = filterable;
                     } else if nameval.path.is_ident("searchable") {
-                        let searchable = extract_array_ident(nameval.value, "searchable", fields)?;
+                        let searchable = extract_array_ident(nameval.value)?;
                         if !searchable.is_empty() {
                             model_searchable = searchable;
                         }
                     } else if nameval.path.is_ident("sortable") {
-                        let sortable = extract_array_ident(nameval.value, "sortable", fields)?;
+                        let sortable = extract_array_ident(nameval.value)?;
                         model_sortable = sortable;
                     } else if nameval.path.is_ident("displayed") {
-                        let displayed = extract_array_ident(nameval.value, "displayed", fields)?;
+                        let displayed = extract_array_ident(nameval.value)?;
                         if !displayed.is_empty() {
                             model_displayed = displayed;
                         }
@@ -143,13 +130,6 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
                 }
             };
 
-            // Get all fields names
-            let field_names = fields
-                .named
-                .iter()
-                .map(|field| field.ident.as_ref().unwrap().to_string())
-                .collect::<Vec<String>>();
-
             let pk_field = fields.named.iter().find(|&field| {
                 field
                     .attrs
@@ -170,7 +150,7 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
             let pk_field_name = pk_field.unwrap().ident.as_ref().unwrap().to_string();
 
             // Get the search model attributes
-            let search_attrs = get_searchmodel_attr(ast.attrs.clone(), &field_names);
+            let search_attrs = get_searchmodel_attr(ast.attrs.clone());
 
             match search_attrs {
                 Ok(data) => (data, pk_field_name),
