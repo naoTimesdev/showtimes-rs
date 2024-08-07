@@ -88,7 +88,7 @@ pub struct Server {
 impl Server {
     pub fn new(name: impl Into<String>, owners: Vec<ServerUser>) -> Self {
         Server {
-            id: showtimes_shared::ulid::Ulid::new(),
+            id: ulid_serializer::default(),
             name: name.into(),
             integrations: Vec::new(),
             owners,
@@ -125,9 +125,6 @@ pub struct ServerCollaborationSync {
     /// The list of projects
     #[serde(with = "ulid_list_serializer")]
     pub projects: Vec<showtimes_shared::ulid::Ulid>,
-    /// The list of servers
-    #[serde(with = "ulid_list_serializer")]
-    pub servers: Vec<showtimes_shared::ulid::Ulid>,
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
@@ -142,15 +139,69 @@ pub struct ServerCollaborationSync {
     pub updated: chrono::DateTime<chrono::Utc>,
 }
 
-/// An information for a collaboration invite
+impl ServerCollaborationSync {
+    pub fn new(projects: Vec<showtimes_shared::ulid::Ulid>) -> Self {
+        ServerCollaborationSync {
+            id: ulid_serializer::default(),
+            projects,
+            _id: None,
+            created: chrono::Utc::now(),
+            updated: chrono::Utc::now(),
+        }
+    }
+}
+
+/// An information for a collaboration invite (for source)
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServerCollaborationInviteInfo {
+pub struct ServerCollaborationInviteSource {
     /// The server ID
     #[serde(with = "ulid_serializer")]
     pub server: showtimes_shared::ulid::Ulid,
-    /// The project ID (can be null)
+    /// The project ID
+    #[serde(with = "ulid_serializer")]
+    pub project: showtimes_shared::ulid::Ulid,
+}
+
+impl ServerCollaborationInviteSource {
+    pub fn new(
+        server: showtimes_shared::ulid::Ulid,
+        project: showtimes_shared::ulid::Ulid,
+    ) -> Self {
+        ServerCollaborationInviteSource { server, project }
+    }
+}
+
+/// An information for a collaboration invite (for target)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerCollaborationInviteTarget {
+    /// The server ID
+    #[serde(with = "ulid_serializer")]
+    pub server: showtimes_shared::ulid::Ulid,
+    /// The project ID (can be `None`)
+    ///
+    /// If `None` then the source server data
+    /// will be used as the project data
     #[serde(with = "ulid_opt_serializer")]
     pub project: Option<showtimes_shared::ulid::Ulid>,
+}
+
+impl ServerCollaborationInviteTarget {
+    pub fn new(server: showtimes_shared::ulid::Ulid) -> Self {
+        ServerCollaborationInviteTarget {
+            server,
+            project: None,
+        }
+    }
+
+    pub fn new_with_project(
+        server: showtimes_shared::ulid::Ulid,
+        project: showtimes_shared::ulid::Ulid,
+    ) -> Self {
+        ServerCollaborationInviteTarget {
+            server,
+            project: Some(project),
+        }
+    }
 }
 
 /// A model to hold server collaboration invite on a project
@@ -161,9 +212,9 @@ pub struct ServerCollaborationInvite {
     #[serde(with = "ulid_serializer")]
     pub id: showtimes_shared::ulid::Ulid,
     /// The source server
-    pub source: ServerCollaborationInviteInfo,
+    pub source: ServerCollaborationInviteSource,
     /// The target server
-    pub target: ServerCollaborationInviteInfo,
+    pub target: ServerCollaborationInviteTarget,
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
@@ -176,4 +227,20 @@ pub struct ServerCollaborationInvite {
         default = "chrono::Utc::now"
     )]
     pub updated: chrono::DateTime<chrono::Utc>,
+}
+
+impl ServerCollaborationInvite {
+    pub fn new(
+        source: ServerCollaborationInviteSource,
+        target: ServerCollaborationInviteTarget,
+    ) -> Self {
+        ServerCollaborationInvite {
+            id: ulid_serializer::default(),
+            source,
+            target,
+            _id: None,
+            created: chrono::Utc::now(),
+            updated: chrono::Utc::now(),
+        }
+    }
 }
