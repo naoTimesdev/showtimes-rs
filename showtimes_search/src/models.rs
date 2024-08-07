@@ -1,13 +1,13 @@
 use serde::{Deserialize, Serialize};
 use showtimes_derive::SearchModel;
-use showtimes_shared::{ulid_list_serializer, ulid_serializer};
+use showtimes_shared::{ulid_list_serializer, ulid_opt_serializer, ulid_serializer};
 use std::ops::Deref;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-projects",
-    filterable = ["id", "parent", "created", "title", "aliases"],
-    searchable = ["id", "title", "aliases", "parent"], // integrations
+    filterable = ["id", "parent", "created", "title", "aliases", "integrations.id", "integrations.type"],
+    searchable = ["id", "title", "aliases", "parent", "integrations.id", "integrations.type"],
     sortable = ["id", "created", "updated"],
     distinct = "id",
 )]
@@ -58,8 +58,8 @@ impl From<showtimes_db::m::Project> for Project {
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-servers",
-    filterable = ["id", "created", "name"],
-    searchable = ["id", "name"], // integrations
+    filterable = ["id", "created", "name", "integrations.id", "integrations.type"],
+    searchable = ["id", "name", "integrations.id", "integrations.type"],
     sortable = ["id", "created", "updated"],
     distinct = "id",
 )]
@@ -113,7 +113,7 @@ impl From<showtimes_db::m::Server> for Server {
 #[search(
     name = "nt-users",
     filterable = ["id", "created", "username", "discord_id", "discord_username", "api_key", "kind", "registered"],
-    searchable = ["id", "username", "discord_id", "discord_username", "api_key"], // integrations
+    searchable = ["id", "username", "discord_id", "discord_username", "api_key"],
     sortable = ["id", "created", "updated"],
     distinct = "id",
 )]
@@ -166,6 +166,117 @@ impl From<showtimes_db::m::User> for User {
             api_key: value.api_key,
             kind: value.kind,
             registered: value.registered,
+            created: value.created,
+            updated: value.updated,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
+#[search(
+    name = "nt-collab-sync",
+    filterable = ["id", "created", "projects"],
+    searchable = ["id", "projects"],
+    sortable = ["id", "created", "updated"],
+    distinct = "id",
+)]
+pub struct ServerCollabSync {
+    /// The unique identifier of the server
+    #[serde(with = "ulid_serializer", default = "ulid_serializer::default")]
+    #[primary_key]
+    pub id: showtimes_shared::ulid::Ulid,
+    /// The project being linked together
+    #[serde(with = "ulid_list_serializer")]
+    pub projects: Vec<showtimes_shared::ulid::Ulid>,
+    #[serde(
+        with = "showtimes_shared::unix_timestamp_serializer",
+        default = "chrono::Utc::now"
+    )]
+    pub created: chrono::DateTime<chrono::Utc>,
+    #[serde(
+        with = "showtimes_shared::unix_timestamp_serializer",
+        default = "chrono::Utc::now"
+    )]
+    pub updated: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<showtimes_db::m::ServerCollaborationSync> for ServerCollabSync {
+    fn from(value: showtimes_db::m::ServerCollaborationSync) -> Self {
+        Self {
+            id: value.id,
+            projects: value.projects.clone(),
+            created: value.created,
+            updated: value.updated,
+        }
+    }
+}
+
+/// An information for a collaboration invite (for source)
+#[derive(Debug, Clone, Serialize, Default, Deserialize)]
+pub struct ServerCollabInviteSource {
+    /// The server ID
+    #[serde(with = "ulid_serializer")]
+    pub server: showtimes_shared::ulid::Ulid,
+    /// The project ID
+    #[serde(with = "ulid_serializer")]
+    pub project: showtimes_shared::ulid::Ulid,
+}
+
+/// An information for a collaboration invite (for target)
+#[derive(Debug, Clone, Serialize, Default, Deserialize)]
+pub struct ServerCollabInviteTarget {
+    /// The server ID
+    #[serde(with = "ulid_serializer")]
+    pub server: showtimes_shared::ulid::Ulid,
+    /// The project ID (can be `None`)
+    ///
+    /// If `None` then the source server data
+    /// will be used as the project data
+    #[serde(with = "ulid_opt_serializer")]
+    pub project: Option<showtimes_shared::ulid::Ulid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
+#[search(
+    name = "nt-collab-invite",
+    filterable = ["id", "source.server", "source.project", "target.server", "target.project", "created"],
+    searchable = ["id", "source.server", "source.project", "target.server", "target.project"],
+    sortable = ["id", "created", "updated"],
+    distinct = "id",
+)]
+pub struct ServerCollabInvite {
+    /// The collab invite ID (unique, and used as invite code too)
+    #[serde(with = "ulid_serializer")]
+    #[primary_key]
+    pub id: showtimes_shared::ulid::Ulid,
+    /// The source server
+    pub source: ServerCollabInviteSource,
+    /// The target server
+    pub target: ServerCollabInviteTarget,
+    #[serde(
+        with = "showtimes_shared::unix_timestamp_serializer",
+        default = "chrono::Utc::now"
+    )]
+    pub created: chrono::DateTime<chrono::Utc>,
+    #[serde(
+        with = "showtimes_shared::unix_timestamp_serializer",
+        default = "chrono::Utc::now"
+    )]
+    pub updated: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<showtimes_db::m::ServerCollaborationInvite> for ServerCollabInvite {
+    fn from(value: showtimes_db::m::ServerCollaborationInvite) -> Self {
+        Self {
+            id: value.id,
+            source: ServerCollabInviteSource {
+                server: value.source.server,
+                project: value.source.project,
+            },
+            target: ServerCollabInviteTarget {
+                server: value.target.server,
+                project: value.target.project,
+            },
             created: value.created,
             updated: value.updated,
         }
