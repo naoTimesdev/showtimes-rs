@@ -37,7 +37,8 @@ async fn main() -> anyhow::Result<()> {
     let mut migrations = get_migrations(&connection.client, &connection.db);
     migrations.sort_by(|a, b| a.timestamp().cmp(&b.timestamp()));
 
-    let migration_db = showtimes_db::MigrationHandler::new(connection.db).await;
+    let cloned_db = connection.db.clone();
+    let migration_db = showtimes_db::MigrationHandler::new(cloned_db).await;
 
     match cli.command {
         MigrationCommands::List { detailed } => {
@@ -111,7 +112,14 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        MigrationCommands::MeiliFix => runner::run_meili_fix().await?,
+        MigrationCommands::Meili { command: meili_cmd } => match meili_cmd {
+            cli::MigrationMeiliCommands::Fix => {
+                runner::run_meilisearch_fix().await?;
+            }
+            cli::MigrationMeiliCommands::Reindex => {
+                runner::run_meilisearch_reindex(&connection).await?;
+            }
+        },
     }
 
     Ok(())

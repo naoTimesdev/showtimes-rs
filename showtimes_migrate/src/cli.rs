@@ -45,9 +45,20 @@ pub(crate) enum MigrationCommands {
         #[arg(short, long, default_value = None)]
         name: Option<String>,
     },
-    /// Fix up Meilisearch indexes
-    #[command(name = "meili-fix")]
-    MeiliFix,
+    /// Meili related commands
+    #[command(name = "meili")]
+    Meili {
+        #[command(subcommand)]
+        command: MigrationMeiliCommands,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum MigrationMeiliCommands {
+    /// Fix all Meilisearch schema
+    Fix,
+    /// Reindex all Meilisearch indexes, this will also fix the schema
+    Reindex,
 }
 
 fn cli_styles() -> Styles {
