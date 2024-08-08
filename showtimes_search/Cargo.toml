@@ -12,6 +12,7 @@ description = "A simple wrapper for Showtimes API Meilisearch instance"
 tokio.workspace = true
 serde.workspace = true
 chrono.workspace = true
+tracing.workspace = true
 
 bson.workspace = true
 meilisearch-sdk.workspace = true

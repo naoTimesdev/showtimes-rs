@@ -1,3 +1,7 @@
+//! A custom derive macro for Meilisearch models
+//!
+//! Since the provided one by Meilisearch is a bit more limited for my use case.
+
 use proc_macro::TokenStream;
 use syn::{punctuated::Punctuated, spanned::Spanned, Attribute, Expr, Lit, Meta, Token};
 
@@ -222,6 +226,7 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
 
             async fn set_filterable_attributes(index: &meilisearch_sdk::indexes::Index, client: &meilisearch_sdk::client::Client) -> Result<(), meilisearch_sdk::errors::Error> {
                 let data = #name::search_filterable();
+                tracing::debug!("Setting filterable attributes for `{}`: {:?}", #model_attr_name, &data);
                 let task = index.set_filterable_attributes(data).await?;
                 task.wait_for_completion(client, None, None).await?;
                 Ok(())
@@ -229,6 +234,7 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
 
             async fn set_searchable_attributes(index: &meilisearch_sdk::indexes::Index, client: &meilisearch_sdk::client::Client) -> Result<(), meilisearch_sdk::errors::Error> {
                 let data = #name::search_searchable();
+                tracing::debug!("Setting searchable attributes for `{}`: {:?}", #model_attr_name, &data);
                 let task = index.set_searchable_attributes(data).await?;
                 task.wait_for_completion(client, None, None).await?;
                 Ok(())
@@ -236,6 +242,7 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
 
             async fn set_sortable_attributes(index: &meilisearch_sdk::indexes::Index, client: &meilisearch_sdk::client::Client) -> Result<(), meilisearch_sdk::errors::Error> {
                 let data = #name::search_sortable();
+                tracing::debug!("Setting sortable attributes for `{}`: {:?}", #model_attr_name, &data);
                 let task = index.set_sortable_attributes(data).await?;
                 task.wait_for_completion(client, None, None).await?;
                 Ok(())
@@ -243,6 +250,7 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
 
             async fn set_displayed_attributes(index: &meilisearch_sdk::indexes::Index, client: &meilisearch_sdk::client::Client) -> Result<(), meilisearch_sdk::errors::Error> {
                 let data = #name::search_displayed();
+                tracing::debug!("Setting displayed attributes for `{}`: {:?}", #model_attr_name, &data);
                 let task = index.set_displayed_attributes(data).await?;
                 task.wait_for_completion(client, None, None).await?;
                 Ok(())
@@ -251,8 +259,10 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
             async fn set_distinct_attribute(index: &meilisearch_sdk::indexes::Index, client: &meilisearch_sdk::client::Client) -> Result<(), meilisearch_sdk::errors::Error> {
                 let data = #name::search_distinct();
                 let task = if let Some(data) = data {
+                    tracing::debug!("Setting distinct attribute for `{}`: {:?}", #model_attr_name, &data);
                     index.set_distinct_attribute(data).await?
                 } else {
+                    tracing::debug!("Resetting distinct attribute for `{}`", #model_attr_name);
                     index.reset_distinct_attribute().await?
                 };
                 task.wait_for_completion(client, None, None).await?;
@@ -261,6 +271,7 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
 
             async fn set_primary_key(client: &meilisearch_sdk::client::Client) -> Result<(), meilisearch_sdk::errors::Error> {
                 let mut index = client.index(#model_attr_name);
+                tracing::debug!("Setting primary key for `{}`: {:?}", #model_attr_name, #pk_name);
                 let task = index.set_primary_key(#pk_name).await?;
                 task.wait_for_completion(client, None, None).await?;
                 Ok(())
@@ -269,6 +280,7 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
             /// Update the schema of the index according to the model attributes
             pub async fn update_schema(client: &std::sync::Arc<tokio::sync::Mutex<meilisearch_sdk::client::Client>>) -> Result<(), meilisearch_sdk::errors::Error> {
                 let client_ref = client.lock().await;
+                tracing::debug!("Updating schema for index: {}", #model_attr_name);
                 let index = client_ref.index(#model_attr_name);
 
                 #name::set_filterable_attributes(&index, client_ref.deref()).await?;
@@ -287,13 +299,17 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
             /// - `client`: The MeiliSearch client
             pub async fn get_index(client: &std::sync::Arc<tokio::sync::Mutex<meilisearch_sdk::client::Client>>) -> Result<meilisearch_sdk::indexes::Index, meilisearch_sdk::errors::Error> {
                 let client_ref = client.lock().await;
+                tracing::debug!("Getting index: {}", #model_attr_name);
                 let index = client_ref.get_index(#model_attr_name).await;
                 match index {
                     Ok(index) => Ok(index),
                     Err(meilisearch_sdk::errors::Error::Meilisearch(error)) => {
                         if error.error_code == meilisearch_sdk::errors::ErrorCode::IndexNotFound {
+                            tracing::debug!("Index \"{}\" not found, creating...", #model_attr_name);
                             let task = client_ref.create_index(#model_attr_name, Some(#pk_name)).await?;
+                            tracing::debug!("Waiting for \"{}\" index creation to complete...", #model_attr_name);
                             task.wait_for_completion(client_ref.deref(), None, None).await?;
+                            tracing::debug!("Index \"{}\" created, getting the index...", #model_attr_name);
                             let index = client_ref.get_index(#model_attr_name).await?;
                             Ok(index)
                         } else {

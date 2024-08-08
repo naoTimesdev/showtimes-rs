@@ -3196,6 +3196,7 @@ dependencies = [
  "showtimes-derive",
  "showtimes-shared",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
