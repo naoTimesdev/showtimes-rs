@@ -93,10 +93,11 @@ pub(crate) fn make_file_path(
 ) -> String {
     let kind = kind.unwrap_or_default().to_name().to_ascii_lowercase();
 
-    let mut path = format!("{}/{}/", kind, base_key);
+    let mut path = format!("{}/", kind);
     if let Some(parent_id) = parent_id {
         path.push_str(&format!("{}/", parent_id.replace('-', "")))
     }
+    path.push_str(&format!("{}/", base_key));
     path.push_str(filename);
     path
 }

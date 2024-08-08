@@ -5,20 +5,36 @@ use serde::{Deserialize, Serialize};
 pub struct ImageMetadata {
     /// The type of the image
     pub kind: String,
-    /// The key of the image
+    /// The key of the image (usually the project ID)
     pub key: String,
     /// The filename of the image
     pub filename: String,
     /// The format of the image
     pub format: String,
-    /// The parent of the image
+    /// The parent of the image (usually the server ID)
     pub parent: Option<String>,
 }
 
 impl ImageMetadata {
+    pub fn new(
+        kind: impl Into<String>,
+        key: impl Into<String>,
+        filename: impl Into<String>,
+        format: impl Into<String>,
+        parent: Option<impl Into<String>>,
+    ) -> Self {
+        ImageMetadata {
+            kind: kind.into(),
+            key: key.into(),
+            filename: filename.into(),
+            format: format.into(),
+            parent: parent.map(|p| p.into()),
+        }
+    }
+
     pub fn stub_with_name(name: impl Into<String>) -> Self {
         ImageMetadata {
-            kind: "image".to_string(),
+            kind: "images".to_string(),
             key: "stubbed".to_string(),
             filename: name.into(),
             format: "png".to_string(),
@@ -31,7 +47,7 @@ impl ImageMetadata {
         match &self.parent {
             Some(parent) => format!(
                 "/{}/{}/{}/{}",
-                &self.kind, &self.key, parent, &self.filename
+                &self.kind, parent, &self.key, &self.filename
             ),
             None => format!("/{}/{}/{}", &self.kind, &self.key, &self.filename),
         }
@@ -41,7 +57,7 @@ impl ImageMetadata {
 impl Default for ImageMetadata {
     fn default() -> Self {
         ImageMetadata {
-            kind: "image".to_string(),
+            kind: "images".to_string(),
             key: "default".to_string(),
             filename: "default.png".to_string(),
             format: "png".to_string(),
