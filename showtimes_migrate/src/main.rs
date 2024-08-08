@@ -111,6 +111,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
+        MigrationCommands::MeiliFix => runner::run_meili_fix().await?,
     }
 
     Ok(())

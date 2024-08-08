@@ -1,7 +1,7 @@
 use bson::doc;
 use showtimes_db::{m::ShowModelHandler, MigrationHandler};
 
-use crate::migrations::Migration;
+use crate::{common::env_or_exit, migrations::Migration};
 
 async fn check_if_migration_exists(
     handler: MigrationHandler,
@@ -112,4 +112,30 @@ pub async fn run_migration_down(handler: &MigrationHandler, migration: Box<dyn M
     } else {
         tracing::warn!("[DOWN] Migration {} not found", migration.name());
     }
+}
+
+pub async fn run_meili_fix() -> anyhow::Result<()> {
+    let meili_url = env_or_exit("MEILI_URL");
+    let meili_key = env_or_exit("MEILI_KEY");
+
+    tracing::info!("Creating Meilisearch client instances...");
+    let client = showtimes_search::create_connection(&meili_url, &meili_key).await?;
+
+    tracing::info!("Creating or getting Meilisearch indexes...");
+    // This will create the index if it doesn't exist
+    showtimes_search::models::Project::get_index(&client).await?;
+    showtimes_search::models::Server::get_index(&client).await?;
+    showtimes_search::models::User::get_index(&client).await?;
+    showtimes_search::models::ServerCollabSync::get_index(&client).await?;
+    showtimes_search::models::ServerCollabInvite::get_index(&client).await?;
+
+    tracing::info!("Fixing Meilisearch indexes schemas...");
+    showtimes_search::models::Project::update_schema(&client).await?;
+    showtimes_search::models::Server::update_schema(&client).await?;
+    showtimes_search::models::User::update_schema(&client).await?;
+    showtimes_search::models::ServerCollabSync::update_schema(&client).await?;
+    showtimes_search::models::ServerCollabInvite::update_schema(&client).await?;
+
+    tracing::info!("Meilisearch indexes fixed");
+    Ok(())
 }

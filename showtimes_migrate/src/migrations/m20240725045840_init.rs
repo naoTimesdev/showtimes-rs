@@ -520,6 +520,8 @@ impl M20240725045840Init {
         showtimes_search::models::Project::get_index(&client).await?;
         showtimes_search::models::Server::get_index(&client).await?;
         showtimes_search::models::User::get_index(&client).await?;
+        showtimes_search::models::ServerCollabSync::get_index(&client).await?;
+        showtimes_search::models::ServerCollabInvite::get_index(&client).await?;
 
         Ok(client)
     }
@@ -529,6 +531,8 @@ impl M20240725045840Init {
         showtimes_search::models::Project::update_schema(client).await?;
         showtimes_search::models::Server::update_schema(client).await?;
         showtimes_search::models::User::update_schema(client).await?;
+        showtimes_search::models::ServerCollabSync::update_schema(client).await?;
+        showtimes_search::models::ServerCollabInvite::update_schema(client).await?;
 
         Ok(())
     }
