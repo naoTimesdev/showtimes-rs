@@ -104,6 +104,7 @@ impl S3Fs {
 
         let config = config_loader.load().await;
 
+        tracing::debug!("Creating S3Fs with config: {:?}", config);
         let client = aws_sdk_s3::Client::new(&config);
 
         Self {
@@ -161,12 +162,14 @@ impl FsImpl for S3Fs {
     async fn init(&self) -> anyhow::Result<()> {
         let bucket = self.bucket_name.clone();
         let client = self.client.lock().await;
+        tracing::debug!("Initializing, checking if bucket {} exists...", bucket);
         let buckets = client.list_buckets().send().await?;
 
         let matched = buckets
             .buckets()
             .iter()
             .find(|&b| b.name() == Some(&bucket));
+        tracing::debug!("Bucket {} match into: {:?}", bucket, matched);
         match matched {
             Some(_) => Ok(()),
             None => {
@@ -186,6 +189,7 @@ impl FsImpl for S3Fs {
     ) -> anyhow::Result<FsFileObject> {
         let key = make_file_path(base_key, filename, parent_id, kind);
         let client = self.client.lock().await;
+        tracing::debug!("Checking file stat for: {}", &key);
         let object = client
             .head_object()
             .bucket(&self.bucket_name)
@@ -212,12 +216,16 @@ impl FsImpl for S3Fs {
             None => None,
         };
 
-        Ok(FsFileObject {
-            filename: key,
+        let fs_meta = FsFileObject {
+            filename: key.clone(),
             content_type,
             size: object.content_length.unwrap_or(-1),
             last_modified: last_mod,
-        })
+        };
+
+        tracing::debug!("File stat for {}: {:?}", &key, fs_meta);
+
+        Ok(fs_meta)
     }
 
     async fn file_exists(
@@ -229,6 +237,7 @@ impl FsImpl for S3Fs {
     ) -> anyhow::Result<bool> {
         let key = make_file_path(base_key, filename, parent_id, kind);
         let client = self.client.lock().await;
+        tracing::debug!("Checking file existence for: {}", &key);
         let object = client
             .head_object()
             .bucket(&self.bucket_name)
@@ -250,10 +259,12 @@ impl FsImpl for S3Fs {
         let key = make_file_path(base_key, filename, parent_id, kind.clone());
         let client = self.client.lock().await;
         // Create a temporary writer since AWS SDK s3 FUCKING SUCKS!
+        tracing::debug!("Initializing file upload to: {}", &key);
         let mut target = CustomS3Writer::new();
         tokio::io::copy(stream, &mut target).await?;
         let body = ByteStream::new(SdkBody::from(target.as_bytes()));
 
+        tracing::debug!("Sending file stream into: {}", &key);
         client
             .put_object()
             .bucket(&self.bucket_name)
@@ -261,6 +272,10 @@ impl FsImpl for S3Fs {
             .body(body)
             .send()
             .await?;
+
+        // unlock so we can do file stat
+        tracing::debug!("Upload complete, unlocking Mutex guard for: {}", &key);
+        std::mem::drop(client);
 
         self.file_stat(base_key, filename, parent_id, kind).await
     }
@@ -275,6 +290,7 @@ impl FsImpl for S3Fs {
     ) -> anyhow::Result<()> {
         let key = make_file_path(base_key, filename, parent_id, kind);
         let client = self.client.lock().await;
+        tracing::debug!("Initializing file download for: {}", &key);
         let mut resp = client
             .get_object()
             .bucket(&self.bucket_name)
@@ -282,6 +298,7 @@ impl FsImpl for S3Fs {
             .send()
             .await?;
 
+        tracing::debug!("Downloading file stream for: {}", &key);
         while let Some(bytes) = resp.body.try_next().await? {
             writer.write(&bytes).await?;
         }
@@ -298,6 +315,7 @@ impl FsImpl for S3Fs {
     ) -> anyhow::Result<()> {
         let key = make_file_path(base_key, filename, parent_id, kind);
         let client = self.client.lock().await;
+        tracing::debug!("Deleting file: {}", &key);
         client
             .delete_object()
             .bucket(&self.bucket_name)

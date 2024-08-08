@@ -21,6 +21,7 @@ tracing-subscriber.workspace = true
 
 clap = { version = "4.5.10", features = ["derive"] }
 dotenvy = "0.15.7"
+reqwest.workspace = true
 
 mongodb.workspace = true
 bson.workspace = true

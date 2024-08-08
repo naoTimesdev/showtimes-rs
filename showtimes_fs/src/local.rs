@@ -27,6 +27,10 @@ impl LocalFs {
 impl FsImpl for LocalFs {
     async fn init(&self) -> anyhow::Result<()> {
         // Test if the directory exists
+        tracing::debug!(
+            "Initializing, checking if the directory exists: {:?}",
+            &self.directory
+        );
         let item = tokio::fs::metadata(&self.directory).await?;
         if !item.is_dir() {
             anyhow::bail!("The provided `directory` is not a directory");
@@ -45,6 +49,7 @@ impl FsImpl for LocalFs {
         let key = make_file_path(base_key, filename, parent_id, kind);
         let path = self.directory.join(&key);
 
+        tracing::debug!("Checking file stat for: {}", &key);
         let item = tokio::fs::metadata(&path).await?;
         let content_type = mime_guess::from_path(path).first_or_octet_stream();
         let last_modified = match item.modified() {
@@ -55,12 +60,16 @@ impl FsImpl for LocalFs {
             Err(_) => None,
         };
 
-        Ok(FsFileObject {
-            filename: key,
+        let fs_meta = FsFileObject {
+            filename: key.clone(),
             content_type: content_type.to_string(),
             size: item.len().try_into().unwrap(),
             last_modified,
-        })
+        };
+
+        tracing::debug!("File stat for {}: {:?}", &key, fs_meta);
+
+        Ok(fs_meta)
     }
 
     async fn file_exists(
@@ -71,8 +80,9 @@ impl FsImpl for LocalFs {
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<bool> {
         let key = make_file_path(base_key, filename, parent_id, kind);
-        let path = self.directory.join(key);
+        let path = self.directory.join(&key);
 
+        tracing::debug!("Checking file existence for: {}", &key);
         let is_exists = (tokio::fs::try_exists(&path).await).unwrap_or(false);
 
         Ok(is_exists)
@@ -87,8 +97,9 @@ impl FsImpl for LocalFs {
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<FsFileObject> {
         let key = make_file_path(base_key, filename, parent_id, kind.clone());
-        let path = self.directory.join(key);
+        let path = self.directory.join(&key);
 
+        tracing::debug!("Sending file stream into: {}", &key);
         let mut file = tokio::fs::File::create(&path).await?;
         tokio::io::copy(stream, &mut file).await?;
 
@@ -104,8 +115,9 @@ impl FsImpl for LocalFs {
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()> {
         let key = make_file_path(base_key, filename, parent_id, kind);
-        let path = self.directory.join(key);
+        let path = self.directory.join(&key);
 
+        tracing::debug!("Downloading file stream for: {}", &key);
         let mut file = tokio::fs::File::open(&path).await?;
         tokio::io::copy(&mut file, writer).await?;
 
@@ -120,8 +132,9 @@ impl FsImpl for LocalFs {
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()> {
         let key = make_file_path(base_key, filename, parent_id, kind);
-        let path = self.directory.join(key);
+        let path = self.directory.join(&key);
 
+        tracing::debug!("Deleting file: {}", &key);
         tokio::fs::remove_file(&path).await?;
 
         Ok(())
