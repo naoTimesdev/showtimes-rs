@@ -6,8 +6,8 @@ use std::ops::Deref;
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-projects",
-    filterable = ["id", "parent", "created", "title", "aliases", "integrations.id", "integrations.type"],
-    searchable = ["id", "title", "aliases", "parent", "integrations.id", "integrations.type"],
+    filterable = ["id", "parent", "created", "title", "aliases", "integrations.id", "integrations.kind"],
+    searchable = ["id", "title", "aliases", "parent", "integrations.id"],
     sortable = ["id", "created", "updated"],
     distinct = "id",
 )]
@@ -58,8 +58,8 @@ impl From<showtimes_db::m::Project> for Project {
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-servers",
-    filterable = ["id", "created", "name", "integrations.id", "integrations.type"],
-    searchable = ["id", "name", "integrations.id", "integrations.type"],
+    filterable = ["id", "created", "name", "integrations.id", "integrations.kind"],
+    searchable = ["id", "name", "integrations.id"],
     sortable = ["id", "created", "updated"],
     distinct = "id",
 )]
