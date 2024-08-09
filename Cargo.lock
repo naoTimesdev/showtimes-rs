@@ -3159,6 +3159,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "tosho-macros",
 ]
 
 [[package]]
@@ -3207,6 +3208,8 @@ dependencies = [
  "bson",
  "chrono",
  "serde",
+ "tokio",
+ "toml",
  "ulid",
  "uuid",
 ]

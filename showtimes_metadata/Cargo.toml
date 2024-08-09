@@ -11,10 +11,10 @@ description = "A library to fetch metadata information of a shows or books, data
 [dependencies]
 anyhow.workspace = true
 tokio.workspace = true
+chrono.workspace = true
 
 serde.workspace = true
 serde_json.workspace = true
-
 reqwest.workspace = true
 
-chrono.workspace = true
+tosho-macros.workspace = true

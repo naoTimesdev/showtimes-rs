@@ -5,5 +5,7 @@ pub mod providers;
 pub use models as m;
 /// The Anilist provider
 pub use providers::AnilistProvider;
+/// The TMDb provider
+pub use providers::TMDbProvider;
 /// The VNDB provider
 pub use providers::VndbProvider;
