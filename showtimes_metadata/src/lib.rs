@@ -9,3 +9,13 @@ pub use providers::AnilistProvider;
 pub use providers::TMDbProvider;
 /// The VNDB provider
 pub use providers::VndbProvider;
+
+/// The provider enum
+pub enum Provider {
+    /// Anilist provider
+    Anilist(AnilistProvider),
+    /// TMDb provider
+    TMDb(TMDbProvider),
+    /// VNDB provider
+    VNDB(VndbProvider),
+}

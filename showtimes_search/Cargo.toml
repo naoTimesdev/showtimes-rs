@@ -6,6 +6,7 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
+rust-version.workspace = true
 description = "A simple wrapper for Showtimes API Meilisearch instance"
 
 [dependencies]
