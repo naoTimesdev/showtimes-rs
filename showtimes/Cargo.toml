@@ -26,3 +26,5 @@ tower-http.workspace = true
 showtimes-shared = { path = "../showtimes_shared" }
 showtimes-db = { path = "../showtimes_db" }
 showtimes-fs = { path = "../showtimes_fs" }
+showtimes-metadata = { path = "../showtimes_metadata" }
+showtimes-search = { path = "../showtimes_search" }

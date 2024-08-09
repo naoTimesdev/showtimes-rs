@@ -3092,6 +3092,8 @@ dependencies = [
  "serde",
  "showtimes-db",
  "showtimes-fs",
+ "showtimes-metadata",
+ "showtimes-search",
  "showtimes-shared",
  "tokio",
  "toml",

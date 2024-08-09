@@ -8,29 +8,29 @@ master_key = "masterkey"
 [database]
 # MongoDB connection string
 mongodb = "mongodb://localhost:27017"
-# Name of the database
-mongodb_db = "naotimes"
 # Redis-adjacent (Valkey, etc) connecting string
+# Note: We will not support Redis 7.4+
 redis = "redis://localhost:6379/0"
 
 # Meilisearch config
 [search]
 # Meilisearch URL
-meili_url = "https://your.meilisearch.instance"
+url = "https://your.meilisearch.instance"
 # Meilisearch key, allow write access to the index
-meili_key = "meilisearch-api-key-or-master-key"
+api_key = "meilisearch-api-key-or-master-key"
 
 # Discord OAuth2
 [discord]
 client_id = "00000000000000000000"
 client_secret = "supersecretdiscordclientsecret"
+redirect_url = "https://your.naotimes.ui.instance/callback/discord"
 
 # External or metadata services API key
 [external]
 # VNDB Token
 vndb = "your-valid-token-for-vndb"
 # TMDB Token
-tmdb = "your-valid-token-for-tmdb"
+tmdb = "your-valid-access-token-for-tmdb"
 
 # Local storage path
 [storages.local]
