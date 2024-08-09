@@ -23,6 +23,7 @@ authors = ["noaione <noaione@n4o.xyz>"]
 license = "AGPL-3.0"
 repository = "https://github.com/naoTimesdev/showtimes-rs"
 homepage = "https://naoti.me"
+rust-version = "1.80" # MSRV to 1.80 because of `LazyLock` stability
 
 [workspace.dependencies]
 # Essential stuff
