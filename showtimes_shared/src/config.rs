@@ -2,6 +2,18 @@
 
 use serde::Deserialize;
 
+/// JWT session configuration
+#[derive(Debug, Clone, Deserialize)]
+pub struct JwtSession {
+    /// The secret key for the JWT session
+    pub secret: String,
+    /// The expiration time for the JWT session
+    ///
+    /// By default, it is set to 7 days.
+    /// Set to 0 to disable expiration.
+    pub expiration: Option<u64>,
+}
+
 /// Database connection configuration
 #[derive(Debug, Clone, Deserialize)]
 pub struct Database {
@@ -85,6 +97,8 @@ pub struct Config {
     ///
     /// Default to `5560`
     pub port: Option<u16>,
+    /// The master key for the server
+    pub master_key: String,
     /// The database connection configuration
     pub database: Database,
     /// The Meilisearch configuration
@@ -96,6 +110,8 @@ pub struct Config {
     pub external: ExternalServices,
     /// The storage configuration
     pub storages: Storages,
+    /// The JWT session configuration
+    pub jwt: JwtSession,
 }
 
 impl Config {
@@ -106,6 +122,10 @@ impl Config {
 
         if self.port.is_none() {
             self.port = Some(5560);
+        }
+
+        if self.jwt.expiration.is_none() {
+            self.jwt.expiration = Some(7 * 24 * 60 * 60);
         }
     }
 

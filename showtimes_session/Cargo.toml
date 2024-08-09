@@ -1,0 +1,16 @@
+[package]
+name = "showtimes-session"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Shared session utility for Showtimes API"
+
+[dependencies]
+serde.workspace = true
+jsonwebtoken.workspace = true
+chrono.workspace = true
+
+showtimes-shared = { path = "../showtimes_shared" }
