@@ -5,6 +5,7 @@ use aws_config::AppName;
 use aws_credential_types::provider::{self, error::CredentialsError, future, ProvideCredentials};
 use aws_credential_types::Credentials;
 use aws_sdk_s3::primitives::{ByteStream, DateTimeFormat, SdkBody};
+use aws_sdk_s3::types::{Delete, ObjectIdentifier};
 use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::sync::Mutex;
 
@@ -323,6 +324,62 @@ impl FsImpl for S3Fs {
             .send()
             .await?;
 
+        Ok(())
+    }
+
+    async fn directory_delete(
+        &self,
+        base_key: &str,
+        parent_id: Option<&str>,
+        kind: Option<FsFileKind>,
+    ) -> anyhow::Result<()> {
+        let client = self.client.lock().await;
+        let prefix = make_file_path(base_key, "", parent_id, kind);
+
+        tracing::debug!("Collecting objects with prefix: {}", &prefix);
+        let mut pages = client
+            .list_objects_v2()
+            .bucket(&self.bucket_name)
+            .prefix(&prefix)
+            .into_paginator()
+            .send();
+
+        let mut delete_objects: Vec<ObjectIdentifier> = Vec::new();
+        while let Some(page) = pages.next().await {
+            let page = page?;
+            if let Some(content) = page.contents {
+                let objects: Vec<ObjectIdentifier> = content
+                    .iter()
+                    .filter_map(|c| match c.key() {
+                        Some(key) => Some(
+                            ObjectIdentifier::builder()
+                                .set_key(Some(key.to_string()))
+                                .build()
+                                .unwrap(),
+                        ),
+                        None => None,
+                    })
+                    .collect();
+
+                tracing::debug!("Adding {} objects for deletion", objects.len());
+
+                delete_objects.extend(objects);
+            }
+        }
+
+        tracing::debug!("Deleting {} objects", delete_objects.len());
+        let delete_in = Delete::builder()
+            .set_objects(Some(delete_objects))
+            .build()?;
+
+        client
+            .delete_objects()
+            .bucket(&self.bucket_name)
+            .delete(delete_in)
+            .send()
+            .await?;
+
+        tracing::debug!("Deletion complete");
         Ok(())
     }
 }

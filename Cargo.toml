@@ -48,7 +48,7 @@ aws-sdk-s3 = { version = "1.42.0", features = ["http-1x"] }
 
 # Web server
 axum = { version = "0.7.5", features = ["ws", "tracing"] }
-async-graphql = { version = "7.0.7", features = ["uuid", "tracing", "bson", "password-strength-validator"] }
+async-graphql = { version = "7.0.7", features = ["uuid", "tracing", "bson", "password-strength-validator", "unblock"] }
 async-graphql-axum = "7.0.7"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

@@ -139,4 +139,19 @@ impl FsImpl for LocalFs {
 
         Ok(())
     }
+
+    async fn directory_delete(
+        &self,
+        base_key: &str,
+        parent_id: Option<&str>,
+        kind: Option<FsFileKind>,
+    ) -> anyhow::Result<()> {
+        let key = make_file_path(base_key, "", parent_id, kind);
+        let path = self.directory.join(&key);
+
+        tracing::debug!("Deleting directory: {}", &key);
+        tokio::fs::remove_dir_all(&path).await?;
+
+        Ok(())
+    }
 }

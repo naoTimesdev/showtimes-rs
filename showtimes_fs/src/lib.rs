@@ -97,6 +97,13 @@ pub trait FsImpl {
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()>;
+    /// Delete a directory from the filesystem.
+    async fn directory_delete(
+        &self,
+        base_key: &str,
+        parent_id: Option<&str>,
+        kind: Option<FsFileKind>,
+    ) -> anyhow::Result<()>;
 }
 
 /// Make a file path from the base key, filename, parent id, and kind.
