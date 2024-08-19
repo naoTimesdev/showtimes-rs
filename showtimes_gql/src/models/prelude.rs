@@ -1,12 +1,9 @@
 use std::ops::Deref;
 
-use async_graphql::{ComplexObject, Enum, Scalar, ScalarType, SimpleObject};
+use async_graphql::{ComplexObject, Description, Enum, Scalar, ScalarType, SimpleObject};
 
 /// A wrapper around ULID to allow it to be used in GraphQL
-pub struct UlidGQL(
-    /// A wrapper around ULID to allow it to be used in GraphQL
-    showtimes_shared::ulid::Ulid,
-);
+pub struct UlidGQL(showtimes_shared::ulid::Ulid);
 
 impl Deref for UlidGQL {
     type Target = showtimes_shared::ulid::Ulid;
@@ -16,7 +13,13 @@ impl Deref for UlidGQL {
     }
 }
 
-#[Scalar]
+impl Description for UlidGQL {
+    fn description() -> &'static str {
+        "A ULID (Universally Unique Lexicographically Sortable Identifier) used to uniquely identify objects\nThe following ULID are converted from UUID timestamp or UUIDv7 before being converted to a ULID"
+    }
+}
+
+#[Scalar(use_type_description = true)]
 impl ScalarType for UlidGQL {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
         match value {
@@ -48,6 +51,12 @@ pub struct DateTimeGQL(
     chrono::DateTime<chrono::Utc>,
 );
 
+impl Description for DateTimeGQL {
+    fn description() -> &'static str {
+        "A datetime timestamp format in UTC timezone, follows RFC3339 format"
+    }
+}
+
 impl Deref for DateTimeGQL {
     type Target = chrono::DateTime<chrono::Utc>;
 
@@ -56,7 +65,7 @@ impl Deref for DateTimeGQL {
     }
 }
 
-#[Scalar]
+#[Scalar(use_type_description = true)]
 impl ScalarType for DateTimeGQL {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
         match value {
