@@ -199,7 +199,15 @@ impl FsImpl for S3Fs {
             .await?;
 
         let content_type = match object.content_type {
-            Some(content_type) => content_type,
+            Some(content_type) => {
+                // Check if octet-stream
+                if content_type.to_ascii_lowercase().contains("/octet-stream") {
+                    let guessed = mime_guess::from_path(filename);
+                    guessed.first_or_octet_stream().to_string()
+                } else {
+                    content_type
+                }
+            }
             None => {
                 let guessed = mime_guess::from_path(filename);
                 guessed.first_or_octet_stream().to_string()

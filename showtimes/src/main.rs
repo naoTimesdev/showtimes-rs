@@ -4,17 +4,20 @@ use axum::{response::IntoResponse, routing::get, Router};
 use serde_json::json;
 use showtimes_fs::s3::{S3FsCredentialsProvider, S3FsRegionProvider};
 use showtimes_shared::Config;
-use tokio::{net::TcpListener, sync::Mutex};
+use tokio::net::TcpListener;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod routes;
 mod state;
 
 #[tokio::main]
 async fn main() {
+    // Call our entrypoint function
     entrypoint().await.unwrap();
 }
 
+/// Actual main function
 async fn entrypoint() -> anyhow::Result<()> {
     // get current working directory
     let cwd = std::env::current_dir().unwrap();
@@ -107,7 +110,7 @@ async fn entrypoint() -> anyhow::Result<()> {
     tracing::info!("🔌 Initializing state...");
     let state = state::ShowtimesState {
         db: mongo_conn.db,
-        storage: Arc::new(Mutex::new(fs)),
+        storage: Arc::new(fs),
         meili,
         config: Arc::new(config.clone()),
     };
@@ -116,6 +119,11 @@ async fn entrypoint() -> anyhow::Result<()> {
     let app: Router = Router::new()
         .route("/", get(index))
         .route("/_/health", get(|| async { "OK" }))
+        .route("/images/:id/:filename", get(routes::image::image_by_id))
+        .route(
+            "/images/:parent_id/:id/:filename",
+            get(routes::image::image_by_id),
+        )
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::new().allow_origin(tower_http::cors::Any))
         .with_state(state);

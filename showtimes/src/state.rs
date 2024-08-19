@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tokio::sync::Mutex;
+pub type StorageShared = Arc<showtimes_fs::FsPool>;
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -8,7 +8,7 @@ pub struct ShowtimesState {
     /// The `showtimes_db` database
     pub db: showtimes_db::DatabaseMutex,
     /// Storage handler
-    pub storage: Arc<Mutex<showtimes_fs::FsPool>>,
+    pub storage: StorageShared,
     /// Meilisearch handler
     pub meili: showtimes_search::ClientMutex,
     /// Configuration

@@ -19,6 +19,8 @@ anyhow.workspace = true
 
 # Web server
 axum.workspace = true
+axum-extra = { version = "0.9.3", features = ["async-read-body"] }
+futures.workspace = true
 async-graphql-axum.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
