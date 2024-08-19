@@ -8,7 +8,7 @@ use tokio::io::AsyncWriteExt;
 
 use crate::state::{ShowtimesState, StorageShared};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct ImageQuery {
     id: String,
     filename: String,
@@ -20,11 +20,9 @@ async fn common_reader(
     query: ImageQuery,
     fs_pool: StorageShared,
 ) -> impl IntoResponse {
-    let (tx, rx) = tokio::io::duplex(65_536);
-    futures::pin_mut!(tx);
+    let (mut tx, rx) = tokio::io::duplex(65_536);
 
     let body = AsyncReadBody::new(rx);
-
     let file = fs_pool
         .file_stat(
             &query.id,
@@ -86,16 +84,21 @@ async fn common_reader(
         }
     };
 
-    fs_pool
-        .file_stream_download(
-            &query.id,
-            &query.filename,
-            &mut tx,
-            query.parent_id.as_deref(),
-            Some(showtimes_fs::FsFileKind::Images),
-        )
-        .await
-        .unwrap();
+    let q_clone = query.clone();
+    tokio::spawn(async move {
+        if let Err(e) = fs_pool
+            .file_stream_download(
+                &q_clone.id,
+                &q_clone.filename,
+                &mut tx,
+                query.parent_id.as_deref(),
+                Some(showtimes_fs::FsFileKind::Images),
+            )
+            .await
+        {
+            tracing::error!("Failed to read file: {:?}", e);
+        }
+    });
 
     let mut builder = axum::http::Response::builder();
     let headers = builder.headers_mut().unwrap();
@@ -104,6 +107,7 @@ async fn common_reader(
         headers.insert(key, axum::http::HeaderValue::from_str(&value).unwrap());
     }
 
+    tracing::info!("Image sent: {:?}", query.filename);
     builder.body(body).unwrap()
 }
 

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWriteExt};
 
 use crate::{make_file_path, FsFileKind, FsFileObject, FsImpl};
 
@@ -106,7 +106,7 @@ impl FsImpl for LocalFs {
         self.file_stat(base_key, filename, parent_id, kind).await
     }
 
-    async fn file_stream_download<W: AsyncWrite + Unpin + Send>(
+    async fn file_stream_download<W: AsyncWriteExt + Unpin + Send>(
         &self,
         base_key: &str,
         filename: &str,
@@ -120,6 +120,9 @@ impl FsImpl for LocalFs {
         tracing::debug!("Downloading file stream for: {}", &key);
         let mut file = tokio::fs::File::open(&path).await?;
         tokio::io::copy(&mut file, writer).await?;
+
+        tracing::debug!("Download complete for: {}", &key);
+        writer.flush().await?;
 
         Ok(())
     }

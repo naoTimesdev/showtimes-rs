@@ -309,8 +309,29 @@ impl FsImpl for S3Fs {
 
         tracing::debug!("Downloading file stream for: {}", &key);
         while let Some(bytes) = resp.body.try_next().await? {
-            writer.write_all(&bytes).await?;
+            match writer.write_all(&bytes).await {
+                Ok(_) => (),
+                Err(e) => {
+                    // If broken pipe, just shut down, else re-throw
+                    if e.kind() == tokio::io::ErrorKind::BrokenPipe {
+                        break;
+                    }
+                    match writer.shutdown().await {
+                        Ok(_) => {
+                            tracing::debug!("Writer shutdown successfully for: {}", &key);
+                            return Err(e.into());
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to shutdown writer: {:?}", e);
+                            return Err(e.into());
+                        }
+                    }
+                }
+            }
+            writer.flush().await?;
         }
+        tracing::debug!("Download complete for: {}", &key);
+        writer.flush().await?;
 
         Ok(())
     }
