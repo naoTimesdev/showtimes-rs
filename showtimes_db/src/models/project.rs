@@ -5,7 +5,7 @@ use showtimes_shared::{bson_datetime_opt_serializer, ulid_opt_serializer, ulid_s
 use super::{ImageMetadata, IntegrationId, ShowModelHandler};
 
 /// The list of enums holding the project kinds.
-#[derive(Debug, Clone, tosho_macros::SerializeEnum, tosho_macros::DeserializeEnum)]
+#[derive(Debug, Copy, Clone, tosho_macros::SerializeEnum, tosho_macros::DeserializeEnum)]
 pub enum ProjectKind {
     /// The project is a show.
     Shows,
@@ -44,7 +44,9 @@ impl std::fmt::Display for ProjectKind {
 }
 
 /// The list of enums holding the project types.
-#[derive(Debug, Clone, Default, tosho_macros::SerializeEnum, tosho_macros::DeserializeEnum)]
+#[derive(
+    Debug, Copy, Clone, Default, tosho_macros::SerializeEnum, tosho_macros::DeserializeEnum,
+)]
 pub enum ProjectType {
     /// The project is a movie.
     Movies,

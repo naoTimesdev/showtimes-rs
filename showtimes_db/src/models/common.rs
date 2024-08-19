@@ -67,7 +67,7 @@ impl Default for ImageMetadata {
 }
 
 /// The list of possible integration types.
-#[derive(Debug, Clone, tosho_macros::DeserializeEnum, tosho_macros::SerializeEnum)]
+#[derive(Debug, Copy, Clone, tosho_macros::DeserializeEnum, tosho_macros::SerializeEnum)]
 pub enum IntegrationType {
     // Related to Discord
     /// A Discord Role ID
