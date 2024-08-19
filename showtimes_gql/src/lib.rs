@@ -5,6 +5,7 @@ use showtimes_db::{mongodb::bson::doc, DatabaseMutex};
 use showtimes_session::{oauth2::discord::DiscordClient, ShowtimesUserSession};
 use std::sync::Arc;
 
+mod guard;
 mod models;
 
 pub type ShowtimesGQLSchema = async_graphql::Schema<QueryRoot, MutationRoot, EmptySubscription>;
@@ -15,25 +16,21 @@ pub struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
+    /// Get current authenticated user
+    #[graphql(guard = "guard::AuthUserMinimumGuard::new(guard::AuthLevel::User)")]
     async fn current<'a>(&self, ctx: &'a Context<'_>) -> async_graphql::Result<UserSessionGQL> {
-        match ctx.data_opt::<ShowtimesUserSession>() {
-            Some(session) => {
-                let handler =
-                    showtimes_db::UserHandler::new(ctx.data_unchecked::<DatabaseMutex>().clone())
-                        .await;
+        let user_session = ctx.data_unchecked::<ShowtimesUserSession>();
+        let handler =
+            showtimes_db::UserHandler::new(ctx.data_unchecked::<DatabaseMutex>().clone()).await;
 
-                let user = handler
-                    .find_by(doc! { "id": session.get_claims().get_metadata() })
-                    .await?;
+        let user = handler
+            .find_by(doc! { "id": user_session.get_claims().get_metadata() })
+            .await?;
 
-                match user {
-                    Some(user) => Ok(UserSessionGQL::new(user, session.get_token())),
-                    None => Err(Error::new("User not found")
-                        .extend_with(|_, e| e.set("reason", "not_found"))),
-                }
-            }
+        match user {
+            Some(user) => Ok(UserSessionGQL::new(user, user_session.get_token())),
             None => {
-                Err(Error::new("Unauthorized").extend_with(|_, e| e.set("reason", "unauthorized")))
+                Err(Error::new("User not found").extend_with(|_, e| e.set("reason", "not_found")))
             }
         }
     }
@@ -43,11 +40,12 @@ pub struct MutationRoot;
 
 #[Object]
 impl MutationRoot {
+    /// Authorize Discord OAuth2 token and state that was returned from the OAuth2 redirect
     async fn auth<'a>(
         &self,
         ctx: &'a Context<'_>,
-        token: String,
-        state: String,
+        #[graphql(desc = "The OAuth2 token/code returned from Discord")] token: String,
+        #[graphql(desc = "The OAuth2 state")] state: String,
     ) -> async_graphql::Result<UserSessionGQL> {
         let config = ctx.data_unchecked::<Arc<showtimes_shared::Config>>();
 
