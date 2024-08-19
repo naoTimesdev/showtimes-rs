@@ -3352,6 +3352,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-graphql",
+ "chrono",
  "serde",
  "serde_json",
  "showtimes-db",
@@ -3420,7 +3421,9 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "jsonwebtoken",
+ "reqwest",
  "serde",
+ "serde_json",
  "showtimes-shared",
 ]
 
