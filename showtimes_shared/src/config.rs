@@ -99,6 +99,9 @@ pub struct Config {
     pub port: Option<u16>,
     /// The master key for the server
     pub master_key: String,
+    /// The log directory for the server
+    #[serde(rename = "log-directory")]
+    pub log_directory: Option<String>,
     /// The database connection configuration
     pub database: Database,
     /// The Meilisearch configuration
@@ -126,6 +129,20 @@ impl Config {
 
         if self.jwt.expiration.is_none() {
             self.jwt.expiration = Some(7 * 24 * 60 * 60);
+        }
+
+        if let Some(log_dir) = &self.log_directory {
+            // Check if not empty
+            if log_dir.is_empty() {
+                self.log_directory = None;
+                return;
+            }
+
+            // Check if a directory
+            let path = std::path::Path::new(log_dir);
+            if !path.is_dir() {
+                self.log_directory = None;
+            }
         }
     }
 

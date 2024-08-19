@@ -28,3 +28,4 @@ _data_test/
 /**/tests/*.json
 
 /storages
+/logs

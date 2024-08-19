@@ -3,6 +3,7 @@ host = "127.0.0.1"
 port = 5560
 # Master key for the server
 master_key = "masterkey"
+log-directory = ""
 
 # Database connection string
 [database]
