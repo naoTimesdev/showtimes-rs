@@ -41,7 +41,7 @@ impl std::fmt::Display for ShowtimesAudience {
 }
 
 /// Our claims struct, it needs to derive `Serialize` and/or `Deserialize`
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShowtimesUserClaims {
     /// When the token expires
     #[serde(with = "unix_timestamp_serializer")]

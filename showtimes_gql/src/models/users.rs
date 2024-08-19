@@ -89,7 +89,9 @@ impl From<&showtimes_db::m::User> for UserGQL {
 /// A user session object
 #[derive(SimpleObject)]
 pub struct UserSessionGQL {
+    /// The user object
     user: UserGQL,
+    /// The user's session token
     token: String,
 }
 

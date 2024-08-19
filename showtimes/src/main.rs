@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use axum::{response::IntoResponse, routing::get, Router};
+use routes::graphql::GRAPHQL_ROUTE;
 use serde_json::json;
 use showtimes_fs::s3::{S3FsCredentialsProvider, S3FsRegionProvider};
 use showtimes_shared::Config;
@@ -55,7 +56,7 @@ async fn entrypoint() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                "showtimes=debug,tower_http=debug,axum::rejection=trace".into()
+                "showtimes=debug,tower_http=debug,axum::rejection=trace,async_graphql::graphql=debug".into()
             }),
         )
         .with(tracing_subscriber::fmt::layer())
@@ -107,22 +108,34 @@ async fn entrypoint() -> anyhow::Result<()> {
         showtimes_search::create_connection(&config.meilisearch.url, &config.meilisearch.api_key)
             .await?;
 
+    tracing::info!("🔌🚀 Loading GraphQL schema...");
+    let schema = showtimes_gql::create_schema();
+
     tracing::info!("🔌 Initializing state...");
     let state = state::ShowtimesState {
         db: mongo_conn.db,
         storage: Arc::new(fs),
         meili,
         config: Arc::new(config.clone()),
+        schema,
     };
 
     tracing::info!("🚀 Starting server...");
     let app: Router = Router::new()
         .route("/", get(index))
+        .route(
+            GRAPHQL_ROUTE,
+            get(routes::graphql::graphql_playground).post(routes::graphql::graphql_handler),
+        )
         .route("/_/health", get(|| async { "OK" }))
         .route("/images/:id/:filename", get(routes::image::image_by_id))
         .route(
             "/images/:parent_id/:id/:filename",
             get(routes::image::image_by_id),
+        )
+        .route(
+            "/oauth2/discord/authorize",
+            get(routes::oauth2::oauth2_discord_authorize),
         )
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::new().allow_origin(tower_http::cors::Any))
@@ -135,6 +148,11 @@ async fn entrypoint() -> anyhow::Result<()> {
     ))
     .await?;
     tracing::info!("🌍 Fast serving at http://{}", listener.local_addr()?);
+    tracing::info!(
+        "🌍 GraphQL playground: http://{}{}",
+        listener.local_addr()?,
+        GRAPHQL_ROUTE
+    );
     axum::serve(listener, app).await?;
 
     Ok(())

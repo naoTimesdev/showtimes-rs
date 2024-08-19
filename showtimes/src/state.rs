@@ -13,4 +13,6 @@ pub struct ShowtimesState {
     pub meili: showtimes_search::ClientMutex,
     /// Configuration
     pub config: Arc<showtimes_shared::Config>,
+    /// The GraphQL request schema
+    pub schema: showtimes_gql::ShowtimesGQLSchema,
 }

@@ -52,6 +52,21 @@ impl std::fmt::Debug for DiscordClient {
     }
 }
 
+#[derive(Debug)]
+pub enum DiscordClientError {
+    Reqwest(reqwest::Error),
+    Serde(serde_json::Error),
+}
+
+impl std::fmt::Display for DiscordClientError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DiscordClientError::Reqwest(e) => write!(f, "Reqwest error: {}", e),
+            DiscordClientError::Serde(e) => write!(f, "Serde error: {}", e),
+        }
+    }
+}
+
 impl DiscordClient {
     pub fn new(client_id: impl Into<String>, client_secret: impl Into<String>) -> Self {
         Self {
@@ -64,7 +79,7 @@ impl DiscordClient {
         &self,
         code: impl Into<String>,
         redirect_uri: impl Into<String>,
-    ) -> Result<DiscordToken, reqwest::Error> {
+    ) -> Result<DiscordToken, DiscordClientError> {
         let client = reqwest::Client::new();
         let res = client
             .post(&format!("{}/oauth2/token", BASE_URL))
@@ -77,9 +92,17 @@ impl DiscordClient {
                 ("redirect_uri", &redirect_uri.into()),
             ])
             .send()
-            .await?;
+            .await
+            .map_err(DiscordClientError::Reqwest)?;
 
-        res.json().await
+        let raw_resp = res.text().await.map_err(DiscordClientError::Reqwest)?;
+
+        serde_json::from_str::<DiscordToken>(&raw_resp).map_err(|e| {
+            println!("Error: {:?}", e);
+            println!("Body: {:?}", raw_resp);
+
+            DiscordClientError::Serde(e)
+        })
     }
 
     pub async fn refresh_token(

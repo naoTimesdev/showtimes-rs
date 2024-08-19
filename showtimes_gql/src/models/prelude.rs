@@ -3,7 +3,10 @@ use std::ops::Deref;
 use async_graphql::{ComplexObject, Enum, Scalar, ScalarType, SimpleObject};
 
 /// A wrapper around ULID to allow it to be used in GraphQL
-pub struct UlidGQL(showtimes_shared::ulid::Ulid);
+pub struct UlidGQL(
+    /// A wrapper around ULID to allow it to be used in GraphQL
+    showtimes_shared::ulid::Ulid,
+);
 
 impl Deref for UlidGQL {
     type Target = showtimes_shared::ulid::Ulid;
@@ -40,7 +43,10 @@ impl From<&showtimes_shared::ulid::Ulid> for UlidGQL {
 }
 
 /// A wrapper around DateTime<Utc> to allow it to be used in GraphQL
-pub struct DateTimeGQL(chrono::DateTime<chrono::Utc>);
+pub struct DateTimeGQL(
+    /// A datetime timestamp format in UTC timezone, follows RFC3339 format
+    chrono::DateTime<chrono::Utc>,
+);
 
 impl Deref for DateTimeGQL {
     type Target = chrono::DateTime<chrono::Utc>;
@@ -92,6 +98,7 @@ pub enum UserKindGQL {
     Admin,
 }
 
+/// Information about an image
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct ImageMetadataGQL {

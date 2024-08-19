@@ -14,6 +14,7 @@ description = "The Showtimes API backend for naoTimes. A full-featured group man
 tokio.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+urlencoding.workspace = true
 toml.workspace = true
 anyhow.workspace = true
 
@@ -31,5 +32,7 @@ tower-http.workspace = true
 showtimes-shared = { path = "../showtimes_shared" }
 showtimes-db = { path = "../showtimes_db" }
 showtimes-fs = { path = "../showtimes_fs" }
+showtimes-gql = { path = "../showtimes_gql" }
 showtimes-metadata = { path = "../showtimes_metadata" }
 showtimes-search = { path = "../showtimes_search" }
+showtimes-session = { path = "../showtimes_session" }

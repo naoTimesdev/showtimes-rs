@@ -3290,8 +3290,10 @@ dependencies = [
  "serde_json",
  "showtimes-db",
  "showtimes-fs",
+ "showtimes-gql",
  "showtimes-metadata",
  "showtimes-search",
+ "showtimes-session",
  "showtimes-shared",
  "tokio",
  "toml",
@@ -3299,6 +3301,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "urlencoding",
 ]
 
 [[package]]
@@ -3362,6 +3365,7 @@ dependencies = [
  "showtimes-session",
  "showtimes-shared",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
