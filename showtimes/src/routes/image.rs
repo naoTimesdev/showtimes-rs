@@ -76,7 +76,7 @@ async fn common_reader(
             }
 
             // Write something to tx so we can have same type
-            tx.write(b"Not found").await.unwrap();
+            tx.write_all(b"Not found").await.unwrap();
 
             // Return an error 404
             return axum::http::Response::builder()

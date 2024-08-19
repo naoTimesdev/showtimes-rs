@@ -143,10 +143,7 @@ impl Migration for M20240725045840Init {
             "Found {} valid users, committing to database",
             users_map.len()
         );
-        let mut users = users_map
-            .iter()
-            .map(|(_, user)| user.clone())
-            .collect::<Vec<_>>();
+        let mut users: Vec<showtimes_db::m::User> = users_map.values().cloned().collect();
         let user_handler = UserHandler::new(self.db.clone()).await;
         user_handler.insert(&mut users).await?;
         tracing::info!("Committed all users data");
@@ -172,14 +169,10 @@ impl Migration for M20240725045840Init {
                         &server.id,
                         server.anime.len()
                     );
-                    let temp_projects = temp_mapping_projects
-                        .entry(server.id.clone())
-                        .or_insert(Vec::new());
+                    let temp_projects = temp_mapping_projects.entry(server.id.clone()).or_default();
                     temp_invite_maps.insert(server.id.clone(), server.konfirmasi.clone());
-                    server_id_maps.insert(server.id.clone(), t_server.id.clone());
-                    let server_maps = project_id_maps
-                        .entry(server.id.clone())
-                        .or_insert(HashMap::new());
+                    server_id_maps.insert(server.id.clone(), t_server.id);
+                    let server_maps = project_id_maps.entry(server.id.clone()).or_default();
                     for project in &server.anime {
                         match M20240725045840Init::transform_project_data(
                             &t_server.id,
@@ -200,13 +193,13 @@ impl Migration for M20240725045840Init {
                                     .collect();
                                 if !collab_data.is_empty() {
                                     temp_projects.push(ServerCollab {
-                                        id: t_project.id.clone(),
+                                        id: t_project.id,
                                         old_id: project.id.clone(),
                                         servers: collab_data,
                                     })
                                 }
 
-                                server_maps.insert(project.id.clone(), t_project.id.clone());
+                                server_maps.insert(project.id.clone(), t_project.id);
                                 transformed_projects.push(t_project.clone());
                             }
                             Err(e) => {
@@ -690,7 +683,7 @@ impl M20240725045840Init {
             .iter()
             .filter_map(|owner| match actors.get(owner) {
                 Some(user) => Some(showtimes_db::m::ServerUser::new(
-                    user.id.clone(),
+                    user.id,
                     showtimes_db::m::UserPrivilege::Admin,
                 )),
                 None => {
@@ -701,7 +694,7 @@ impl M20240725045840Init {
             .collect();
 
         if let Some(announce) = &server.announce_channel {
-            if is_discord_snowflake(&announce) {
+            if is_discord_snowflake(announce) {
                 integrations.push(IntegrationId::new(
                     announce.clone(),
                     showtimes_db::m::IntegrationType::DiscordChannel,
@@ -829,10 +822,7 @@ impl M20240725045840Init {
             })
             .collect();
 
-        let correct_roles = available_roles
-            .values()
-            .map(|role| role.clone())
-            .collect::<Vec<_>>();
+        let correct_roles: Vec<showtimes_db::m::Role> = available_roles.values().cloned().collect();
 
         let mut assignees: HashMap<String, RoleAssignee> = correct_roles
             .iter()
@@ -878,15 +868,12 @@ impl M20240725045840Init {
             assign_people(&custom.person.id, &custom.key, actors, &mut assignees);
         }
 
-        let proper_assignee = assignees
-            .values()
-            .map(|assignee| assignee.clone())
-            .collect::<Vec<_>>();
+        let proper_assignee: Vec<RoleAssignee> = assignees.values().cloned().collect();
 
         let mut new_project = showtimes_db::m::Project::new_with_poster_roles_assignees(
             title,
             project_kind,
-            server_id.clone(),
+            *server_id,
             poster_info,
             correct_roles,
             proper_assignee,
@@ -939,10 +926,10 @@ impl M20240725045840Init {
                 let all_project_ids: Vec<Ulid> = merged_servers
                     .iter()
                     .filter_map(|server_id| match top_collab_info.get(server_id) {
-                        Some(top_c) => match top_c.iter().find(|c| c.old_id == collab.old_id) {
-                            Some(c) => Some(c.id.clone()),
-                            None => None,
-                        },
+                        Some(top_c) => top_c
+                            .iter()
+                            .find(|c| c.old_id == collab.old_id)
+                            .map(|c| c.id),
                         None => None,
                     })
                     .collect();
@@ -955,7 +942,8 @@ impl M20240725045840Init {
         }
 
         // get all values
-        let all_values = mapped_temp.values().map(|v| v.clone()).collect::<Vec<_>>();
+        let all_values: Vec<showtimes_db::m::ServerCollaborationSync> =
+            mapped_temp.values().cloned().collect();
 
         Ok(all_values)
     }
@@ -969,7 +957,7 @@ impl M20240725045840Init {
 
         for (target_server_id, collab_info) in confirm_maps {
             let target_server = match server_maps.get(target_server_id) {
-                Some(p) => p.clone(),
+                Some(p) => *p,
                 None => {
                     tracing::warn!("Target server {} not found", target_server_id);
                     continue;
@@ -981,7 +969,7 @@ impl M20240725045840Init {
                 let source_id = collab.server_id.clone();
 
                 let source_server = match server_maps.get(&source_id) {
-                    Some(p) => p.clone(),
+                    Some(p) => *p,
                     None => {
                         tracing::warn!("Source server {} not found", &source_id);
                         continue;
@@ -990,7 +978,7 @@ impl M20240725045840Init {
 
                 let source_project_id = match project_maps.get(&source_id) {
                     Some(p) => match p.get(&project_id) {
-                        Some(p) => p.clone(),
+                        Some(p) => *p,
                         None => {
                             tracing::warn!(
                                 "Project {} not found in source server {}",
@@ -1007,10 +995,7 @@ impl M20240725045840Init {
                 };
 
                 let target_project_id = match project_maps.get(target_server_id) {
-                    Some(p) => match p.get(&project_id) {
-                        Some(p) => Some(p.clone()),
-                        None => None,
-                    },
+                    Some(p) => p.get(&project_id).copied(),
                     None => None,
                 };
 

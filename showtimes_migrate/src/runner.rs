@@ -5,7 +5,7 @@ use crate::{common::env_or_exit, migrations::Migration};
 
 async fn check_if_migration_exists(
     handler: MigrationHandler,
-    migration: &Box<dyn Migration>,
+    migration: &dyn Migration,
 ) -> Option<showtimes_db::m::Migration> {
     let name = migration.name();
 
@@ -41,7 +41,7 @@ pub async fn run_migration_list(
 }
 
 pub async fn run_migration_up(handler: &MigrationHandler, migration: Box<dyn Migration>) {
-    let db_migrate = check_if_migration_exists(handler.clone(), &migration).await;
+    let db_migrate = check_if_migration_exists(handler.clone(), &*migration).await;
 
     if db_migrate.is_none() {
         tracing::info!("[UP] Running migration: {}", migration.name());
@@ -61,7 +61,7 @@ pub async fn run_migration_up(handler: &MigrationHandler, migration: Box<dyn Mig
             );
             handler.save(old_migration, None).await.unwrap();
             if old_migration.name == migration.name() {
-                current_id = old_migration.id().clone();
+                current_id = old_migration.id();
             }
         }
 
@@ -78,7 +78,7 @@ pub async fn run_migration_up(handler: &MigrationHandler, migration: Box<dyn Mig
 }
 
 pub async fn run_migration_down(handler: &MigrationHandler, migration: Box<dyn Migration>) {
-    let db_migrate = check_if_migration_exists(handler.clone(), &migration).await;
+    let db_migrate = check_if_migration_exists(handler.clone(), &*migration).await;
 
     if let Some(db_migrate) = db_migrate {
         if !db_migrate.is_current {

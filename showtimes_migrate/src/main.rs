@@ -35,7 +35,7 @@ async fn main() -> anyhow::Result<()> {
     let connection = create_connection(&mongodb_uri).await.unwrap();
     tracing::info!("Connected to MongoDB");
     let mut migrations = get_migrations(&connection.client, &connection.db);
-    migrations.sort_by(|a, b| a.timestamp().cmp(&b.timestamp()));
+    migrations.sort_by_key(|a| a.timestamp());
 
     let cloned_db = connection.db.clone();
     let migration_db = showtimes_db::MigrationHandler::new(cloned_db).await;

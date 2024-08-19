@@ -309,7 +309,7 @@ impl FsImpl for S3Fs {
 
         tracing::debug!("Downloading file stream for: {}", &key);
         while let Some(bytes) = resp.body.try_next().await? {
-            writer.write(&bytes).await?;
+            writer.write_all(&bytes).await?;
         }
 
         Ok(())
@@ -358,14 +358,13 @@ impl FsImpl for S3Fs {
             if let Some(content) = page.contents {
                 let objects: Vec<ObjectIdentifier> = content
                     .iter()
-                    .filter_map(|c| match c.key() {
-                        Some(key) => Some(
+                    .filter_map(|c| {
+                        c.key().map(|key| {
                             ObjectIdentifier::builder()
                                 .set_key(Some(key.to_string()))
                                 .build()
-                                .unwrap(),
-                        ),
-                        None => None,
+                                .unwrap()
+                        })
                     })
                     .collect();
 

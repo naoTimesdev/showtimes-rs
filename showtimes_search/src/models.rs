@@ -91,10 +91,7 @@ pub struct Server {
 
 impl From<showtimes_db::m::Server> for Server {
     fn from(value: showtimes_db::m::Server) -> Self {
-        let avatar_url = match value.avatar {
-            Some(avatar) => Some(avatar.as_url()),
-            None => None,
-        };
+        let avatar_url = value.avatar.map(|avatar| avatar.as_url());
         let owners_ids = value.owners.iter().map(|owner| owner.id).collect();
 
         Self {
@@ -150,10 +147,7 @@ pub struct User {
 
 impl From<showtimes_db::m::User> for User {
     fn from(value: showtimes_db::m::User) -> Self {
-        let avatar_url = match value.avatar {
-            Some(avatar) => Some(avatar.as_url()),
-            None => None,
-        };
+        let avatar_url = value.avatar.map(|avatar| avatar.as_url());
         let discord_id = value.discord_meta.id;
         let discord_username = value.discord_meta.username;
 

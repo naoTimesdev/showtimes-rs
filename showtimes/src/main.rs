@@ -77,7 +77,7 @@ async fn entrypoint() -> anyhow::Result<()> {
             tracing::info!("🔌📁🚀 Using S3 filesystem");
             let credentials = S3FsCredentialsProvider::new(&s3.access_key, &s3.secret_key);
             let region_info = match &s3.endpoint_url {
-                Some(endpoint) => S3FsRegionProvider::new(&s3.region, Some(&endpoint)),
+                Some(endpoint) => S3FsRegionProvider::new(&s3.region, Some(endpoint)),
                 None => S3FsRegionProvider::new(&s3.region, None),
             };
 

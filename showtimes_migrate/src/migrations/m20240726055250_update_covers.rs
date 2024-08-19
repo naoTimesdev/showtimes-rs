@@ -108,7 +108,7 @@ impl Migration for M20240726055250UpdateCovers {
             let cover_url = proper_url(&project.poster.image.filename);
             locked_anilist_maps
                 .entry(cover_url)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(project.clone());
         }
 

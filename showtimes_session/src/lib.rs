@@ -11,7 +11,7 @@ pub use jsonwebtoken::errors::Error as SessionError;
 pub use jsonwebtoken::errors::ErrorKind as SessionErrorKind;
 
 // The issuer of the token, we use a LazyLock to ensure it's only created once
-const ISSUER: LazyLock<String> = LazyLock::new(|| {
+static ISSUER: LazyLock<String> = LazyLock::new(|| {
     let iss = format!("showtimes-rs-session/{}", env!("CARGO_PKG_VERSION"));
 
     iss
