@@ -11,7 +11,11 @@ description = "Shared session utility for Showtimes API"
 
 [dependencies]
 serde.workspace = true
+serde_json.workspace = true
 jsonwebtoken.workspace = true
 chrono.workspace = true
 
+reqwest.workspace = true
+
+# Showtimes related
 showtimes-shared = { path = "../showtimes_shared" }

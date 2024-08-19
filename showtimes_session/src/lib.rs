@@ -5,6 +5,8 @@ use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use showtimes_shared::unix_timestamp_serializer;
 
+pub mod oauth2;
+
 /// Re-export the error type from the jsonwebtoken crate
 pub use jsonwebtoken::errors::Error as SessionError;
 /// Re-export the error kind from the jsonwebtoken crate
@@ -107,6 +109,35 @@ impl ShowtimesUserClaims {
 
     pub fn get_audience(&self) -> ShowtimesAudience {
         self.aud
+    }
+}
+
+/// A wrapper around the encoded token and the claims
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ShowtimesUserSession {
+    /// The encoded token
+    token: String,
+    /// The claims of the token
+    claims: ShowtimesUserClaims,
+}
+
+impl ShowtimesUserSession {
+    /// Create a new user session
+    pub fn new(token: impl Into<String>, claims: ShowtimesUserClaims) -> Self {
+        Self {
+            token: token.into(),
+            claims,
+        }
+    }
+
+    /// Get the encoded token
+    pub fn get_token(&self) -> &str {
+        &self.token
+    }
+
+    /// Get the claims of the token
+    pub fn get_claims(&self) -> &ShowtimesUserClaims {
+        &self.claims
     }
 }
 
