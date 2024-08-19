@@ -1,5 +1,18 @@
-use super::prelude::*;
-use async_graphql::{Object, SimpleObject};
+use super::{prelude::*, servers::ServerGQL};
+use async_graphql::{Enum, Object, SimpleObject};
+use futures::TryStreamExt;
+use showtimes_db::{mongodb::bson::doc, DatabaseMutex};
+
+/// Enum to hold user kinds
+#[derive(Enum, Default, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[graphql(remote = "showtimes_db::m::UserKind")]
+pub enum UserKindGQL {
+    /// A normal user
+    #[default]
+    User,
+    /// An admin user, can see all users and manage all servers
+    Admin,
+}
 
 /// The main user object
 pub struct UserGQL {
@@ -53,6 +66,59 @@ impl UserGQL {
     /// The user's last update date
     async fn updated(&self) -> DateTimeGQL {
         self.updated.into()
+    }
+
+    /// Get the server associated with the user
+    async fn servers(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        #[graphql(desc = "The number of servers to return", name = "perPage")] per_page: Option<
+            u32,
+        >,
+        #[graphql(desc = "The cursor to start from")] cursor: Option<UlidGQL>,
+    ) -> async_graphql::Result<PaginatedGQL<ServerGQL>> {
+        let db = ctx.data_unchecked::<DatabaseMutex>();
+
+        // Allowed range of per_page is 10-100, with
+        let per_page = per_page.filter(|&p| p >= 2 && p <= 100).unwrap_or(20);
+
+        let srv_handler = showtimes_db::ServerHandler::new(db.clone()).await;
+
+        let doc_query = match cursor {
+            Some(cursor) => {
+                doc! {
+                    "owners.id": self.id.to_string(),
+                    "id": { "$gte": cursor.to_string() }
+                }
+            }
+            None => doc! { "owners.id": self.id.to_string() },
+        };
+
+        let col = srv_handler.col.lock().await;
+        let cursor = col
+            .find(doc_query)
+            .limit((per_page + 1) as i64)
+            .sort(doc! { "id": 1 })
+            .await?;
+        let count = col
+            .count_documents(doc! { "owners.id": self.id.to_string() })
+            .await?;
+
+        let mut all_servers: Vec<showtimes_db::m::Server> = cursor.try_collect().await?;
+
+        // If all_servers is equal to per_page, then there is a next page
+        let last_srv = if all_servers.len() == per_page as usize {
+            Some(all_servers.pop().unwrap())
+        } else {
+            None
+        };
+
+        let page_info = PageInfoGQL::new(count, per_page, last_srv.map(|p| p.id.into()));
+
+        Ok(PaginatedGQL::new(
+            all_servers.into_iter().map(|p| p.into()).collect(),
+            page_info,
+        ))
     }
 }
 

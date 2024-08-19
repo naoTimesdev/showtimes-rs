@@ -1,29 +1,16 @@
 use async_graphql::Guard;
-use showtimes_db::{m::UserKind, mongodb::bson::doc, DatabaseMutex};
+use showtimes_db::{mongodb::bson::doc, DatabaseMutex};
 use showtimes_session::ShowtimesUserSession;
 
-#[derive(Eq, PartialEq, Copy, Clone, PartialOrd, Ord)]
-pub enum AuthLevel {
-    User,
-    Admin,
-}
+use crate::models::users::UserKindGQL;
 
 pub struct AuthUserMinimumGuard {
-    level: AuthLevel,
+    level: UserKindGQL,
 }
 
 impl AuthUserMinimumGuard {
-    pub fn new(level: AuthLevel) -> Self {
+    pub fn new(level: UserKindGQL) -> Self {
         Self { level }
-    }
-}
-
-impl From<UserKind> for AuthLevel {
-    fn from(value: UserKind) -> Self {
-        match value {
-            UserKind::User => AuthLevel::User,
-            UserKind::Admin => AuthLevel::Admin,
-        }
     }
 }
 
@@ -31,7 +18,7 @@ impl Guard for AuthUserMinimumGuard {
     async fn check(&self, ctx: &async_graphql::Context<'_>) -> async_graphql::Result<()> {
         match ctx.data_opt::<ShowtimesUserSession>() {
             Some(session) => {
-                if self.level >= AuthLevel::Admin {
+                if self.level >= UserKindGQL::Admin {
                     tracing::info!(
                         "Checking user level for admin for session: {}",
                         session.get_claims().get_metadata()
@@ -48,7 +35,7 @@ impl Guard for AuthUserMinimumGuard {
 
                     match user {
                         Some(user) => {
-                            if AuthLevel::from(user.kind) >= self.level {
+                            if UserKindGQL::from(user.kind) >= self.level {
                                 Ok(())
                             } else {
                                 Err("User level not authorized".into())

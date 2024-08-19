@@ -17,7 +17,7 @@ pub struct QueryRoot;
 #[Object]
 impl QueryRoot {
     /// Get current authenticated user
-    #[graphql(guard = "guard::AuthUserMinimumGuard::new(guard::AuthLevel::User)")]
+    #[graphql(guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)")]
     async fn current<'a>(&self, ctx: &'a Context<'_>) -> async_graphql::Result<UserSessionGQL> {
         let user_session = ctx.data_unchecked::<ShowtimesUserSession>();
         let handler =

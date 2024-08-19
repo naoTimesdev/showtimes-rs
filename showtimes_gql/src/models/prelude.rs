@@ -1,6 +1,8 @@
 use std::ops::Deref;
 
-use async_graphql::{ComplexObject, Description, Enum, Scalar, ScalarType, SimpleObject};
+use async_graphql::{ComplexObject, Description, OutputType, Scalar, ScalarType, SimpleObject};
+
+use super::{projects::ProjectGQL, servers::ServerGQL};
 
 /// A wrapper around ULID to allow it to be used in GraphQL
 pub struct UlidGQL(showtimes_shared::ulid::Ulid);
@@ -96,17 +98,6 @@ impl From<&chrono::DateTime<chrono::Utc>> for DateTimeGQL {
     }
 }
 
-/// Enum to hold user kinds
-#[derive(Enum, Default, Copy, Clone, Eq, PartialEq)]
-#[graphql(remote = "showtimes_db::m::UserKind")]
-pub enum UserKindGQL {
-    /// A normal user
-    #[default]
-    User,
-    /// An admin user, can see all users and manage all servers
-    Admin,
-}
-
 /// Information about an image
 #[derive(SimpleObject)]
 #[graphql(complex)]
@@ -158,5 +149,57 @@ impl From<&showtimes_db::m::ImageMetadata> for ImageMetadataGQL {
             format: meta.format.clone(),
             parent: meta.parent.clone(),
         }
+    }
+}
+
+/// A page information for pagination
+#[derive(SimpleObject)]
+pub struct PageInfoGQL {
+    /// The total number of pages
+    total: u64,
+    /// The number of items per page
+    #[graphql(name = "perPage")]
+    per_page: u32,
+    /// Next cursor to get the next page
+    #[graphql(name = "nextCursor")]
+    next_cursor: Option<UlidGQL>,
+}
+
+/// A paginated data structure
+#[derive(SimpleObject)]
+#[graphql(concrete(name = "ProjectPaginated", params(ProjectGQL)))]
+#[graphql(concrete(name = "ServerPaginated", params(ServerGQL)))]
+pub struct PaginatedGQL<T: OutputType> {
+    /// The items list
+    node: Vec<T>,
+    /// The page information
+    #[graphql(name = "pageInfo")]
+    page_info: PageInfoGQL,
+}
+
+impl PageInfoGQL {
+    /// Create a new PageInfoGQL
+    pub fn new(total: u64, per_page: u32, next_cursor: Option<UlidGQL>) -> Self {
+        PageInfoGQL {
+            total,
+            per_page,
+            next_cursor,
+        }
+    }
+
+    /// Empty PageInfoGQL
+    pub fn empty(per_page: u32) -> Self {
+        PageInfoGQL {
+            total: 0,
+            per_page: per_page,
+            next_cursor: None,
+        }
+    }
+}
+
+impl<T: OutputType> PaginatedGQL<T> {
+    /// Create a new PaginatedGQL
+    pub fn new(node: Vec<T>, page_info: PageInfoGQL) -> Self {
+        PaginatedGQL { node, page_info }
     }
 }

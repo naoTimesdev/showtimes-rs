@@ -7,7 +7,7 @@ use super::{ImageMetadata, IntegrationId, ShowModelHandler};
 /// Enum to hold user privileges on a server.
 ///
 /// There is no "normal" user, as all users are considered normal.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum UserPrivilege {
     /// A project manager on a server
     ///

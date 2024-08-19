@@ -3356,6 +3356,7 @@ dependencies = [
  "anyhow",
  "async-graphql",
  "chrono",
+ "futures",
  "serde",
  "serde_json",
  "showtimes-db",
