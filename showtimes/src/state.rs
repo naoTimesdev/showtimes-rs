@@ -6,7 +6,7 @@ pub type StorageShared = Arc<showtimes_fs::FsPool>;
 #[derive(Clone)]
 pub struct ShowtimesState {
     /// The `showtimes_db` database
-    pub db: showtimes_db::DatabaseMutex,
+    pub db: showtimes_db::DatabaseShared,
     /// Storage handler
     pub storage: StorageShared,
     /// Meilisearch handler

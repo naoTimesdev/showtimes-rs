@@ -1,6 +1,8 @@
 use std::ops::Deref;
 
-use async_graphql::{ComplexObject, Description, OutputType, Scalar, ScalarType, SimpleObject};
+use async_graphql::{
+    ComplexObject, Description, Enum, OutputType, Scalar, ScalarType, SimpleObject,
+};
 
 use super::{projects::ProjectGQL, servers::ServerGQL};
 
@@ -43,7 +45,7 @@ impl From<showtimes_shared::ulid::Ulid> for UlidGQL {
 
 impl From<&showtimes_shared::ulid::Ulid> for UlidGQL {
     fn from(ulid: &showtimes_shared::ulid::Ulid) -> Self {
-        UlidGQL(ulid.clone())
+        UlidGQL(*ulid)
     }
 }
 
@@ -94,7 +96,7 @@ impl From<chrono::DateTime<chrono::Utc>> for DateTimeGQL {
 
 impl From<&chrono::DateTime<chrono::Utc>> for DateTimeGQL {
     fn from(dt: &chrono::DateTime<chrono::Utc>) -> Self {
-        DateTimeGQL(dt.clone())
+        DateTimeGQL(*dt)
     }
 }
 
@@ -152,6 +154,75 @@ impl From<&showtimes_db::m::ImageMetadata> for ImageMetadataGQL {
     }
 }
 
+/// The list of possible integrations types.
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[graphql(
+    remote = "showtimes_db::m::IntegrationType",
+    rename_items = "SCREAMING_SNAKE_CASE"
+)]
+pub enum IntegrationTypeGQL {
+    // Related to Discord
+    /// A Discord Role ID
+    DiscordRole,
+    /// A Discord User ID
+    DiscordUser,
+    /// A Discord Text Channel ID
+    #[graphql(name = "DISCORD_TEXT_CHANNEL")]
+    DiscordChannel,
+    /// A Discord Guild ID
+    DiscordGuild,
+    // Related to FansubDB
+    /// Your group FansubDB ID
+    #[graphql(name = "FANSUBDB_ID")]
+    FansubDB,
+    /// A FansubDB Project ID
+    #[graphql(name = "FANSUBDB_PROJECT_ID")]
+    FansubDBProject,
+    /// A FansubDB Shows ID
+    #[graphql(name = "FANSUBDB_SHOWS_ID")]
+    FansubDBShows,
+    // Related to Providers
+    /// Anilist ID
+    #[graphql(name = "PVD_ANILIST")]
+    ProviderAnilist,
+    /// Anilist MAL ID mapping
+    #[graphql(name = "PVD_ANILIST_MAL")]
+    ProviderAnilistMal,
+    /// VNDB ID
+    #[graphql(name = "PVD_VNDB")]
+    ProviderVndb,
+    /// TMDB ID
+    #[graphql(name = "PVD_TMDB")]
+    ProviderTmdb,
+}
+
+/// A metadata collection to hold integration information with other platform
+#[derive(SimpleObject)]
+pub struct IntegrationIdGQL {
+    /// The ID of the integration
+    iod: String,
+    /// The kind of the integration
+    kind: IntegrationTypeGQL,
+}
+
+impl From<showtimes_db::m::IntegrationId> for IntegrationIdGQL {
+    fn from(integration: showtimes_db::m::IntegrationId) -> Self {
+        IntegrationIdGQL {
+            iod: integration.id().to_string(),
+            kind: (*integration.kind()).into(),
+        }
+    }
+}
+
+impl From<&showtimes_db::m::IntegrationId> for IntegrationIdGQL {
+    fn from(integration: &showtimes_db::m::IntegrationId) -> Self {
+        IntegrationIdGQL {
+            iod: integration.id().to_string(),
+            kind: (*integration.kind()).into(),
+        }
+    }
+}
+
 /// A page information for pagination
 #[derive(SimpleObject)]
 pub struct PageInfoGQL {
@@ -191,7 +262,7 @@ impl PageInfoGQL {
     pub fn empty(per_page: u32) -> Self {
         PageInfoGQL {
             total: 0,
-            per_page: per_page,
+            per_page,
             next_cursor: None,
         }
     }

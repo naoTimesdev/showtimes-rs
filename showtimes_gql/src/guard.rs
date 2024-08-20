@@ -1,9 +1,10 @@
 use async_graphql::Guard;
-use showtimes_db::{mongodb::bson::doc, DatabaseMutex};
+use showtimes_db::{mongodb::bson::doc, DatabaseShared};
 use showtimes_session::ShowtimesUserSession;
 
 use crate::models::users::UserKindGQL;
 
+/// A guard to check if the user is at least a certain level
 pub struct AuthUserMinimumGuard {
     level: UserKindGQL,
 }
@@ -24,10 +25,8 @@ impl Guard for AuthUserMinimumGuard {
                         session.get_claims().get_metadata()
                     );
 
-                    let handler = showtimes_db::UserHandler::new(
-                        ctx.data_unchecked::<DatabaseMutex>().clone(),
-                    )
-                    .await;
+                    let handler =
+                        showtimes_db::UserHandler::new(ctx.data_unchecked::<DatabaseShared>());
 
                     let user = handler
                         .find_by(doc! { "id": session.get_claims().get_metadata() })

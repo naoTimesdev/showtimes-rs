@@ -1,7 +1,7 @@
-use super::{prelude::*, projects::ProjectGQL};
-use async_graphql::{Enum, Object, SimpleObject};
+use super::{prelude::*, projects::ProjectGQL, users::UserGQL};
+use async_graphql::{Enum, Object};
 use futures::TryStreamExt;
-use showtimes_db::{m::ServerUser, mongodb::bson::doc, DatabaseMutex};
+use showtimes_db::{m::ServerUser, mongodb::bson::doc, DatabaseShared};
 
 /// Enum to hold user privileges on a server.
 ///
@@ -29,23 +29,53 @@ pub enum UserPrivilegeGQL {
 }
 
 /// Owner information in the server
-#[derive(SimpleObject)]
 pub struct ServerUserGQL {
     /// The associated user ID
-    id: UlidGQL,
+    id: showtimes_shared::ulid::Ulid,
     /// The user's privilege
-    privilege: UserPrivilegeGQL,
+    privilege: showtimes_db::m::UserPrivilege,
     /// The extra associated data with the user
     ///
     /// Used to store extra data like what projects the user is managing
     extras: Vec<String>,
 }
 
+#[Object]
+impl ServerUserGQL {
+    /// The complete user information
+    async fn user(&self, ctx: &async_graphql::Context<'_>) -> async_graphql::Result<UserGQL> {
+        let db = ctx.data_unchecked::<DatabaseShared>();
+        let handler = showtimes_db::UserHandler::new(db);
+
+        let user = handler.find_by_id(&self.id.to_string()).await?;
+
+        match user {
+            Some(user) => {
+                let user: UserGQL = user.into();
+                Ok(user.with_disable_server_fetch())
+            }
+            None => Err("User not found".into()),
+        }
+    }
+
+    /// The user's privilege
+    async fn privilege(&self) -> UserPrivilegeGQL {
+        self.privilege.into()
+    }
+
+    /// The extra associated data with the user
+    ///
+    /// Used to store extra data like what projects the user is managing
+    async fn extras(&self) -> Vec<String> {
+        self.extras.clone()
+    }
+}
+
 impl From<ServerUser> for ServerUserGQL {
     fn from(user: ServerUser) -> Self {
         ServerUserGQL {
-            id: user.id.into(),
-            privilege: user.privilege.into(),
+            id: user.id,
+            privilege: user.privilege,
             extras: user.extras,
         }
     }
@@ -54,8 +84,8 @@ impl From<ServerUser> for ServerUserGQL {
 impl From<&ServerUser> for ServerUserGQL {
     fn from(user: &ServerUser) -> Self {
         ServerUserGQL {
-            id: user.id.into(),
-            privilege: user.privilege.into(),
+            id: user.id,
+            privilege: user.privilege,
             extras: user.extras.clone(),
         }
     }
@@ -73,6 +103,7 @@ pub struct ServerGQL {
     created: chrono::DateTime<chrono::Utc>,
     updated: chrono::DateTime<chrono::Utc>,
     current_user: Option<showtimes_shared::ulid::Ulid>,
+    disable_projects: bool,
 }
 
 #[Object]
@@ -119,12 +150,16 @@ impl ServerGQL {
         per_page: Option<u32>,
         #[graphql(desc = "The cursor to start from")] cursor: Option<UlidGQL>,
     ) -> async_graphql::Result<PaginatedGQL<ProjectGQL>> {
-        let db = ctx.data_unchecked::<DatabaseMutex>();
+        if self.disable_projects {
+            return Err("Projects fetch from this context is disabled to avoid looping".into());
+        }
+
+        let db = ctx.data_unchecked::<DatabaseShared>();
 
         // Allowed range of per_page is 10-100, with
-        let per_page = per_page.filter(|&p| p >= 2 && p <= 100).unwrap_or(20);
+        let per_page = per_page.filter(|&p| (2..=100).contains(&p)).unwrap_or(20);
 
-        let project_handler = showtimes_db::ProjectHandler::new(db.clone()).await;
+        let project_handler = showtimes_db::ProjectHandler::new(db);
         let limit_projects = self.get_project_limits();
 
         if let Some(limit_proj) = &limit_projects {
@@ -152,13 +187,14 @@ impl ServerGQL {
             (None, None) => doc! { "creator": self.id.to_string() },
         };
 
-        let col = project_handler.col.lock().await;
-        let cursor = col
+        let cursor = project_handler
+            .get_collection()
             .find(doc_query)
             .limit((per_page + 1) as i64)
             .sort(doc! { "id": 1 })
             .await?;
-        let count = col
+        let count = project_handler
+            .get_collection()
             .count_documents(doc! { "creator": self.id.to_string() })
             .await?;
 
@@ -190,6 +226,7 @@ impl From<showtimes_db::m::Server> for ServerGQL {
             created: server.created,
             updated: server.updated,
             current_user: None,
+            disable_projects: false,
         }
     }
 }
@@ -204,6 +241,7 @@ impl From<&showtimes_db::m::Server> for ServerGQL {
             created: server.created,
             updated: server.updated,
             current_user: None,
+            disable_projects: false,
         }
     }
 }
@@ -229,6 +267,11 @@ impl ServerGQL {
 
     pub fn with_current_user(mut self, user_id: showtimes_shared::ulid::Ulid) -> Self {
         self.current_user = Some(user_id);
+        self
+    }
+
+    pub fn with_projects_disabled(mut self) -> Self {
+        self.disable_projects = true;
         self
     }
 }

@@ -37,8 +37,7 @@ async fn main() -> anyhow::Result<()> {
     let mut migrations = get_migrations(&connection.client, &connection.db);
     migrations.sort_by_key(|a| a.timestamp());
 
-    let cloned_db = connection.db.clone();
-    let migration_db = showtimes_db::MigrationHandler::new(cloned_db).await;
+    let migration_db = showtimes_db::MigrationHandler::new(&connection.db);
 
     match cli.command {
         MigrationCommands::List { detailed } => {

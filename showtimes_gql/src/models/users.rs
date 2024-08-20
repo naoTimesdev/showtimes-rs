@@ -1,7 +1,7 @@
 use super::{prelude::*, servers::ServerGQL};
 use async_graphql::{Enum, Object, SimpleObject};
 use futures::TryStreamExt;
-use showtimes_db::{mongodb::bson::doc, DatabaseMutex};
+use showtimes_db::{mongodb::bson::doc, DatabaseShared};
 
 /// Enum to hold user kinds
 #[derive(Enum, Default, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -24,6 +24,7 @@ pub struct UserGQL {
     avatar: Option<showtimes_db::m::ImageMetadata>,
     created: chrono::DateTime<chrono::Utc>,
     updated: chrono::DateTime<chrono::Utc>,
+    disallow_server_fetch: bool,
 }
 
 #[Object]
@@ -77,12 +78,16 @@ impl UserGQL {
         >,
         #[graphql(desc = "The cursor to start from")] cursor: Option<UlidGQL>,
     ) -> async_graphql::Result<PaginatedGQL<ServerGQL>> {
-        let db = ctx.data_unchecked::<DatabaseMutex>();
+        if self.disallow_server_fetch {
+            return Err("Servers fetch from this context is disabled to avoid looping".into());
+        }
+
+        let db = ctx.data_unchecked::<DatabaseShared>();
 
         // Allowed range of per_page is 10-100, with
-        let per_page = per_page.filter(|&p| p >= 2 && p <= 100).unwrap_or(20);
+        let per_page = per_page.filter(|&p| (2..=100).contains(&p)).unwrap_or(20);
 
-        let srv_handler = showtimes_db::ServerHandler::new(db.clone()).await;
+        let srv_handler = showtimes_db::ServerHandler::new(db);
 
         let doc_query = match cursor {
             Some(cursor) => {
@@ -94,13 +99,14 @@ impl UserGQL {
             None => doc! { "owners.id": self.id.to_string() },
         };
 
-        let col = srv_handler.col.lock().await;
-        let cursor = col
+        let cursor = srv_handler
+            .get_collection()
             .find(doc_query)
             .limit((per_page + 1) as i64)
             .sort(doc! { "id": 1 })
             .await?;
-        let count = col
+        let count = srv_handler
+            .get_collection()
             .count_documents(doc! { "owners.id": self.id.to_string() })
             .await?;
 
@@ -133,6 +139,7 @@ impl From<showtimes_db::m::User> for UserGQL {
             avatar: user.avatar,
             created: user.created,
             updated: user.updated,
+            disallow_server_fetch: false,
         }
     }
 }
@@ -142,13 +149,21 @@ impl From<&showtimes_db::m::User> for UserGQL {
         UserGQL {
             id: user.id,
             username: user.username.clone(),
-            kind: user.kind.clone(),
+            kind: user.kind,
             api_key: user.api_key.clone(),
             registered: user.registered,
             avatar: user.avatar.clone(),
             created: user.created,
             updated: user.updated,
+            disallow_server_fetch: false,
         }
+    }
+}
+
+impl UserGQL {
+    pub fn with_disable_server_fetch(mut self) -> Self {
+        self.disallow_server_fetch = true;
+        self
     }
 }
 

@@ -1,7 +1,10 @@
 use async_graphql::extensions::Tracing;
 use async_graphql::{Context, EmptySubscription, Error, ErrorExtensions, Object};
+use futures::TryStreamExt;
+use models::prelude::{PageInfoGQL, PaginatedGQL, UlidGQL};
+use models::servers::ServerGQL;
 use models::users::UserSessionGQL;
-use showtimes_db::{mongodb::bson::doc, DatabaseMutex};
+use showtimes_db::{mongodb::bson::doc, DatabaseShared};
 use showtimes_session::{oauth2::discord::DiscordClient, ShowtimesUserSession};
 use std::sync::Arc;
 
@@ -20,8 +23,7 @@ impl QueryRoot {
     #[graphql(guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)")]
     async fn current<'a>(&self, ctx: &'a Context<'_>) -> async_graphql::Result<UserSessionGQL> {
         let user_session = ctx.data_unchecked::<ShowtimesUserSession>();
-        let handler =
-            showtimes_db::UserHandler::new(ctx.data_unchecked::<DatabaseMutex>().clone()).await;
+        let handler = showtimes_db::UserHandler::new(ctx.data_unchecked::<DatabaseShared>());
 
         let user = handler
             .find_by(doc! { "id": user_session.get_claims().get_metadata() })
@@ -33,6 +35,78 @@ impl QueryRoot {
                 Err(Error::new("User not found").extend_with(|_, e| e.set("reason", "not_found")))
             }
         }
+    }
+
+    /// Get authenticated user associated servers
+    #[graphql(guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)")]
+    async fn servers<'a>(
+        &self,
+        ctx: &'a Context<'_>,
+        #[graphql(desc = "Limit what server we want to return")] ids: Option<Vec<UlidGQL>>,
+        #[graphql(desc = "The number of servers to return, default 20", name = "perPage")] per_page: Option<
+            u32,
+        >,
+        #[graphql(desc = "The cursor to start from")] cursor: Option<UlidGQL>,
+    ) -> async_graphql::Result<PaginatedGQL<ServerGQL>> {
+        let user_session = ctx.data_unchecked::<ShowtimesUserSession>();
+        let user_id = user_session.get_claims().get_metadata();
+        let db = ctx.data_unchecked::<DatabaseShared>();
+
+        // Allowed range of per_page is 10-100, with
+        let per_page = per_page.filter(|&p| (2..=100).contains(&p)).unwrap_or(20);
+
+        let srv_handler = showtimes_db::ServerHandler::new(db);
+
+        let doc_query = match (cursor, ids) {
+            (Some(cursor), Some(ids)) => {
+                let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
+                doc! {
+                    "owners.id": user_id.to_string(),
+                    "id": { "$gte": cursor.to_string(), "$in": ids }
+                }
+            }
+            (Some(cursor), None) => {
+                doc! {
+                    "owners.id": user_id.to_string(),
+                    "id": { "$gte": cursor.to_string() }
+                }
+            }
+            (None, Some(ids)) => {
+                let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
+                doc! {
+                    "owners.id": user_id.to_string(),
+                    "id": { "$in": ids }
+                }
+            }
+            (None, None) => doc! { "owners.id": user_id.to_string() },
+        };
+
+        let cursor = srv_handler
+            .get_collection()
+            .find(doc_query)
+            .limit((per_page + 1) as i64)
+            .sort(doc! { "id": 1 })
+            .await?;
+        let count = srv_handler
+            .get_collection()
+            .count_documents(doc! { "owners.id": user_id.to_string() })
+            .await?;
+
+        let mut all_servers: Vec<showtimes_db::m::Server> = cursor.try_collect().await?;
+
+        // If all_servers is equal to per_page, then there is a next page
+        let last_srv = if all_servers.len() == per_page as usize {
+            Some(all_servers.pop().unwrap())
+        } else {
+            None
+        };
+
+        let page_info = PageInfoGQL::new(count, per_page, last_srv.map(|p| p.id.into()));
+
+        Ok(PaginatedGQL::new(
+            all_servers.into_iter().map(|p| p.into()).collect(),
+            page_info,
+        ))
     }
 }
 
@@ -71,8 +145,7 @@ impl MutationRoot {
         tracing::info!("Success, getting user for code {}", &token);
         let user_info = discord.get_user(&exchanged.access_token).await?;
 
-        let handler =
-            showtimes_db::UserHandler::new(ctx.data_unchecked::<DatabaseMutex>().clone()).await;
+        let handler = showtimes_db::UserHandler::new(ctx.data_unchecked::<DatabaseShared>());
 
         tracing::info!("Checking if user exists for ID: {}", &user_info.id);
         let user = handler

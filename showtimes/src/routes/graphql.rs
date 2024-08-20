@@ -23,7 +23,7 @@ fn get_token_from_headers(headers: &HeaderMap) -> Option<String> {
     headers.get("Authorization").and_then(|value| {
         value.to_str().ok().and_then(|value| {
             if value.starts_with("Bearer ") {
-                Some(value["Bearer ".len()..].to_string())
+                value.strip_prefix("Bearer ").map(|token| token.to_string())
             } else {
                 None
             }

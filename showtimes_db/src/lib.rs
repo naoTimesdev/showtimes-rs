@@ -2,7 +2,6 @@ pub mod models;
 
 use bson::doc;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 use crate::models::ShowModelHandler;
 use futures::stream::TryStreamExt;
@@ -13,19 +12,19 @@ pub use mongodb;
 use mongodb::options::ClientOptions;
 use showtimes_derive::create_handler;
 
-/// A type alias for a shared [`mongodb::Client`] wrapped in an [`Arc`] and [`Mutex`]
-pub type ClientMutex = Arc<Mutex<mongodb::Client>>;
-/// A type alias for a shared [`mongodb::Database`] wrapped in an [`Arc`] and [`Mutex`]
-pub type DatabaseMutex = Arc<Mutex<mongodb::Database>>;
-/// A type alias for a shared [`mongodb::Collection`] wrapped in an [`Arc`] and [`Mutex`]
-pub type CollectionMutex<T> = Arc<Mutex<mongodb::Collection<T>>>;
+/// A type alias for a shared [`mongodb::Client`] wrapped in an [`Arc`]
+pub type ClientShared = Arc<mongodb::Client>;
+/// A type alias for a shared [`mongodb::Database`] wrapped in an [`Arc`]
+pub type DatabaseShared = Arc<mongodb::Database>;
+/// A type alias for a shared [`mongodb::Collection`] wrapped in an [`Arc`]
+pub type CollectionShared<T> = Arc<mongodb::Collection<T>>;
 
 /// Shared connection handler
 pub struct Connection {
     /// The mongodb client
-    pub client: ClientMutex,
+    pub client: ClientShared,
     /// The `showtimes_db` database
-    pub db: DatabaseMutex,
+    pub db: DatabaseShared,
 }
 
 /// Create a connection to the MongoDB server
@@ -50,10 +49,10 @@ pub async fn create_connection(url: &str) -> anyhow::Result<Connection> {
     // Test the connection
     db.run_command(doc! { "ping": 1 }).await?;
 
-    // It works! Return the client and db with Arc<Mutex<T>>
+    // It works! Return the client and db with Arc<T>
     Ok(Connection {
-        client: Arc::new(Mutex::new(client)),
-        db: Arc::new(Mutex::new(db)),
+        client: Arc::new(client),
+        db: Arc::new(db),
     })
 }
 

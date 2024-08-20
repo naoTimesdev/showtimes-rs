@@ -163,7 +163,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
     tracing::info!("Reindexing all models...");
 
     tracing::info!("Reindexing users...");
-    let user_db = showtimes_db::UserHandler::new(conn.db.clone()).await;
+    let user_db = showtimes_db::UserHandler::new(&conn.db);
     let users = user_db.find_all().await.unwrap();
 
     let mapped_users: Vec<showtimes_search::models::User> = users
@@ -188,7 +188,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
         .await?;
 
     tracing::info!("Reindexing servers...");
-    let server_db = showtimes_db::ServerHandler::new(conn.db.clone()).await;
+    let server_db = showtimes_db::ServerHandler::new(&conn.db);
     let servers = server_db.find_all().await.unwrap();
 
     let mapped_servers: Vec<showtimes_search::models::Server> = servers
@@ -213,7 +213,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
         .await?;
 
     tracing::info!("Reindexing projects...");
-    let project_db = showtimes_db::ProjectHandler::new(conn.db.clone()).await;
+    let project_db = showtimes_db::ProjectHandler::new(&conn.db);
     let projects = project_db.find_all().await.unwrap();
 
     let mapped_projects: Vec<showtimes_search::models::Project> = projects
@@ -238,7 +238,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
         .await?;
 
     tracing::info!("Reindexing server collab syncs...");
-    let server_collab_sync_db = showtimes_db::CollaborationSyncHandler::new(conn.db.clone()).await;
+    let server_collab_sync_db = showtimes_db::CollaborationSyncHandler::new(&conn.db);
     let server_collab_syncs = server_collab_sync_db.find_all().await.unwrap();
 
     let mapped_server_collab_syncs: Vec<showtimes_search::models::ServerCollabSync> =
@@ -264,8 +264,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
         .await?;
 
     tracing::info!("Reindexing server collab invites...");
-    let server_collab_invite_db =
-        showtimes_db::CollaborationInviteHandler::new(conn.db.clone()).await;
+    let server_collab_invite_db = showtimes_db::CollaborationInviteHandler::new(&conn.db);
     let server_collab_invites = server_collab_invite_db.find_all().await.unwrap();
 
     let mapped_server_collab_invites: Vec<showtimes_search::models::ServerCollabInvite> =

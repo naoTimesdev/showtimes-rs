@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use bson::doc;
 use chrono::TimeZone;
@@ -7,7 +7,7 @@ use showtimes_db::{
     m::{
         DiscordUser, EpisodeProgress, ImageMetadata, IntegrationId, RoleAssignee, RoleStatus, User,
     },
-    ClientMutex, DatabaseMutex, UserHandler,
+    ClientShared, DatabaseShared, UserHandler,
 };
 use showtimes_fs::{
     local::LocalFs,
@@ -55,16 +55,16 @@ struct ServerCollab {
 
 #[derive(Clone)]
 pub struct M20240725045840Init {
-    client: ClientMutex,
-    db: DatabaseMutex,
+    client: ClientShared,
+    db: DatabaseShared,
 }
 
 #[async_trait::async_trait]
 impl Migration for M20240725045840Init {
-    fn init(client: &ClientMutex, db: &DatabaseMutex) -> Self {
+    fn init(client: &ClientShared, db: &DatabaseShared) -> Self {
         Self {
-            client: client.clone(),
-            db: db.clone(),
+            client: Arc::clone(client),
+            db: Arc::clone(db),
         }
     }
 
@@ -144,7 +144,7 @@ impl Migration for M20240725045840Init {
             users_map.len()
         );
         let mut users: Vec<showtimes_db::m::User> = users_map.values().cloned().collect();
-        let user_handler = UserHandler::new(self.db.clone()).await;
+        let user_handler = UserHandler::new(&self.db);
         user_handler.insert(&mut users).await?;
         tracing::info!("Committed all users data");
 
@@ -239,7 +239,7 @@ impl Migration for M20240725045840Init {
 
         if !mapped_servers.is_empty() {
             tracing::info!("Committing all servers to database...");
-            let server_handler = showtimes_db::ServerHandler::new(self.db.clone()).await;
+            let server_handler = showtimes_db::ServerHandler::new(&self.db);
             server_handler.insert(&mut mapped_servers).await?;
         } else {
             tracing::warn!("No servers to commit");
@@ -247,7 +247,7 @@ impl Migration for M20240725045840Init {
 
         if !transformed_projects.is_empty() {
             tracing::info!("Committing all projects to database...");
-            let project_handler = showtimes_db::ProjectHandler::new(self.db.clone()).await;
+            let project_handler = showtimes_db::ProjectHandler::new(&self.db);
             project_handler.insert(&mut transformed_projects).await?;
         }
 
@@ -257,8 +257,7 @@ impl Migration for M20240725045840Init {
 
         if !transformed_collab_sync.is_empty() {
             tracing::info!("Committing server collaborations to database...");
-            let collab_sync_handler =
-                showtimes_db::CollaborationSyncHandler::new(self.db.clone()).await;
+            let collab_sync_handler = showtimes_db::CollaborationSyncHandler::new(&self.db);
             collab_sync_handler
                 .insert(&mut transformed_collab_sync)
                 .await?;
@@ -274,8 +273,7 @@ impl Migration for M20240725045840Init {
 
         if !transformed_invites.is_empty() {
             tracing::info!("Committing collab invites to database...");
-            let collab_invite_handler =
-                showtimes_db::CollaborationInviteHandler::new(self.db.clone()).await;
+            let collab_invite_handler = showtimes_db::CollaborationInviteHandler::new(&self.db);
             collab_invite_handler
                 .insert(&mut transformed_invites)
                 .await?;
@@ -396,29 +394,27 @@ impl Migration for M20240725045840Init {
         let meilisearch = M20240725045840Init::setup_meilisearch(&meili_url, &meili_key).await?;
 
         // Remove projects from the database
-        let project_handler = showtimes_db::ProjectHandler::new(self.db.clone()).await;
+        let project_handler = showtimes_db::ProjectHandler::new(&self.db);
         tracing::info!("Dropping projects collection...");
         project_handler.delete_all().await?;
 
         // Remove servers from the database
-        let server_handler = showtimes_db::ServerHandler::new(self.db.clone()).await;
+        let server_handler = showtimes_db::ServerHandler::new(&self.db);
         tracing::info!("Dropping servers collection...");
         server_handler.delete_all().await?;
 
         // Remove users from the database
-        let user_handler = UserHandler::new(self.db.clone()).await;
+        let user_handler = UserHandler::new(&self.db);
         tracing::info!("Dropping users collection...");
         user_handler.delete_all().await?;
 
         // Remove server collaborations from the database
-        let collab_sync_handler =
-            showtimes_db::CollaborationSyncHandler::new(self.db.clone()).await;
+        let collab_sync_handler = showtimes_db::CollaborationSyncHandler::new(&self.db);
         tracing::info!("Dropping server collaborations collection...");
         collab_sync_handler.delete_all().await?;
 
         // Remove server collab invites from the database
-        let collab_invite_handler =
-            showtimes_db::CollaborationInviteHandler::new(self.db.clone()).await;
+        let collab_invite_handler = showtimes_db::CollaborationInviteHandler::new(&self.db);
         tracing::info!("Dropping server collab invites collection...");
         collab_invite_handler.delete_all().await?;
 
@@ -534,7 +530,7 @@ impl M20240725045840Init {
         &self,
         old_db_name: &str,
     ) -> anyhow::Result<Vec<crate::models::servers::Server>> {
-        let client = self.client.lock().await;
+        let client = Arc::clone(&self.client);
         let db = client.database(old_db_name);
 
         let coll = db.collection::<crate::models::servers::Server>("showtimesdatas");
@@ -549,7 +545,7 @@ impl M20240725045840Init {
         old_db_name: &str,
         servers: &[crate::models::servers::Server],
     ) -> anyhow::Result<HashMap<String, User>> {
-        let client = self.client.lock().await;
+        let client = Arc::clone(&self.client);
         let db = client.database(old_db_name);
 
         let show_admins = db.collection::<crate::models::servers::ServerAdmin>("showtimesadmin");

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bson::doc;
 use chrono::TimeZone;
-use showtimes_db::{ClientMutex, DatabaseMutex};
+use showtimes_db::{ClientShared, DatabaseShared};
 use showtimes_fs::{
     local::LocalFs,
     s3::{S3Fs, S3FsCredentialsProvider, S3FsRegionProvider},
@@ -14,13 +14,13 @@ use crate::common::env_or_exit;
 use super::Migration;
 
 pub struct M20240726055250UpdateCovers {
-    client: ClientMutex,
-    db: DatabaseMutex,
+    client: ClientShared,
+    db: DatabaseShared,
 }
 
 #[async_trait::async_trait]
 impl Migration for M20240726055250UpdateCovers {
-    fn init(client: &ClientMutex, db: &DatabaseMutex) -> Self {
+    fn init(client: &ClientShared, db: &DatabaseShared) -> Self {
         Self {
             client: client.clone(),
             db: db.clone(),
@@ -94,7 +94,7 @@ impl Migration for M20240726055250UpdateCovers {
         tracing::info!("Initializing filesystem with {}...", storages.get_name());
         storages.init().await?;
 
-        let project_db = showtimes_db::ProjectHandler::new(self.db.clone()).await;
+        let project_db = showtimes_db::ProjectHandler::new(&self.db);
         let projects = project_db
             .find_all_by(doc! {
                 "poster.image.key": "stubbed"

@@ -172,29 +172,35 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
         #[doc = "collection"]
         pub struct #handler_ident {
             /// The shared database connection
-            pub db: DatabaseMutex,
+            db: DatabaseShared,
             #[doc = "The shared connection for the `"]
             #[doc = #model_name]
             #[doc = "` collection"]
-            pub col: CollectionMutex<#model_ident>,
+            col: CollectionShared<#model_ident>,
         }
 
         impl #handler_ident {
             /// Create a new instance of the handler
-            pub async fn new(db: DatabaseMutex) -> Self {
-                let typed_col = db.lock().await.collection::<#model_ident>(#model_ident::collection_name());
+            pub fn new(db: &DatabaseShared) -> Self {
+                let typed_col = db.clone().collection::<#model_ident>(#model_ident::collection_name());
                 Self {
-                    db,
-                    col: std::sync::Arc::new(tokio::sync::Mutex::new(typed_col)),
+                    db: ::std::sync::Arc::clone(db),
+                    col: ::std::sync::Arc::new(typed_col),
                 }
+            }
+
+            #[doc = "Get the shared connection for"]
+            #[doc = #model_name_full]
+            #[doc = "collection"]
+            pub fn get_collection(&self) -> CollectionShared<#model_ident> {
+                ::std::sync::Arc::clone(&self.col)
             }
 
             #[doc = "Find all documents in the"]
             #[doc = #model_name_full]
             #[doc = "collection"]
             pub async fn find_all(&self) -> anyhow::Result<Vec<#model_ident>> {
-                let col = self.col.lock().await;
-                let mut cursor = col.find(mongodb::bson::doc! {}).await?;
+                let mut cursor = self.col.find(mongodb::bson::doc! {}).await?;
                 let mut results = Vec::new();
 
                 while let Some(result) = cursor.try_next().await? {
@@ -208,8 +214,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             #[doc = #model_name_full]
             #[doc = "collection"]
             pub async fn find_by_oid(&self, id: &mongodb::bson::oid::ObjectId) -> anyhow::Result<Option<#model_ident>> {
-                let col = self.col.lock().await;
-                let result = col.find_one(mongodb::bson::doc! { "_id": id }).await?;
+                let result = self.col.find_one(mongodb::bson::doc! { "_id": id }).await?;
                 Ok(result)
             }
 
@@ -217,8 +222,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             #[doc = #model_name_full]
             #[doc = "collection"]
             pub async fn find_by_id(&self, id: &str) -> anyhow::Result<Option<#model_ident>> {
-                let col = self.col.lock().await;
-                let result = col.find_one(mongodb::bson::doc! { "id": id }).await?;
+                let result = self.col.find_one(mongodb::bson::doc! { "id": id }).await?;
                 Ok(result)
             }
 
@@ -229,8 +233,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
                 &self,
                 filter: mongodb::bson::Document,
             ) -> anyhow::Result<Option<#model_ident>> {
-                let col = self.col.lock().await;
-                let result = col.find_one(filter).await?;
+                let result = self.col.find_one(filter).await?;
                 Ok(result)
             }
 
@@ -241,8 +244,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
                 &self,
                 filter: mongodb::bson::Document,
             ) -> anyhow::Result<Vec<#model_ident>> {
-                let col = self.col.lock().await;
-                let mut cursor = col.find(filter).await?;
+                let mut cursor = self.col.find(filter).await?;
                 let mut results = Vec::new();
 
                 while let Some(result) = cursor.try_next().await? {
@@ -256,7 +258,6 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             #[doc = #model_name_full]
             #[doc = "collection"]
             pub async fn insert(&self, docs: &mut Vec<#model_ident>) -> anyhow::Result<()> {
-                let col = self.col.lock().await;
                 // Iterate over the documents and add the `_id` field if it's missing
                 for doc in docs.iter_mut() {
                     if doc.id().is_none() {
@@ -265,7 +266,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
                         doc.updated();
                     }
                 }
-                col.insert_many(docs).await?;
+                self.col.insert_many(docs).await?;
                 Ok(())
             }
 
@@ -273,7 +274,6 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             #[doc = #model_name_full]
             #[doc = "collection"]
             pub async fn update(&self, doc: &#model_ident, filter: Option<mongodb::bson::Document>, update: mongodb::bson::Document) -> anyhow::Result<#model_ident> {
-                let col = self.col.lock().await;
                 if doc.id().is_none() {
                     anyhow::bail!("Document must have an `_id` to be updated");
                 }
@@ -292,7 +292,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
                 wc.journal = Some(true);
                 options.write_concern = Some(wc);
 
-                match col.find_one_and_update(filter, update).with_options(options).await? {
+                match self.col.find_one_and_update(filter, update).with_options(options).await? {
                     Some(result) => Ok(result),
                     None => anyhow::bail!("Failed to update document"),
                 }
@@ -302,8 +302,6 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             #[doc = #model_name_full]
             #[doc = "collection"]
             pub async fn save(&self, doc: &mut #model_ident, filter: Option<mongodb::bson::Document>) -> anyhow::Result<()> {
-                let col = self.col.lock().await;
-
                 let mut wc = mongodb::options::WriteConcern::default();
                 wc.journal = Some(true);
                 doc.updated();
@@ -328,7 +326,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
                     .return_document(Some(mongodb::options::ReturnDocument::After))
                     .build();
 
-                match col.find_one_and_replace(filter, &(*doc)).with_options(options).await? {
+                match self.col.find_one_and_replace(filter, &(*doc)).with_options(options).await? {
                     Some(result) => {
                         match mongodb::bson::to_bson(&result)? {
                             mongodb::bson::Bson::Document(dd) => {
@@ -349,31 +347,28 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             #[doc = #model_name_full]
             #[doc = "collection"]
             pub async fn delete(&self, doc: &#model_ident) -> anyhow::Result<mongodb::results::DeleteResult> {
-                let col = self.col.lock().await;
                 if doc.id().is_none() {
                     anyhow::bail!("Document must have an `_id` to be deleted");
                 }
 
                 let filter = mongodb::bson::doc! { "_id": doc.id().unwrap() };
-                Ok(col.delete_one(filter).await?)
+                Ok(self.col.delete_one(filter).await?)
             }
 
             #[doc = "Delete documents in the"]
             #[doc = #model_name_full]
             #[doc = "collection by filter"]
             pub async fn delete_by(&self, filter: mongodb::bson::Document) -> anyhow::Result<mongodb::results::DeleteResult> {
-                let col = self.col.lock().await;
-                Ok(col.delete_one(filter).await?)
+                Ok(self.col.delete_one(filter).await?)
             }
 
             #[doc = "Delete all documents in the"]
             #[doc = #model_name_full]
             #[doc = "collection"]
             pub async fn delete_all(&self) -> anyhow::Result<()> {
-                let col = self.col.lock().await;
-                // Call .drop() to delete all documents in the collection
-                let col_copy = col.clone();
-                Ok(col_copy.drop().await?)
+                let col = self.col.clone();
+                let deref_col = ::std::sync::Arc::try_unwrap(col).unwrap_or_else(|arc| (*arc).clone());
+                Ok(deref_col.drop().await?)
             }
         }
     };
