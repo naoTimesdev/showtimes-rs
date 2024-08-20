@@ -99,6 +99,7 @@ pub struct ServerGQL {
     id: showtimes_shared::ulid::Ulid,
     name: String,
     owners: Vec<ServerUser>,
+    integrations: Vec<showtimes_db::m::IntegrationId>,
     avatar: Option<showtimes_db::m::ImageMetadata>,
     created: chrono::DateTime<chrono::Utc>,
     updated: chrono::DateTime<chrono::Utc>,
@@ -129,6 +130,13 @@ impl ServerGQL {
     /// The server's avatar
     async fn avatar(&self) -> Option<ImageMetadataGQL> {
         self.avatar.clone().map(|a| a.into())
+    }
+
+    /// The server integrations information.
+    ///
+    /// Can be used to link to other services like Discord or FansubDB.
+    async fn integrations(&self) -> Vec<IntegrationIdGQL> {
+        self.integrations.iter().map(|i| i.into()).collect()
     }
 
     /// The server's creation date
@@ -225,6 +233,7 @@ impl From<showtimes_db::m::Server> for ServerGQL {
             id: server.id,
             name: server.name,
             owners: server.owners,
+            integrations: server.integrations,
             avatar: server.avatar,
             created: server.created,
             updated: server.updated,
@@ -241,6 +250,7 @@ impl From<&showtimes_db::m::Server> for ServerGQL {
             name: server.name.clone(),
             owners: server.owners.clone(),
             avatar: server.avatar.clone(),
+            integrations: server.integrations.clone(),
             created: server.created,
             updated: server.updated,
             current_user: None,
