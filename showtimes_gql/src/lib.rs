@@ -15,8 +15,7 @@ mod guard;
 mod models;
 
 pub type ShowtimesGQLSchema = async_graphql::Schema<QueryRoot, MutationRoot, EmptySubscription>;
-pub use async_graphql::http::playground_source;
-pub use async_graphql::http::GraphQLPlaygroundConfig;
+pub use async_graphql::http::{graphiql_plugin_explorer, GraphiQLSource};
 
 pub struct QueryRoot;
 

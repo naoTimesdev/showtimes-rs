@@ -6,6 +6,7 @@ use axum::{
     http::HeaderMap,
     response::{Html, IntoResponse},
 };
+use showtimes_gql::{graphiql_plugin_explorer, GraphiQLSource};
 use showtimes_session::oauth2::discord::DiscordClient;
 
 use crate::state::ShowtimesState;
@@ -14,9 +15,14 @@ pub const GRAPHQL_ROUTE: &str = "/graphql";
 static DISCORD_CLIENT: OnceLock<Arc<DiscordClient>> = OnceLock::new();
 
 pub async fn graphql_playground() -> impl IntoResponse {
-    Html(showtimes_gql::playground_source(
-        showtimes_gql::GraphQLPlaygroundConfig::new(GRAPHQL_ROUTE),
-    ))
+    let plugins = vec![graphiql_plugin_explorer()];
+    let source = GraphiQLSource::build()
+        .endpoint(GRAPHQL_ROUTE)
+        .plugins(&plugins)
+        .title("GraphiQL Playgronud")
+        .finish();
+
+    Html(source)
 }
 
 fn get_token_from_headers(headers: &HeaderMap) -> Option<String> {
