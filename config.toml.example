@@ -5,6 +5,13 @@ port = 5560
 master_key = "masterkey"
 log-directory = ""
 
+# JWT/session configuration
+[jwt]
+# JWT secret
+secret = "83bc1066615281e08b9b3dd76bf6c10eac50b3b86f85f8141a5a070591293cf4"
+# JWT expiration time
+expiration = 86400
+
 # Database connection string
 [database]
 # MongoDB connection string
