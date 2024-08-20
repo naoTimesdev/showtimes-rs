@@ -5,7 +5,7 @@ use routes::graphql::GRAPHQL_ROUTE;
 use serde_json::json;
 use showtimes_fs::s3::{S3FsCredentialsProvider, S3FsRegionProvider};
 use showtimes_shared::Config;
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, sync::Mutex};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -68,6 +68,11 @@ async fn entrypoint() -> anyhow::Result<()> {
 
     // Start loading database, storage, and other services
     tracing::info!("🔌 Loading services...");
+    tracing::info!("🔌🔒 Loading session manager...");
+    let session_manager =
+        showtimes_session::manager::SessionManager::new(&config.database.redis, &config.jwt.secret)
+            .await?;
+
     tracing::info!("🔌📅 Loading database...");
     let mongo_conn = showtimes_db::create_connection(&config.database.mongodb).await?;
 
@@ -118,6 +123,7 @@ async fn entrypoint() -> anyhow::Result<()> {
         meili,
         config: Arc::new(config.clone()),
         schema,
+        session: Arc::new(Mutex::new(session_manager)),
     };
 
     tracing::info!("🚀 Starting server...");

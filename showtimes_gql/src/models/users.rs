@@ -12,6 +12,8 @@ pub enum UserKindGQL {
     User,
     /// An admin user, can see all users and manage all servers
     Admin,
+    /// "Owner" user, basically can do anything
+    Owner,
 }
 
 /// The main user object
@@ -25,6 +27,7 @@ pub struct UserGQL {
     created: chrono::DateTime<chrono::Utc>,
     updated: chrono::DateTime<chrono::Utc>,
     disallow_server_fetch: bool,
+    requester: Option<showtimes_shared::ulid::Ulid>,
 }
 
 #[Object]
@@ -44,9 +47,17 @@ impl UserGQL {
         self.kind.into()
     }
 
-    /// The user's API key
-    async fn api_key(&self) -> String {
-        self.api_key.clone()
+    /// The user's API key, this will be `null` if you're not *this* user.
+    async fn api_key(&self) -> Option<String> {
+        if let Some(requester) = self.requester {
+            if requester == self.id {
+                Some(self.api_key.clone())
+            } else {
+                None
+            }
+        } else {
+            Some(self.api_key.clone())
+        }
     }
 
     /// Check if the user is registered
@@ -89,7 +100,7 @@ impl UserGQL {
 
         let srv_handler = showtimes_db::ServerHandler::new(db);
 
-        let doc_query = match cursor {
+        let mut doc_query = match cursor {
             Some(cursor) => {
                 doc! {
                     "owners.id": self.id.to_string(),
@@ -98,6 +109,11 @@ impl UserGQL {
             }
             None => doc! { "owners.id": self.id.to_string() },
         };
+
+        if self.kind != showtimes_db::m::UserKind::User {
+            // Admin and owner can see all servers
+            doc_query.remove("owners.id");
+        }
 
         let cursor = srv_handler
             .get_collection()
@@ -122,7 +138,17 @@ impl UserGQL {
         let page_info = PageInfoGQL::new(count, per_page, last_srv.map(|p| p.id.into()));
 
         Ok(PaginatedGQL::new(
-            all_servers.into_iter().map(|p| p.into()).collect(),
+            all_servers
+                .into_iter()
+                .map(|p| {
+                    let srv_gql: ServerGQL = p.into();
+
+                    match self.kind {
+                        showtimes_db::m::UserKind::User => srv_gql.with_current_user(self.id),
+                        _ => srv_gql,
+                    }
+                })
+                .collect(),
             page_info,
         ))
     }
@@ -140,6 +166,7 @@ impl From<showtimes_db::m::User> for UserGQL {
             created: user.created,
             updated: user.updated,
             disallow_server_fetch: false,
+            requester: None,
         }
     }
 }
@@ -156,6 +183,7 @@ impl From<&showtimes_db::m::User> for UserGQL {
             created: user.created,
             updated: user.updated,
             disallow_server_fetch: false,
+            requester: None,
         }
     }
 }
@@ -163,6 +191,11 @@ impl From<&showtimes_db::m::User> for UserGQL {
 impl UserGQL {
     pub fn with_disable_server_fetch(mut self) -> Self {
         self.disallow_server_fetch = true;
+        self
+    }
+
+    pub fn with_requester(mut self, requester: showtimes_shared::ulid::Ulid) -> Self {
+        self.requester = Some(requester);
         self
     }
 }
@@ -179,8 +212,10 @@ pub struct UserSessionGQL {
 impl UserSessionGQL {
     /// Create a new user session
     pub fn new(user: showtimes_db::m::User, token: impl Into<String>) -> Self {
+        let gql_user = UserGQL::from(&user).with_requester(user.id);
+
         UserSessionGQL {
-            user: user.into(),
+            user: gql_user,
             token: token.into(),
         }
     }

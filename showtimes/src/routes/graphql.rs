@@ -7,7 +7,8 @@ use axum::{
     response::{Html, IntoResponse},
 };
 use showtimes_gql::{graphiql_plugin_explorer, GraphiQLSource};
-use showtimes_session::oauth2::discord::DiscordClient;
+use showtimes_session::{manager::SessionKind, oauth2::discord::DiscordClient};
+use showtimes_shared::Config;
 
 use crate::state::ShowtimesState;
 
@@ -25,11 +26,21 @@ pub async fn graphql_playground() -> impl IntoResponse {
     Html(source)
 }
 
-fn get_token_from_headers(headers: &HeaderMap) -> Option<String> {
+fn get_token_or_bearer(headers: &HeaderMap, config: &Config) -> Option<(SessionKind, String)> {
     headers.get("Authorization").and_then(|value| {
         value.to_str().ok().and_then(|value| {
             if value.starts_with("Bearer ") {
-                value.strip_prefix("Bearer ").map(|token| token.to_string())
+                value
+                    .strip_prefix("Bearer ")
+                    .map(|token| (SessionKind::Bearer, token.to_string()))
+            } else if value.starts_with("Token ") {
+                value.strip_prefix("Token ").map(|token| {
+                    if token == config.master_key {
+                        (SessionKind::MasterKey, token.to_string())
+                    } else {
+                        (SessionKind::APIKey, token.to_string())
+                    }
+                })
             } else {
                 None
             }
@@ -55,12 +66,17 @@ pub async fn graphql_handler(
 
     req = req.data(discord_client.clone());
     req = req.data(state.meili.clone());
+    req = req.data(state.session.clone());
 
-    if let Some(token) = get_token_from_headers(&headers) {
-        // Verify token
-        if let Ok(claims) = showtimes_session::verify_session(&token, &state.config.jwt.secret) {
-            req = req.data(claims.clone());
-            req = req.data(showtimes_session::ShowtimesUserSession::new(token, claims));
+    if let Some((kind, token)) = get_token_or_bearer(&headers, &state.config) {
+        match state.session.lock().await.get_session(token, kind).await {
+            Ok(session) => {
+                req = req.data(session.get_claims().clone());
+                req = req.data(session);
+            }
+            Err(err) => {
+                tracing::error!("Error getting session: {:?}", err);
+            }
         }
     };
 

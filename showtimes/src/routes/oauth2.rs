@@ -21,12 +21,7 @@ pub async fn oauth2_discord_authorize(
         showtimes_session::create_discord_session_state(&decoded_url, &state.config.jwt.secret)
             .unwrap();
 
-    let scopes = [
-        "identify".to_string(),
-        "email".to_string(),
-        "guilds".to_string(),
-        "guilds.members.read".to_string(),
-    ];
+    let scopes = ["identify", "email", "guilds", "guilds.members.read"];
 
     let query_params = [
         ("client_id", &state.config.discord.client_id),

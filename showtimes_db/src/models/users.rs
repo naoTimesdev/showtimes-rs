@@ -12,6 +12,12 @@ pub enum UserKind {
     User,
     /// An admin user, can see all users and manage all servers
     Admin,
+    /// "Owner" user, basically can do anything
+    ///
+    /// This is a non-existent role but used internally
+    /// to mark that this is request made by master key
+    /// which can do anything.
+    Owner,
 }
 
 /// A model to hold discord user information
@@ -125,6 +131,26 @@ impl User {
         }
     }
 
+    /// Stub a owner user
+    pub fn stub_owner(master_key: impl Into<String>) -> Self {
+        let now = chrono::Utc::now();
+
+        Self {
+            id: ulid_serializer::default(),
+            username: "Showtimes Administrator".to_string(),
+            avatar: None,
+            api_key: master_key.into(),
+            kind: UserKind::Owner,
+            registered: true,
+            // Stub discord user since this is a master key
+            discord_meta: DiscordUser::stub(),
+            _id: None,
+            created: now,
+            updated: now,
+        }
+    }
+
+    /// Create with unregistered status
     pub fn with_unregistered(&self) -> Self {
         Self {
             registered: false,

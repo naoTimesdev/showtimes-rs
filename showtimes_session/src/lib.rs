@@ -5,6 +5,7 @@ use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use showtimes_shared::unix_timestamp_serializer;
 
+pub mod manager;
 pub mod oauth2;
 
 /// Re-export the error type from the jsonwebtoken crate
@@ -27,6 +28,11 @@ const ALGORITHM: Algorithm = Algorithm::HS512;
 pub enum ShowtimesAudience {
     /// Token is for user auth
     User,
+    /// Token is for API key auth, this has no expiration
+    #[serde(rename = "api-key")]
+    APIKey,
+    /// Master key auth, this has no expiration
+    MasterKey,
     /// Token is for state jacking protection of Discord OAuth2
     DiscordAuth,
 }
@@ -36,6 +42,8 @@ impl std::fmt::Display for ShowtimesAudience {
         match self {
             ShowtimesAudience::User => write!(f, "user"),
             ShowtimesAudience::DiscordAuth => write!(f, "discord-auth"),
+            ShowtimesAudience::APIKey => write!(f, "api-key"),
+            ShowtimesAudience::MasterKey => write!(f, "master-key"),
         }
     }
 }
@@ -44,8 +52,7 @@ impl std::fmt::Display for ShowtimesAudience {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShowtimesUserClaims {
     /// When the token expires
-    #[serde(with = "unix_timestamp_serializer")]
-    exp: chrono::DateTime<chrono::Utc>,
+    exp: i64,
     /// When the token was issued
     #[serde(with = "unix_timestamp_serializer")]
     iat: chrono::DateTime<chrono::Utc>,
@@ -59,21 +66,32 @@ pub struct ShowtimesUserClaims {
 }
 
 impl ShowtimesUserClaims {
-    fn new(id: showtimes_shared::ulid::Ulid, expires_in: u64) -> Self {
+    fn new(id: showtimes_shared::ulid::Ulid, expires_in: i64) -> Self {
         let iat = chrono::Utc::now();
         let exp = if expires_in == 0 {
             // Do a 32-bit max value
             chrono::Utc.timestamp_opt(2_147_483_647, 0).unwrap()
         } else {
-            iat + chrono::Duration::seconds(expires_in as i64)
+            iat + chrono::Duration::seconds(expires_in)
         };
 
         Self {
-            exp,
+            exp: exp.timestamp(),
             iat,
             iss: ISSUER.clone(),
             aud: ShowtimesAudience::User,
             metadata: id.to_string(),
+        }
+    }
+
+    pub fn new_api(api_key: String, aud: ShowtimesAudience) -> Self {
+        let iat = chrono::Utc::now();
+        Self {
+            exp: -1i64,
+            iat,
+            iss: ISSUER.clone(),
+            aud,
+            metadata: api_key,
         }
     }
 
@@ -83,7 +101,7 @@ impl ShowtimesUserClaims {
         let exp = iat + chrono::Duration::seconds(300);
 
         Self {
-            exp,
+            exp: exp.timestamp(),
             iat,
             iss: ISSUER.clone(),
             aud: ShowtimesAudience::DiscordAuth,
@@ -95,7 +113,7 @@ impl ShowtimesUserClaims {
         &self.metadata
     }
 
-    pub fn get_expires_at(&self) -> chrono::DateTime<chrono::Utc> {
+    pub fn get_expires_at(&self) -> i64 {
         self.exp
     }
 
@@ -143,10 +161,31 @@ impl ShowtimesUserSession {
 
 pub fn create_session(
     user_id: showtimes_shared::ulid::Ulid,
-    expires_in: u64,
+    expires_in: i64,
     secret: impl Into<String>,
-) -> Result<String, SessionError> {
+) -> Result<(ShowtimesUserClaims, String), SessionError> {
     let user = ShowtimesUserClaims::new(user_id, expires_in);
+
+    let header = Header::new(ALGORITHM);
+    let secret_str: String = secret.into();
+    let secret = EncodingKey::from_secret(secret_str.as_bytes());
+
+    let token = jsonwebtoken::encode(&header, &user, &secret)?;
+
+    Ok((user, token))
+}
+
+pub fn create_api_key_session(
+    api_key: impl Into<String>,
+    secret: impl Into<String>,
+    audience: ShowtimesAudience,
+) -> Result<String, SessionError> {
+    match audience {
+        ShowtimesAudience::APIKey | ShowtimesAudience::MasterKey => {}
+        _ => return Err(SessionError::from(SessionErrorKind::InvalidAudience)),
+    }
+
+    let user = ShowtimesUserClaims::new_api(api_key.into(), audience);
 
     let header = Header::new(ALGORITHM);
     let secret_str: String = secret.into();
@@ -171,6 +210,7 @@ pub fn create_discord_session_state(
 pub fn verify_session(
     token: &str,
     secret: impl Into<String>,
+    expect_audience: ShowtimesAudience,
 ) -> Result<ShowtimesUserClaims, SessionError> {
     let secret_str: String = secret.into();
 
@@ -178,30 +218,21 @@ pub fn verify_session(
     let mut validation = Validation::new(ALGORITHM);
 
     validation.set_issuer(&[&*ISSUER]);
-    validation.set_audience(&[ShowtimesAudience::User]);
-    validation.set_required_spec_claims(&["exp", "iat", "iss", "aud"]);
+    validation.set_audience(&[expect_audience]);
+    validation.set_required_spec_claims(&["iat", "iss", "aud"]);
 
+    // Verify `exp` if -1 then no expiration
     match jsonwebtoken::decode::<ShowtimesUserClaims>(token, &secret, &validation) {
-        Ok(data) => Ok(data.claims),
-        Err(e) => Err(e),
-    }
-}
+        Ok(data) => {
+            // 2 minutes allowance
+            let current_time = chrono::Utc::now() - chrono::Duration::minutes(2);
 
-pub fn verify_discord_session_state(
-    token: &str,
-    secret: impl Into<String>,
-) -> Result<ShowtimesUserClaims, SessionError> {
-    let secret_str: String = secret.into();
-
-    let secret = DecodingKey::from_secret(secret_str.as_bytes());
-    let mut validation = Validation::new(ALGORITHM);
-
-    validation.set_issuer(&[&*ISSUER]);
-    validation.set_audience(&[ShowtimesAudience::DiscordAuth]);
-    validation.set_required_spec_claims(&["exp", "iat", "iss", "aud"]);
-
-    match jsonwebtoken::decode::<ShowtimesUserClaims>(token, &secret, &validation) {
-        Ok(data) => Ok(data.claims),
+            if data.claims.exp < current_time.timestamp() {
+                Err(SessionError::from(SessionErrorKind::ExpiredSignature))
+            } else {
+                Ok(data.claims)
+            }
+        }
         Err(e) => Err(e),
     }
 }
@@ -218,11 +249,11 @@ mod tests {
     #[test]
     fn test_valid_session() {
         let user_id = ulid_serializer::default();
-        let token = create_session(user_id, 3600, SECRET).unwrap();
+        let (_, token) = create_session(user_id, 3600, SECRET).unwrap();
 
         println!("{}", token);
 
-        let claims = verify_session(&token, SECRET).unwrap();
+        let claims = verify_session(&token, SECRET, ShowtimesAudience::User).unwrap();
 
         assert_eq!(claims.get_metadata(), &user_id.to_string());
         assert_eq!(claims.get_issuer(), &*ISSUER);
@@ -232,9 +263,9 @@ mod tests {
     #[test]
     fn test_valid_session_with_invalid_aud() {
         let user_id = ulid_serializer::default();
-        let token = create_session(user_id, 3600, SECRET).unwrap();
+        let (_, token) = create_session(user_id, 3600, SECRET).unwrap();
 
-        let result = verify_discord_session_state(&token, SECRET);
+        let result = verify_session(&token, SECRET, ShowtimesAudience::DiscordAuth);
 
         match result {
             Err(e) => {
@@ -248,7 +279,7 @@ mod tests {
     fn test_valid_discord_session_state() {
         let token = create_discord_session_state(REDIRECT_URL, SECRET).unwrap();
 
-        let claims = verify_discord_session_state(&token, SECRET).unwrap();
+        let claims = verify_session(&token, SECRET, ShowtimesAudience::DiscordAuth).unwrap();
 
         assert_eq!(claims.get_metadata(), REDIRECT_URL);
         assert_eq!(claims.get_issuer(), &*ISSUER);
@@ -259,7 +290,7 @@ mod tests {
     fn test_valid_discord_session_state_with_invalid_aud() {
         let token = create_discord_session_state(REDIRECT_URL, SECRET).unwrap();
 
-        let result = verify_session(&token, SECRET);
+        let result = verify_session(&token, SECRET, ShowtimesAudience::User);
 
         match result {
             Err(e) => {
@@ -272,7 +303,7 @@ mod tests {
     #[test]
     fn test_with_valid_header() {
         let user_id = ulid_serializer::default();
-        let token = create_session(user_id, 3600, SECRET).unwrap();
+        let (_, token) = create_session(user_id, 3600, SECRET).unwrap();
 
         let header = jsonwebtoken::decode_header(&token).unwrap();
         let expected = Header::new(ALGORITHM);
@@ -283,7 +314,7 @@ mod tests {
     #[test]
     fn test_with_invalid_header() {
         let user_id = ulid_serializer::default();
-        let token = create_session(user_id, 3600, SECRET).unwrap();
+        let (_, token) = create_session(user_id, 3600, SECRET).unwrap();
 
         let header = jsonwebtoken::decode_header(&token).unwrap();
         let expected = Header::new(Algorithm::HS256);

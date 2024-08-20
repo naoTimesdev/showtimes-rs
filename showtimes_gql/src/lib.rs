@@ -1,12 +1,13 @@
 use async_graphql::dataloader::DataLoader;
 use async_graphql::extensions::Tracing;
-use async_graphql::{Context, EmptySubscription, Error, ErrorExtensions, Object};
-use data_loader::{DiscordIdLoad, UserDataLoader};
+use async_graphql::{Context, EmptySubscription, ErrorExtensions, Object};
+use data_loader::{find_authenticated_user, DiscordIdLoad, UserDataLoader};
 use futures::TryStreamExt;
 use models::prelude::{PageInfoGQL, PaginatedGQL, UlidGQL};
 use models::servers::ServerGQL;
 use models::users::UserSessionGQL;
 use showtimes_db::{mongodb::bson::doc, DatabaseShared};
+use showtimes_session::manager::SharedSessionManager;
 use showtimes_session::{oauth2::discord::DiscordClient, ShowtimesUserSession};
 use std::sync::Arc;
 
@@ -25,18 +26,9 @@ impl QueryRoot {
     #[graphql(guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)")]
     async fn current<'a>(&self, ctx: &'a Context<'_>) -> async_graphql::Result<UserSessionGQL> {
         let user_session = ctx.data_unchecked::<ShowtimesUserSession>();
-        let handler = showtimes_db::UserHandler::new(ctx.data_unchecked::<DatabaseShared>());
+        let user = find_authenticated_user(ctx).await?;
 
-        let user = handler
-            .find_by(doc! { "id": user_session.get_claims().get_metadata() })
-            .await?;
-
-        match user {
-            Some(user) => Ok(UserSessionGQL::new(user, user_session.get_token())),
-            None => {
-                Err(Error::new("User not found").extend_with(|_, e| e.set("reason", "not_found")))
-            }
-        }
+        Ok(UserSessionGQL::new(user, user_session.get_token()))
     }
 
     /// Get authenticated user associated servers
@@ -50,8 +42,7 @@ impl QueryRoot {
         >,
         #[graphql(desc = "The cursor to start from")] cursor: Option<UlidGQL>,
     ) -> async_graphql::Result<PaginatedGQL<ServerGQL>> {
-        let user_session = ctx.data_unchecked::<ShowtimesUserSession>();
-        let user_id = user_session.get_claims().get_metadata();
+        let user = find_authenticated_user(ctx).await?;
         let db = ctx.data_unchecked::<DatabaseShared>();
 
         // Allowed range of per_page is 10-100, with
@@ -59,28 +50,38 @@ impl QueryRoot {
 
         let srv_handler = showtimes_db::ServerHandler::new(db);
 
-        let doc_query = match (cursor, ids) {
+        let mut doc_query = match (cursor, ids) {
             (Some(cursor), Some(ids)) => {
                 let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
                 doc! {
-                    "owners.id": user_id.to_string(),
+                    "owners.id": user.id.to_string(),
                     "id": { "$gte": cursor.to_string(), "$in": ids }
                 }
             }
             (Some(cursor), None) => {
                 doc! {
-                    "owners.id": user_id.to_string(),
+                    "owners.id": user.id.to_string(),
                     "id": { "$gte": cursor.to_string() }
                 }
             }
             (None, Some(ids)) => {
                 let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
                 doc! {
-                    "owners.id": user_id.to_string(),
+                    "owners.id": user.id.to_string(),
                     "id": { "$in": ids }
                 }
             }
-            (None, None) => doc! { "owners.id": user_id.to_string() },
+            (None, None) => doc! { "owners.id": user.id.to_string() },
+        };
+
+        if user.kind != showtimes_db::m::UserKind::User {
+            // Admin and owner can see all servers
+            doc_query.remove("owners.id");
+        }
+
+        let count_query = match user.kind {
+            showtimes_db::m::UserKind::User => doc! { "owners.id": user.id.to_string() },
+            _ => doc! {},
         };
 
         let cursor = srv_handler
@@ -91,7 +92,7 @@ impl QueryRoot {
             .await?;
         let count = srv_handler
             .get_collection()
-            .count_documents(doc! { "owners.id": user_id.to_string() })
+            .count_documents(count_query)
             .await?;
 
         let mut all_servers: Vec<showtimes_db::m::Server> = cursor.try_collect().await?;
@@ -124,17 +125,21 @@ impl MutationRoot {
         #[graphql(desc = "The OAuth2 state")] state: String,
     ) -> async_graphql::Result<UserSessionGQL> {
         let config = ctx.data_unchecked::<Arc<showtimes_shared::Config>>();
+        let sess_manager = ctx.data_unchecked::<SharedSessionManager>();
 
         tracing::info!("Authenticating user with token: {}", &token);
-        showtimes_session::verify_discord_session_state(&state, &config.jwt.secret).map_err(
-            |err| {
-                err.extend_with(|_, e| {
-                    e.set("reason", "invalid_state");
-                    e.set("state", state);
-                    e.set("token", token.clone());
-                })
-            },
-        )?;
+        showtimes_session::verify_session(
+            &state,
+            &config.jwt.secret,
+            showtimes_session::ShowtimesAudience::DiscordAuth,
+        )
+        .map_err(|err| {
+            err.extend_with(|_, e| {
+                e.set("reason", "invalid_state");
+                e.set("state", state);
+                e.set("token", token.clone());
+            })
+        })?;
 
         // Valid!
         let discord = ctx.data_unchecked::<Arc<DiscordClient>>();
@@ -170,11 +175,22 @@ impl MutationRoot {
 
                 handler.save(&mut user, None).await?;
 
-                let oauth_token = showtimes_session::create_session(
+                let (oauth_user, oauth_token) = showtimes_session::create_session(
                     user.id,
-                    config.jwt.expiration.unwrap_or(7 * 24 * 60 * 60),
+                    config
+                        .jwt
+                        .expiration
+                        .unwrap_or(7 * 24 * 60 * 60)
+                        .try_into()?,
                     &config.jwt.secret,
                 )?;
+
+                sess_manager
+                    .lock()
+                    .await
+                    .set_session(&oauth_token, oauth_user)
+                    .await?;
+
                 Ok(UserSessionGQL::new(user, oauth_token))
             }
             None => {
@@ -197,11 +213,21 @@ impl MutationRoot {
                 let mut user = showtimes_db::m::User::new(user_info.username, discord_user);
                 handler.save(&mut user, None).await?;
 
-                let oauth_token = showtimes_session::create_session(
+                let (oauth_user, oauth_token) = showtimes_session::create_session(
                     user.id,
-                    config.jwt.expiration.unwrap_or(7 * 24 * 60 * 60),
+                    config
+                        .jwt
+                        .expiration
+                        .unwrap_or(7 * 24 * 60 * 60)
+                        .try_into()?,
                     &config.jwt.secret,
                 )?;
+
+                sess_manager
+                    .lock()
+                    .await
+                    .set_session(&oauth_token, oauth_user)
+                    .await?;
                 Ok(UserSessionGQL::new(user, oauth_token))
             }
         }

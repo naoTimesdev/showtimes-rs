@@ -19,6 +19,8 @@ pub struct JwtSession {
 pub struct Database {
     /// The URL of the MongoDB server
     pub mongodb: String,
+    /// The URL of the Redis server
+    pub redis: String,
 }
 
 /// Meilisearch configuration
