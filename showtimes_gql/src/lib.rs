@@ -98,7 +98,7 @@ impl QueryRoot {
         let mut all_servers: Vec<showtimes_db::m::Server> = cursor.try_collect().await?;
 
         // If all_servers is equal to per_page, then there is a next page
-        let last_srv = if all_servers.len() == per_page as usize {
+        let last_srv = if all_servers.len() > per_page as usize {
             Some(all_servers.pop().unwrap())
         } else {
             None

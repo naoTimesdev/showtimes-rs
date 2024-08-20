@@ -212,7 +212,7 @@ impl ServerGQL {
         let mut all_projects: Vec<showtimes_db::m::Project> = cursor.try_collect().await?;
 
         // If all_projects is equal to per_page, then there is a next page
-        let last_proj = if all_projects.len() == per_page as usize {
+        let last_proj = if all_projects.len() > per_page as usize {
             Some(all_projects.pop().unwrap())
         } else {
             None
