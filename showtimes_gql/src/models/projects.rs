@@ -1,5 +1,7 @@
+use crate::data_loader::UserDataLoader;
+
 use super::{prelude::*, servers::ServerGQL, users::UserGQL};
-use async_graphql::{Enum, Object, SimpleObject};
+use async_graphql::{dataloader::DataLoader, Enum, Object, SimpleObject};
 use showtimes_db::DatabaseShared;
 
 /// Enum to hold project types or kinds.
@@ -91,10 +93,9 @@ impl RoleAssigneeGQL {
         match self.user {
             None => Ok(None),
             Some(user) => {
-                let handler =
-                    showtimes_db::UserHandler::new(ctx.data_unchecked::<DatabaseShared>());
+                let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
 
-                match handler.find_by_id(&user.to_string()).await? {
+                match loader.load_one(user).await? {
                     Some(user) => {
                         let user_map: UserGQL = user.into();
                         Ok(Some(user_map.with_disable_server_fetch()))

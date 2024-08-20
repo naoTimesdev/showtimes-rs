@@ -1,5 +1,7 @@
+use crate::data_loader::UserDataLoader;
+
 use super::{prelude::*, projects::ProjectGQL, users::UserGQL};
-use async_graphql::{Enum, Object};
+use async_graphql::{dataloader::DataLoader, Enum, ErrorExtensions, Object};
 use futures::TryStreamExt;
 use showtimes_db::{m::ServerUser, mongodb::bson::doc, DatabaseShared};
 
@@ -38,23 +40,30 @@ pub struct ServerUserGQL {
     ///
     /// Used to store extra data like what projects the user is managing
     extras: Vec<String>,
+    top_server: showtimes_shared::ulid::Ulid,
 }
 
 #[Object]
 impl ServerUserGQL {
     /// The complete user information
     async fn user(&self, ctx: &async_graphql::Context<'_>) -> async_graphql::Result<UserGQL> {
-        let db = ctx.data_unchecked::<DatabaseShared>();
-        let handler = showtimes_db::UserHandler::new(db);
-
-        let user = handler.find_by_id(&self.id.to_string()).await?;
+        let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
+        let user = loader.load_one(self.id).await?;
 
         match user {
             Some(user) => {
                 let user: UserGQL = user.into();
                 Ok(user.with_disable_server_fetch())
             }
-            None => Err("User not found".into()),
+            None => Err(
+                async_graphql::Error::new(format!("User {} not found", self.id)).extend_with(
+                    |_, e| {
+                        e.set("reason", "not_found");
+                        e.set("id", self.id.to_string());
+                        e.set("server_id", self.top_server.to_string());
+                    },
+                ),
+            ),
         }
     }
 
@@ -71,22 +80,13 @@ impl ServerUserGQL {
     }
 }
 
-impl From<ServerUser> for ServerUserGQL {
-    fn from(user: ServerUser) -> Self {
-        ServerUserGQL {
-            id: user.id,
-            privilege: user.privilege,
-            extras: user.extras,
-        }
-    }
-}
-
-impl From<&ServerUser> for ServerUserGQL {
-    fn from(user: &ServerUser) -> Self {
+impl ServerUserGQL {
+    fn from_shared(user: &ServerUser, top_server: showtimes_shared::ulid::Ulid) -> Self {
         ServerUserGQL {
             id: user.id,
             privilege: user.privilege,
             extras: user.extras.clone(),
+            top_server,
         }
     }
 }
@@ -120,7 +120,10 @@ impl ServerGQL {
 
     /// The server's owners
     async fn owners(&self) -> Vec<ServerUserGQL> {
-        self.owners.iter().map(|o| o.into()).collect()
+        self.owners
+            .iter()
+            .map(|o| ServerUserGQL::from_shared(o, self.id))
+            .collect()
     }
 
     /// The server's avatar

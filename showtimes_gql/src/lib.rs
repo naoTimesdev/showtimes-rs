@@ -1,5 +1,7 @@
+use async_graphql::dataloader::DataLoader;
 use async_graphql::extensions::Tracing;
 use async_graphql::{Context, EmptySubscription, Error, ErrorExtensions, Object};
+use data_loader::{DiscordIdLoad, UserDataLoader};
 use futures::TryStreamExt;
 use models::prelude::{PageInfoGQL, PaginatedGQL, UlidGQL};
 use models::servers::ServerGQL;
@@ -8,6 +10,7 @@ use showtimes_db::{mongodb::bson::doc, DatabaseShared};
 use showtimes_session::{oauth2::discord::DiscordClient, ShowtimesUserSession};
 use std::sync::Arc;
 
+mod data_loader;
 mod guard;
 mod models;
 
@@ -145,12 +148,12 @@ impl MutationRoot {
         tracing::info!("Success, getting user for code {}", &token);
         let user_info = discord.get_user(&exchanged.access_token).await?;
 
+        // Load handler and data loader
         let handler = showtimes_db::UserHandler::new(ctx.data_unchecked::<DatabaseShared>());
+        let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
 
         tracing::info!("Checking if user exists for ID: {}", &user_info.id);
-        let user = handler
-            .find_by(doc! { "discord_meta.id": user_info.id.clone() })
-            .await?;
+        let user = loader.load_one(DiscordIdLoad(user_info.id.clone())).await?;
 
         match user {
             Some(mut user) => {
@@ -207,8 +210,9 @@ impl MutationRoot {
 }
 
 /// Create the GraphQL schema
-pub fn create_schema() -> ShowtimesGQLSchema {
+pub fn create_schema(db_pool: &DatabaseShared) -> ShowtimesGQLSchema {
     async_graphql::Schema::build(QueryRoot, MutationRoot, EmptySubscription)
         .extension(Tracing)
+        .data(DataLoader::new(UserDataLoader::new(db_pool), tokio::spawn))
         .finish()
 }

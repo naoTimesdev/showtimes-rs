@@ -109,7 +109,7 @@ async fn entrypoint() -> anyhow::Result<()> {
             .await?;
 
     tracing::info!("🔌🚀 Loading GraphQL schema...");
-    let schema = showtimes_gql::create_schema();
+    let schema = showtimes_gql::create_schema(&mongo_conn.db);
 
     tracing::info!("🔌 Initializing state...");
     let state = state::ShowtimesState {

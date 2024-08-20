@@ -49,7 +49,7 @@ aws-sdk-s3 = { version = "1.45.0", features = ["http-1x"] }
 
 # Web server
 axum = { version = "0.7.5", features = ["ws", "tracing"] }
-async-graphql = { version = "7.0.7", features = ["uuid", "tracing", "bson", "password-strength-validator", "unblock"] }
+async-graphql = { version = "7.0.7", features = ["tracing", "bson", "password-strength-validator", "unblock", "dataloader"] }
 async-graphql-axum = "7.0.7"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
@@ -57,7 +57,7 @@ tracing-appender = "0.2.3"
 tower-http = { version = "0.5.2", features = ["cors", "trace"] }
 
 # Database
-mongodb = { version = "3.0.1", features = ["rustls-tls"] }
+mongodb = { version = "3.0.1", features = ["rustls-tls", "tracing-unstable"] }
 bson = { version = "2.11.0", features = ["chrono-0_4"] }
 redis = { version = "0.26.1", features = ["tokio-comp"] }
 meilisearch-sdk = "0.27.1"
