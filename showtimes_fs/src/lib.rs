@@ -14,8 +14,11 @@ pub enum FsPool {
 /// The kind of the file system object.
 #[derive(Default, Debug, Clone, tosho_macros::EnumName)]
 pub enum FsFileKind {
+    /// Images kind.
     #[default]
     Images,
+    /// Invalid/fallback kind.
+    Invalids,
 }
 
 impl FsFileKind {
