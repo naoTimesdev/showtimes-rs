@@ -269,6 +269,9 @@ impl FsImpl for S3Fs {
         let client = self.client.lock().await;
         // Create a temporary writer since AWS SDK s3 FUCKING SUCKS!
         tracing::debug!("Initializing file upload to: {}", &key);
+        let guessed = mime_guess::from_path(filename);
+        let content_type = guessed.first_or_octet_stream().to_string();
+
         let mut target = CustomS3Writer::new();
         tokio::io::copy(stream, &mut target).await?;
         let body = ByteStream::new(SdkBody::from(target.as_bytes()));
@@ -277,6 +280,7 @@ impl FsImpl for S3Fs {
         client
             .put_object()
             .bucket(&self.bucket_name)
+            .content_type(content_type)
             .key(&key)
             .body(body)
             .send()
