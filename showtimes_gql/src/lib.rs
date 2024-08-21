@@ -2,8 +2,7 @@ use async_graphql::dataloader::DataLoader;
 use async_graphql::extensions::Tracing;
 use async_graphql::{Context, EmptySubscription, ErrorExtensions, Object};
 use data_loader::{find_authenticated_user, DiscordIdLoad, UserDataLoader};
-use futures::TryStreamExt;
-use models::prelude::{PageInfoGQL, PaginatedGQL, UlidGQL};
+use models::prelude::PaginatedGQL;
 use models::servers::ServerGQL;
 use models::users::UserSessionGQL;
 use showtimes_db::{mongodb::bson::doc, DatabaseShared};
@@ -14,6 +13,7 @@ use std::sync::Arc;
 mod data_loader;
 mod guard;
 mod models;
+mod queries;
 
 pub type ShowtimesGQLSchema = async_graphql::Schema<QueryRoot, MutationRoot, EmptySubscription>;
 pub use async_graphql::http::{graphiql_plugin_explorer, GraphiQLSource};
@@ -33,83 +33,38 @@ impl QueryRoot {
 
     /// Get authenticated user associated servers
     #[graphql(guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)")]
-    async fn servers<'a>(
+    async fn servers(
         &self,
-        ctx: &'a Context<'_>,
-        #[graphql(desc = "Limit what server we want to return")] ids: Option<Vec<UlidGQL>>,
-        #[graphql(desc = "The number of servers to return, default 20", name = "perPage")] per_page: Option<
-            u32,
+        ctx: &Context<'_>,
+        #[graphql(desc = "Specify server IDs to query")] ids: Option<
+            Vec<crate::models::prelude::UlidGQL>,
         >,
-        #[graphql(desc = "The cursor to start from")] cursor: Option<UlidGQL>,
+        #[graphql(
+            name = "perPage",
+            desc = "The number of servers to return, default to 20",
+            validator(minimum = 2, maximum = 100)
+        )]
+        per_page: Option<u32>,
+        #[graphql(desc = "The cursor to start from")] cursor: Option<
+            crate::models::prelude::UlidGQL,
+        >,
     ) -> async_graphql::Result<PaginatedGQL<ServerGQL>> {
         let user = find_authenticated_user(ctx).await?;
-        let db = ctx.data_unchecked::<DatabaseShared>();
-
-        // Allowed range of per_page is 10-100, with
-        let per_page = per_page.filter(|&p| (2..=100).contains(&p)).unwrap_or(20);
-
-        let srv_handler = showtimes_db::ServerHandler::new(db);
-
-        let mut doc_query = match (cursor, ids) {
-            (Some(cursor), Some(ids)) => {
-                let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
-                doc! {
-                    "owners.id": user.id.to_string(),
-                    "id": { "$gte": cursor.to_string(), "$in": ids }
-                }
-            }
-            (Some(cursor), None) => {
-                doc! {
-                    "owners.id": user.id.to_string(),
-                    "id": { "$gte": cursor.to_string() }
-                }
-            }
-            (None, Some(ids)) => {
-                let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
-                doc! {
-                    "owners.id": user.id.to_string(),
-                    "id": { "$in": ids }
-                }
-            }
-            (None, None) => doc! { "owners.id": user.id.to_string() },
+        let mut queries = queries::servers::ServerQuery::new()
+            .with_current_user(queries::servers::ServerQueryUser::from(&user));
+        if let Some(ids) = ids {
+            queries.set_ids(ids.into_iter().map(|id| *id).collect());
         };
-
-        if user.kind != showtimes_db::m::UserKind::User {
-            // Admin and owner can see all servers
-            doc_query.remove("owners.id");
+        if let Some(per_page) = per_page {
+            queries.set_per_page(per_page);
+        }
+        if let Some(cursor) = cursor {
+            queries.set_cursor(*cursor);
         }
 
-        let count_query = match user.kind {
-            showtimes_db::m::UserKind::User => doc! { "owners.id": user.id.to_string() },
-            _ => doc! {},
-        };
+        let results = queries::servers::query_servers_paginated(ctx, queries).await?;
 
-        let cursor = srv_handler
-            .get_collection()
-            .find(doc_query)
-            .limit((per_page + 1) as i64)
-            .sort(doc! { "id": 1 })
-            .await?;
-        let count = srv_handler
-            .get_collection()
-            .count_documents(count_query)
-            .await?;
-
-        let mut all_servers: Vec<showtimes_db::m::Server> = cursor.try_collect().await?;
-
-        // If all_servers is equal to per_page, then there is a next page
-        let last_srv = if all_servers.len() > per_page as usize {
-            Some(all_servers.pop().unwrap())
-        } else {
-            None
-        };
-
-        let page_info = PageInfoGQL::new(count, per_page, last_srv.map(|p| p.id.into()));
-
-        Ok(PaginatedGQL::new(
-            all_servers.into_iter().map(|p| p.into()).collect(),
-            page_info,
-        ))
+        Ok(results)
     }
 }
 
@@ -238,6 +193,17 @@ impl MutationRoot {
 pub fn create_schema(db_pool: &DatabaseShared) -> ShowtimesGQLSchema {
     async_graphql::Schema::build(QueryRoot, MutationRoot, EmptySubscription)
         .extension(Tracing)
-        .data(DataLoader::new(UserDataLoader::new(db_pool), tokio::spawn))
+        .data(DataLoader::new(
+            data_loader::UserDataLoader::new(db_pool),
+            tokio::spawn,
+        ))
+        .data(DataLoader::new(
+            data_loader::ProjectDataLoader::new(db_pool),
+            tokio::spawn,
+        ))
+        .data(DataLoader::new(
+            data_loader::ServerDataLoader::new(db_pool),
+            tokio::spawn,
+        ))
         .finish()
 }

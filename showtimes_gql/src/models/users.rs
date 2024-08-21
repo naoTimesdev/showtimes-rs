@@ -1,7 +1,8 @@
+use crate::queries::servers::ServerQueryUser;
+
 use super::{prelude::*, servers::ServerGQL};
 use async_graphql::{Enum, Object, SimpleObject};
-use futures::TryStreamExt;
-use showtimes_db::{mongodb::bson::doc, DatabaseShared};
+use showtimes_db::mongodb::bson::doc;
 
 /// Enum to hold user kinds
 #[derive(Enum, Default, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -27,7 +28,7 @@ pub struct UserGQL {
     created: chrono::DateTime<chrono::Utc>,
     updated: chrono::DateTime<chrono::Utc>,
     disallow_server_fetch: bool,
-    requester: Option<showtimes_shared::ulid::Ulid>,
+    requester: Option<ServerQueryUser>,
 }
 
 #[Object]
@@ -50,13 +51,14 @@ impl UserGQL {
     /// The user's API key, this will be `null` if you're not *this* user.
     async fn api_key(&self) -> Option<String> {
         if let Some(requester) = self.requester {
-            if requester == self.id {
+            // Only return the API key if the requester is the same user or the requester is not a user
+            if requester.id() == self.id || requester.kind() != showtimes_db::m::UserKind::User {
                 Some(self.api_key.clone())
             } else {
                 None
             }
         } else {
-            Some(self.api_key.clone())
+            None
         }
     }
 
@@ -84,73 +86,39 @@ impl UserGQL {
     async fn servers(
         &self,
         ctx: &async_graphql::Context<'_>,
-        #[graphql(desc = "The number of servers to return", name = "perPage")] per_page: Option<
-            u32,
+        #[graphql(desc = "Specify server IDs to query")] ids: Option<
+            Vec<crate::models::prelude::UlidGQL>,
         >,
-        #[graphql(desc = "The cursor to start from")] cursor: Option<UlidGQL>,
+        #[graphql(
+            name = "perPage",
+            desc = "The number of servers to return, default to 20",
+            validator(minimum = 2, maximum = 100)
+        )]
+        per_page: Option<u32>,
+        #[graphql(desc = "The cursor to start from")] cursor: Option<
+            crate::models::prelude::UlidGQL,
+        >,
     ) -> async_graphql::Result<PaginatedGQL<ServerGQL>> {
         if self.disallow_server_fetch {
             return Err("Servers fetch from this context is disabled to avoid looping".into());
         }
 
-        let db = ctx.data_unchecked::<DatabaseShared>();
-
-        // Allowed range of per_page is 10-100, with
-        let per_page = per_page.filter(|&p| (2..=100).contains(&p)).unwrap_or(20);
-
-        let srv_handler = showtimes_db::ServerHandler::new(db);
-
-        let mut doc_query = match cursor {
-            Some(cursor) => {
-                doc! {
-                    "owners.id": self.id.to_string(),
-                    "id": { "$gte": cursor.to_string() }
-                }
-            }
-            None => doc! { "owners.id": self.id.to_string() },
+        let mut queries = crate::queries::servers::ServerQuery::new().with_current_user(
+            crate::queries::servers::ServerQueryUser::new(self.id, self.kind),
+        );
+        if let Some(ids) = ids {
+            queries.set_ids(ids.into_iter().map(|id| *id).collect());
         };
-
-        if self.kind != showtimes_db::m::UserKind::User {
-            // Admin and owner can see all servers
-            doc_query.remove("owners.id");
+        if let Some(per_page) = per_page {
+            queries.set_per_page(per_page);
+        }
+        if let Some(cursor) = cursor {
+            queries.set_cursor(*cursor);
         }
 
-        let cursor = srv_handler
-            .get_collection()
-            .find(doc_query)
-            .limit((per_page + 1) as i64)
-            .sort(doc! { "id": 1 })
-            .await?;
-        let count = srv_handler
-            .get_collection()
-            .count_documents(doc! { "owners.id": self.id.to_string() })
-            .await?;
+        let results = crate::queries::servers::query_servers_paginated(ctx, queries).await?;
 
-        let mut all_servers: Vec<showtimes_db::m::Server> = cursor.try_collect().await?;
-
-        // If all_servers is equal to per_page, then there is a next page
-        let last_srv = if all_servers.len() > per_page as usize {
-            Some(all_servers.pop().unwrap())
-        } else {
-            None
-        };
-
-        let page_info = PageInfoGQL::new(count, per_page, last_srv.map(|p| p.id.into()));
-
-        Ok(PaginatedGQL::new(
-            all_servers
-                .into_iter()
-                .map(|p| {
-                    let srv_gql: ServerGQL = p.into();
-
-                    match self.kind {
-                        showtimes_db::m::UserKind::User => srv_gql.with_current_user(self.id),
-                        _ => srv_gql,
-                    }
-                })
-                .collect(),
-            page_info,
-        ))
+        Ok(results)
     }
 }
 
@@ -194,7 +162,7 @@ impl UserGQL {
         self
     }
 
-    pub fn with_requester(mut self, requester: showtimes_shared::ulid::Ulid) -> Self {
+    pub fn with_requester(mut self, requester: ServerQueryUser) -> Self {
         self.requester = Some(requester);
         self
     }
@@ -212,7 +180,7 @@ pub struct UserSessionGQL {
 impl UserSessionGQL {
     /// Create a new user session
     pub fn new(user: showtimes_db::m::User, token: impl Into<String>) -> Self {
-        let gql_user = UserGQL::from(&user).with_requester(user.id);
+        let gql_user = UserGQL::from(&user).with_requester(user.into());
 
         UserSessionGQL {
             user: gql_user,

@@ -1,8 +1,7 @@
-use crate::data_loader::UserDataLoader;
+use crate::data_loader::{ServerDataLoader, UserDataLoader};
 
 use super::{prelude::*, servers::ServerGQL, users::UserGQL};
 use async_graphql::{dataloader::DataLoader, Enum, Object, SimpleObject};
-use showtimes_db::DatabaseShared;
 
 /// Enum to hold project types or kinds.
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -199,9 +198,9 @@ impl ProjectGQL {
             return Err("Server fetch from this context is disabled to avoid looping".into());
         }
 
-        let handler = showtimes_db::ServerHandler::new(ctx.data_unchecked::<DatabaseShared>());
+        let loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
 
-        match handler.find_by_id(&self.creator.to_string()).await? {
+        match loader.load_one(self.creator).await? {
             Some(server) => {
                 let map_server: ServerGQL = server.into();
                 Ok(map_server.with_projects_disabled())

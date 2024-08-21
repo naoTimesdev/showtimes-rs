@@ -2,8 +2,7 @@ use crate::data_loader::UserDataLoader;
 
 use super::{prelude::*, projects::ProjectGQL, users::UserGQL};
 use async_graphql::{dataloader::DataLoader, Enum, ErrorExtensions, Object};
-use futures::TryStreamExt;
-use showtimes_db::{m::ServerUser, mongodb::bson::doc, DatabaseShared};
+use showtimes_db::{m::ServerUser, mongodb::bson::doc};
 
 /// Enum to hold user privileges on a server.
 ///
@@ -153,77 +152,73 @@ impl ServerGQL {
     async fn projects(
         &self,
         ctx: &async_graphql::Context<'_>,
+        #[graphql(desc = "Specify project IDs to query")] ids: Option<
+            Vec<crate::models::prelude::UlidGQL>,
+        >,
         #[graphql(
-            desc = "The number of projects to return, default to 20",
             name = "perPage",
+            desc = "The number of projects to return, default to 20",
             validator(minimum = 2, maximum = 100)
         )]
         per_page: Option<u32>,
-        #[graphql(desc = "The cursor to start from")] cursor: Option<UlidGQL>,
+        #[graphql(desc = "The cursor to start from")] cursor: Option<
+            crate::models::prelude::UlidGQL,
+        >,
     ) -> async_graphql::Result<PaginatedGQL<ProjectGQL>> {
         if self.disable_projects {
             return Err("Projects fetch from this context is disabled to avoid looping".into());
         }
 
-        let db = ctx.data_unchecked::<DatabaseShared>();
-
-        // Allowed range of per_page is 10-100, with
-        let per_page = per_page.filter(|&p| (2..=100).contains(&p)).unwrap_or(20);
-
-        let project_handler = showtimes_db::ProjectHandler::new(db);
         let limit_projects = self.get_project_limits();
+        let mut queries =
+            crate::queries::projects::ProjectQuery::new().with_creators(vec![self.id]);
+        match ids {
+            Some(ids) => {
+                // limit the projects to the ones that the user is managing
+                let mapped_ids: Vec<showtimes_shared::ulid::Ulid> =
+                    ids.into_iter().map(|id| *id).collect();
+                // Filter out the projects that are not in the limit_projects
+                let filtered_ids: Vec<showtimes_shared::ulid::Ulid> =
+                    if let Some(limit_proj) = &limit_projects {
+                        if limit_proj.is_empty() {
+                            // Return an empty list if the limit_proj is empty
+                            let pg_info = PageInfoGQL::empty(per_page.unwrap_or(20));
+                            return Ok(PaginatedGQL::new(Vec::new(), pg_info));
+                        }
 
-        if let Some(limit_proj) = &limit_projects {
-            if limit_proj.is_empty() {
-                let pg_info = PageInfoGQL::empty(per_page);
-                return Ok(PaginatedGQL::new(Vec::new(), pg_info));
+                        let limit_proj: Vec<showtimes_shared::ulid::Ulid> =
+                            limit_proj.iter().map(|id| id.parse().unwrap()).collect();
+                        mapped_ids
+                            .into_iter()
+                            .filter(|&id| limit_proj.contains(&id))
+                            .collect()
+                    } else {
+                        mapped_ids
+                    };
+
+                queries.set_ids(filtered_ids);
             }
-        }
+            None => {
+                if let Some(limit_proj) = &limit_projects {
+                    if limit_proj.is_empty() {
+                        let pg_info = PageInfoGQL::empty(per_page.unwrap_or(20));
+                        return Ok(PaginatedGQL::new(Vec::new(), pg_info));
+                    }
 
-        let doc_query = match (cursor, limit_projects) {
-            (Some(cursor), Some(limit_proj)) => {
-                doc! {
-                    "creator": self.id.to_string(),
-                    "id": { "$gte": cursor.to_string(), "$in": limit_proj }
+                    queries.set_ids(limit_proj.iter().map(|id| id.parse().unwrap()).collect());
                 }
             }
-            (Some(cursor), None) => doc! {
-                "creator": self.id.to_string(),
-                "id": { "$gte": cursor.to_string() }
-            },
-            (None, Some(limitproj)) => doc! {
-                "creator": self.id.to_string(),
-                "id": { "$in": limitproj }
-            },
-            (None, None) => doc! { "creator": self.id.to_string() },
-        };
+        }
+        if let Some(per_page) = per_page {
+            queries.set_per_page(per_page);
+        }
+        if let Some(cursor) = cursor {
+            queries.set_cursor(*cursor);
+        }
 
-        let cursor = project_handler
-            .get_collection()
-            .find(doc_query)
-            .limit((per_page + 1) as i64)
-            .sort(doc! { "id": 1 })
-            .await?;
-        let count = project_handler
-            .get_collection()
-            .count_documents(doc! { "creator": self.id.to_string() })
-            .await?;
+        let results = crate::queries::projects::query_projects_paginated(ctx, queries).await?;
 
-        let mut all_projects: Vec<showtimes_db::m::Project> = cursor.try_collect().await?;
-
-        // If all_projects is equal to per_page, then there is a next page
-        let last_proj = if all_projects.len() > per_page as usize {
-            Some(all_projects.pop().unwrap())
-        } else {
-            None
-        };
-
-        let page_info = PageInfoGQL::new(count, per_page, last_proj.map(|p| p.id.into()));
-
-        Ok(PaginatedGQL::new(
-            all_projects.into_iter().map(|p| p.into()).collect(),
-            page_info,
-        ))
+        Ok(results)
     }
 }
 

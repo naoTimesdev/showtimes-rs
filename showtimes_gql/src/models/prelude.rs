@@ -185,7 +185,7 @@ pub enum IntegrationTypeGQL {
     /// Anilist ID
     #[graphql(name = "PVD_ANILIST")]
     ProviderAnilist,
-    /// Anilist MAL ID mapping
+    /// MyAnimeList ID from Anilist
     #[graphql(name = "PVD_ANILIST_MAL")]
     ProviderAnilistMal,
     /// VNDB ID
