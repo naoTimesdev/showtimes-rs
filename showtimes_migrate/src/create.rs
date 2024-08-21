@@ -38,18 +38,18 @@ pub(crate) struct MigrationCli {
 }
 
 const MIGRATION_TEMPLATE: &str = r#"use chrono::TimeZone;
-use showtimes_db::{ClientMutex, DatabaseMutex};
+use showtimes_db::{ClientShared, DatabaseShared};
 
 use super::Migration;
 
 pub struct {{name}} {
-    client: ClientMutex,
-    db: DatabaseMutex,
+    client: ClientShared,
+    db: DatabaseShared,
 }
 
 #[async_trait::async_trait]
 impl Migration for {{name}} {
-    fn init(client: &ClientMutex, db: &DatabaseMutex) -> Self {
+    fn init(client: &ClientShared, db: &DatabaseShared) -> Self {
         Self {
             client: client.clone(),
             db: db.clone(),
