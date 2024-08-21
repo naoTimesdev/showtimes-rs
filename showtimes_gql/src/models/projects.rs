@@ -41,10 +41,32 @@ pub struct PosterGQL {
 /// The role information on the project
 #[derive(SimpleObject, Clone)]
 pub struct RoleGQL {
+    /// The order of the role, used for sorting
+    order: i32,
     /// The role kind, this is always uppercased
     key: String,
     /// The role actual long name
     name: String,
+}
+
+impl PartialEq for RoleGQL {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
+    }
+}
+
+impl Eq for RoleGQL {}
+
+impl PartialOrd for RoleGQL {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.order.partial_cmp(&other.order)
+    }
+}
+
+impl Ord for RoleGQL {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.order.cmp(&other.order)
+    }
 }
 
 /// The status of an episode for a role on the project
@@ -165,6 +187,8 @@ impl ProjectGQL {
             progress.push(ProjectProgressGQL::from_db(p.clone(), self.roles.clone())?);
         }
 
+        progress.sort_by(|a, b| a.number.cmp(&b.number));
+
         Ok(progress)
     }
 
@@ -179,6 +203,8 @@ impl ProjectGQL {
                 user: assignee.actor(),
             });
         }
+
+        assignees.sort_by(|a, b| a.role.cmp(&b.role));
 
         Ok(assignees)
     }
@@ -228,6 +254,7 @@ impl ProjectGQL {
 impl From<showtimes_db::m::Role> for RoleGQL {
     fn from(role: showtimes_db::m::Role) -> Self {
         RoleGQL {
+            order: role.order(),
             key: role.key().to_uppercase(),
             name: role.name().to_string(),
         }
@@ -248,6 +275,8 @@ impl ProjectProgressGQL {
             statuses.push(RoleStatusGQL::with_role(role, status.finished()));
         }
 
+        statuses.sort_by(|a, b| a.role.cmp(&b.role));
+
         Ok(ProjectProgressGQL {
             number: progress.number,
             finished: progress.finished,
@@ -261,6 +290,7 @@ impl ProjectProgressGQL {
 impl From<&showtimes_db::m::Role> for RoleGQL {
     fn from(role: &showtimes_db::m::Role) -> Self {
         RoleGQL {
+            order: role.order(),
             key: role.key().to_uppercase(),
             name: role.name().to_string(),
         }

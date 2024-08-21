@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 use bson::doc;
 use chrono::TimeZone;
@@ -734,21 +737,22 @@ impl M20240725045840Init {
             showtimes_db::m::Poster::new(ImageMetadata::stub_with_name(poster_url))
         };
 
-        let mut available_roles: HashMap<String, showtimes_db::m::Role> = vec![
-            showtimes_db::m::Role::new("TL", "Translator")?,
-            showtimes_db::m::Role::new("TLC", "Translation Checker")?,
-            showtimes_db::m::Role::new("ED", "Editor")?,
-            showtimes_db::m::Role::new("ENC", "Encoder")?,
-            showtimes_db::m::Role::new("TM", "Timer")?,
-            showtimes_db::m::Role::new("TS", "Typesetter")?,
-            showtimes_db::m::Role::new("QC", "Quality Checker")?,
+        let mut available_roles: BTreeMap<String, showtimes_db::m::Role> = vec![
+            showtimes_db::m::Role::new("TL", "Translator")?.with_order(0),
+            showtimes_db::m::Role::new("TLC", "Translation Checker")?.with_order(1),
+            showtimes_db::m::Role::new("ED", "Editor")?.with_order(2),
+            showtimes_db::m::Role::new("ENC", "Encoder")?.with_order(3),
+            showtimes_db::m::Role::new("TM", "Timer")?.with_order(4),
+            showtimes_db::m::Role::new("TS", "Typesetter")?.with_order(5),
+            showtimes_db::m::Role::new("QC", "Quality Checker")?.with_order(6),
         ]
         .iter()
         .map(|role| (role.key().to_string(), role.clone()))
         .collect();
 
-        for custom in &project.assignments.custom {
-            let role = showtimes_db::m::Role::new(&custom.key, &custom.name)?;
+        for (idx, custom) in project.assignments.custom.iter().enumerate() {
+            let role =
+                showtimes_db::m::Role::new(&custom.key, &custom.name)?.with_order((idx + 7) as i32);
             available_roles.insert(role.key().to_string(), role);
         }
 
@@ -818,9 +822,11 @@ impl M20240725045840Init {
             })
             .collect();
 
-        let correct_roles: Vec<showtimes_db::m::Role> = available_roles.values().cloned().collect();
+        let mut correct_roles: Vec<showtimes_db::m::Role> =
+            available_roles.values().cloned().collect();
+        correct_roles.sort();
 
-        let mut assignees: HashMap<String, RoleAssignee> = correct_roles
+        let mut assignees: BTreeMap<String, RoleAssignee> = correct_roles
             .iter()
             .map(|role| {
                 let assignee = RoleAssignee::from(role);
@@ -1023,7 +1029,7 @@ fn assign_people(
     id: &Option<String>,
     key: &str,
     actors: &HashMap<String, User>,
-    assignees: &mut HashMap<String, RoleAssignee>,
+    assignees: &mut BTreeMap<String, RoleAssignee>,
 ) {
     if let Some(id) = id {
         if !is_discord_snowflake(id) {

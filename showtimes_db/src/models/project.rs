@@ -143,8 +143,34 @@ fn validate_name(name: &str) -> anyhow::Result<()> {
 /// Each role is linked to the assignee and status by `key`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Role {
+    /// The order of the role in the project.
+    ///
+    /// By default it's 0, and it's used to sort the roles in the project.
+    order: i32,
+    /// The key name that will be used to link the role to the assignee and status.
     key: String,
+    /// The name of the role.
     name: String,
+}
+
+impl PartialEq for Role {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
+    }
+}
+
+impl Eq for Role {}
+
+impl PartialOrd for Role {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.order.cmp(&other.order))
+    }
+}
+
+impl Ord for Role {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.order.cmp(&other.order)
+    }
 }
 
 impl Role {
@@ -155,7 +181,22 @@ impl Role {
         let name: String = name.into();
         validate_name(&name)?;
 
-        Ok(Role { key, name })
+        Ok(Role {
+            order: 0,
+            key,
+            name,
+        })
+    }
+
+    /// Create a new role with order
+    pub fn with_order(mut self, order: i32) -> Self {
+        self.order = order;
+        self
+    }
+
+    /// Getter for the order
+    pub fn order(&self) -> i32 {
+        self.order
     }
 
     /// Getter for the key
