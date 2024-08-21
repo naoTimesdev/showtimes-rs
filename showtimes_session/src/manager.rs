@@ -114,7 +114,7 @@ impl SessionManager {
                     })?;
 
                 match session_exp {
-                    None => return Err(SessionError::SessionNotFound),
+                    None => Err(SessionError::SessionNotFound),
                     Some(session_exp) => {
                         if session_exp != -1 {
                             let current_time = chrono::Utc::now() - chrono::Duration::minutes(2);
@@ -129,14 +129,17 @@ impl SessionManager {
                             }
                         }
 
-                        match verify_session(&token, &self.secret, kind.into()).map_err(|e| {
-                            tracing::error!("Failed to verify session: {:?}", e);
-                            match e.kind() {
-                                ErrorKind::ExpiredSignature => SessionError::ExpiredSession,
-                                ErrorKind::InvalidSignature => SessionError::InvalidSignature,
-                                _ => SessionError::InvalidSession,
-                            }
-                        }) {
+                        let session_res = verify_session(&token, &self.secret, kind.into())
+                            .map_err(|e| {
+                                tracing::error!("Failed to verify session: {:?}", e);
+                                match e.kind() {
+                                    ErrorKind::ExpiredSignature => SessionError::ExpiredSession,
+                                    ErrorKind::InvalidSignature => SessionError::InvalidSignature,
+                                    _ => SessionError::InvalidSession,
+                                }
+                            });
+
+                        match session_res {
                             Ok(session) => Ok(ShowtimesUserSession::new(token, session)),
                             Err(SessionError::ExpiredSession) => {
                                 // Delete the session

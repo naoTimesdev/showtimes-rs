@@ -169,10 +169,7 @@ impl Loader<ProjectDataLoaderKey> for ProjectDataLoader {
                 .limit(fetch_by_ids.len() as i64)
                 .await
             {
-                Ok(cursor) => {
-                    let results = cursor.try_collect::<Vec<showtimes_db::m::Project>>().await;
-                    results
-                }
+                Ok(cursor) => cursor.try_collect::<Vec<showtimes_db::m::Project>>().await,
                 Err(e) => Err(e),
             }
         }));
@@ -185,18 +182,15 @@ impl Loader<ProjectDataLoaderKey> for ProjectDataLoader {
                 .limit(fetch_by_servers.len() as i64)
                 .await
             {
-                Ok(cursor) => {
-                    let results = cursor.try_collect::<Vec<showtimes_db::m::Project>>().await;
-                    results
-                }
+                Ok(cursor) => cursor.try_collect::<Vec<showtimes_db::m::Project>>().await,
                 Err(e) => Err(e),
             }
         }));
 
         let tasks_fut = futures::future::join_all(tasks).await;
         // Guaranteed to have 2 tasks
-        let ids_task = tasks_fut.get(0).unwrap().as_ref()?.as_ref()?;
-        let creator_task = tasks_fut.get(1).unwrap().as_ref()?.as_ref()?;
+        let ids_task = tasks_fut.first().unwrap().as_ref()?.as_ref()?;
+        let creator_task = tasks_fut.last().unwrap().as_ref()?.as_ref()?;
 
         let mapped_ids = ids_task
             .iter()

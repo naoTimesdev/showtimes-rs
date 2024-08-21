@@ -59,7 +59,7 @@ impl Eq for RoleGQL {}
 
 impl PartialOrd for RoleGQL {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.order.partial_cmp(&other.order)
+        Some(self.cmp(other))
     }
 }
 
