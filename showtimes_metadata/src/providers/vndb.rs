@@ -3,6 +3,7 @@ use serde_json::json;
 use crate::models::{VndbNovel, VndbResult};
 
 const VNDB_API_URL: &str = "https://api.vndb.org/kana";
+const VNDB_VN_FILTERS: &str = "id, titles.lang, titles.title, titles.official, titles.latin, titles.main, olang, platforms, image.id, image.url, description, developers.id, developers.name, image.sexual, released";
 
 #[derive(Debug, Clone)]
 pub struct VndbProvider {
@@ -48,7 +49,7 @@ impl VndbProvider {
     pub async fn search(&self, title: impl Into<String>) -> anyhow::Result<Vec<VndbNovel>> {
         let json_data = json!({
             "filters": ["search","=", title.into()],
-            "fields": "id, titles.lang, titles.title, titles.official, titles.main, olang, platforms, image.id, image.url, image.dims, description, developers.id, developers.name, image.sexual, released"
+            "fields": VNDB_VN_FILTERS
         });
 
         // json POST
@@ -82,7 +83,7 @@ impl VndbProvider {
 
         let json_data = json!({
             "filters": ["id","=", id],
-            "fields": "id, titles.lang, titles.title, titles.latin, titles.official, titles.main, olang, platforms, image.id, image.url, image.dims, description, developers.id, developers.name, image.sexual, released"
+            "fields": VNDB_VN_FILTERS
         });
 
         // json POST

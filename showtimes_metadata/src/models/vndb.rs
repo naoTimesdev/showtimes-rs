@@ -37,13 +37,13 @@ pub struct VndbImage {
     /// 1 = Tame
     /// 2 = Explicit
     #[serde(rename = "sexual")]
-    pub nsfw: u8,
+    pub nsfw: f32,
 }
 
 impl VndbImage {
     /// Is the image NSFW
     pub fn is_nsfw(&self) -> bool {
-        self.nsfw > 0
+        self.nsfw > 1.5
     }
 }
 
@@ -57,7 +57,7 @@ pub struct VndbNovel {
     /// The novel image
     pub image: VndbImage,
     /// The novel description
-    pub description: String,
+    pub description: Option<String>,
     /// The novel original language
     #[serde(rename = "olang")]
     pub original_lang: String,
