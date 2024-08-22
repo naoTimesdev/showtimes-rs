@@ -110,30 +110,18 @@ impl AnilistProvider {
             .send()
             .await?;
 
-        let rate_limit = req
-            .headers()
-            .get("x-ratelimit-limit")
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .parse()
-            .unwrap();
-        let rate_remaining = req
-            .headers()
-            .get("x-ratelimit-remaining")
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .parse()
-            .unwrap();
-        let rate_reset = req
-            .headers()
-            .get("x-ratelimit-reset")
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .parse()
-            .unwrap();
+        let rate_limit = match req.headers().get("x-ratelimit-limit") {
+            Some(limit) => limit.to_str().unwrap().parse().unwrap(),
+            None => 0u32,
+        };
+        let rate_remaining = match req.headers().get("x-ratelimit-remaining") {
+            Some(remaining) => remaining.to_str().unwrap().parse().unwrap(),
+            None => 0u32,
+        };
+        let rate_reset: i64 = match req.headers().get("x-ratelimit-reset") {
+            Some(reset) => reset.to_str().unwrap().parse().unwrap(),
+            None => -1i64,
+        };
 
         self.rate_limit = AnilistRateLimit {
             limit: rate_limit,
