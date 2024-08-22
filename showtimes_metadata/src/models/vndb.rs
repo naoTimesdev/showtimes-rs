@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 pub struct VndbTitle {
     /// The title of the VN
     pub title: String,
+    /// The latin/romanized title of the VN
+    pub latin: Option<String>,
     /// The language of the title
     pub lang: String,
     /// Is this official translation of the title?
@@ -77,12 +79,43 @@ impl VndbNovel {
         self.titles.iter().find(|t| t.main).map(|t| t.title.clone())
     }
 
-    /// Get english title of the novel
+    /// Get "best" english title of the novel
     pub fn get_english_title(&self) -> Option<String> {
-        self.titles
+        let mut find_en_title: Vec<&VndbTitle> =
+            self.titles.iter().filter(|&t| t.lang == "en").collect();
+
+        find_en_title.sort_by(sort_vndb_title);
+        find_en_title.first().map(|t| t.title.clone())
+    }
+
+    /// Get the "best" original title of the novel
+    pub fn get_original_title(&self) -> Option<VndbTitle> {
+        let mut find_original_title: Vec<&VndbTitle> = self
+            .titles
             .iter()
-            .find(|t| t.lang == "en")
-            .map(|t| t.title.clone())
+            .filter(|&t| t.lang == self.original_lang)
+            .collect();
+
+        find_original_title.sort_by(sort_vndb_title);
+        find_original_title.first().map(|&t| t.clone())
+    }
+
+    /// Get the release date
+    ///
+    /// If "TBA", "TBD", "Unknown", "Today" or "Now", it will return with `None`
+    pub fn get_release_date(&self) -> Option<String> {
+        self.released.as_ref().and_then(|d| {
+            if d.eq_ignore_ascii_case("TBA")
+                || d.eq_ignore_ascii_case("TBD")
+                || d.eq_ignore_ascii_case("Unknown")
+                || d.eq_ignore_ascii_case("Today")
+                || d.eq_ignore_ascii_case("Now")
+            {
+                None
+            } else {
+                Some(d.clone())
+            }
+        })
     }
 }
 
@@ -93,4 +126,18 @@ pub struct VndbResult {
     pub results: Vec<VndbNovel>,
     /// Is there more results?
     pub more: bool,
+}
+
+fn sort_vndb_title(a: &&VndbTitle, b: &&VndbTitle) -> std::cmp::Ordering {
+    if a.main && !b.main {
+        std::cmp::Ordering::Less
+    } else if !a.main && b.main {
+        std::cmp::Ordering::Greater
+    } else if a.official && !b.official {
+        std::cmp::Ordering::Less
+    } else if !a.official && b.official {
+        std::cmp::Ordering::Greater
+    } else {
+        std::cmp::Ordering::Equal
+    }
 }

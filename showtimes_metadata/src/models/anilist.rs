@@ -1,13 +1,13 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AnilistMediaType {
     Anime,
     Manga,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AnilistMediaFormat {
     Tv,
@@ -24,14 +24,14 @@ pub enum AnilistMediaFormat {
     OneShot,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
 pub struct AnilistFuzzyDate {
     pub year: Option<i32>,
     pub month: Option<i32>,
     pub day: Option<i32>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
 pub struct AnilistAiringSchedule {
     pub id: i32,
     pub episode: i32,
@@ -93,7 +93,7 @@ pub struct AnilistMedia {
     pub is_adult: bool,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AnilistPageInfo {
     pub total: i32,

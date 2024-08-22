@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 const BASE_IMAGE: &str = "https://image.tmdb.org/t/p/";
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum TMDbMediaType {
     Movie,
@@ -13,7 +13,7 @@ pub enum TMDbMediaType {
     Person,
 }
 
-#[derive(Debug, Clone, PartialEq, tosho_macros::EnumName)]
+#[derive(Debug, Clone, Copy, PartialEq, tosho_macros::EnumName)]
 pub enum TMDbPosterSize {
     W92,
     W154,
@@ -24,7 +24,7 @@ pub enum TMDbPosterSize {
     Original,
 }
 
-#[derive(Debug, Clone, PartialEq, tosho_macros::EnumName)]
+#[derive(Debug, Clone, Copy, PartialEq, tosho_macros::EnumName)]
 pub enum TMDbBackdropSize {
     W300,
     W780,
@@ -68,6 +68,8 @@ pub struct TMDbMultiResult {
     pub release_date: Option<String>,
     /// The first air date of the result (for TV)
     pub first_air_date: Option<String>,
+    /// Overview/description of the result
+    pub overview: Option<String>,
 }
 
 impl TMDbMultiResult {
@@ -122,11 +124,21 @@ impl TMDbMultiResult {
     /// Get the original title of the result.
     ///
     /// This will check if the `original_title` is `None` and will return the `original_name` if it is.
-    pub fn original_title(&self) -> String {
+    pub fn original_title(&self) -> Option<String> {
         self.original_title
             .as_ref()
             .map(|title| title.to_string())
-            .unwrap_or_else(|| self.original_name.as_ref().unwrap().to_string())
+            .or_else(|| self.original_name.as_ref().map(|name| name.to_string()))
+    }
+
+    /// Get the release date of the result.
+    ///
+    /// This will check if the `release_date` is `None` and will return the `first_air_date` if it is.
+    pub fn release_date(&self) -> Option<String> {
+        self.release_date
+            .as_ref()
+            .map(|date| date.to_string())
+            .or_else(|| self.first_air_date.as_ref().map(|date| date.to_string()))
     }
 }
 
@@ -148,4 +160,14 @@ pub struct TMDbErrorResponse {
     pub status_code: i32,
     /// The status message of the error
     pub status_message: String,
+}
+
+impl std::fmt::Display for TMDbErrorResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "TMDb Error {}: {}",
+            self.status_code, self.status_message
+        )
+    }
 }

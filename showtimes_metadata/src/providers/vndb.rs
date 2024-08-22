@@ -82,7 +82,7 @@ impl VndbProvider {
 
         let json_data = json!({
             "filters": ["id","=", id],
-            "fields": "id, titles.lang, titles.title, titles.official, titles.main, olang, platforms, image.id, image.url, image.dims, description, developers.id, developers.name, image.sexual, released"
+            "fields": "id, titles.lang, titles.title, titles.latin, titles.official, titles.main, olang, platforms, image.id, image.url, image.dims, description, developers.id, developers.name, image.sexual, released"
         });
 
         // json POST
