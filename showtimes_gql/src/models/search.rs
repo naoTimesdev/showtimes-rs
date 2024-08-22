@@ -299,7 +299,14 @@ impl QuerySearchRoot {
 
                 Ok(results
                     .iter()
-                    .map(|m| ExternalSearch::from_tmdb(m, prefer_title))
+                    // Only allow movies and tv shows
+                    .filter_map(|m| match m.media_type {
+                        showtimes_metadata::m::TMDbMediaType::Movie
+                        | showtimes_metadata::m::TMDbMediaType::Tv => {
+                            Some(ExternalSearch::from_tmdb(m, prefer_title))
+                        }
+                        _ => None,
+                    })
                     .collect())
             }
             None => Ok(vec![]),

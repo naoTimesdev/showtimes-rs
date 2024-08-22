@@ -53,7 +53,7 @@ pub struct TMDbMultiResult {
     /// Used in `Movie`
     pub original_title: Option<String>,
     /// The original language of the result
-    pub original_language: String,
+    pub original_language: Option<String>,
     /// The poster path of the result
     ///
     /// This is not a full URL, but need to be appended with some base URL.
