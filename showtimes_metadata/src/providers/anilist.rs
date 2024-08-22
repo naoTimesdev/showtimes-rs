@@ -150,6 +150,7 @@ impl AnilistProvider {
                     volumes
                     description(asHtml:false)
                     status(version:2)
+                    isAdult
                     startDate {
                         year
                         month

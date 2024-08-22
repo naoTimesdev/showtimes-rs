@@ -81,6 +81,8 @@ pub struct ExternalSearch {
     episodes: Option<u32>,
     /// The source of the media
     source: ExternalSearchSource,
+    /// If the media is adult or NSFW
+    nsfw: bool,
 }
 
 impl ExternalSearch {
@@ -108,6 +110,7 @@ impl ExternalSearch {
             image: media.cover_image.get_image(),
             episodes: media.episodes.map(|e| e as u32),
             source: ExternalSearchSource::Anilist,
+            nsfw: media.is_adult,
         }
     }
 
@@ -144,6 +147,7 @@ impl ExternalSearch {
             image: media.poster_url(),
             episodes: None,
             source: ExternalSearchSource::TMDb,
+            nsfw: media.adult,
         }
     }
 
@@ -174,11 +178,13 @@ impl ExternalSearch {
                 romanized: romaji_title,
             },
             format: ProjectTypeGQL::VisualNovel,
-            description: Some(media.description.clone()),
+            description: media.description.clone(),
             release_date: rls_date,
             image: Some(media.image.url.clone()),
             episodes: None,
             source: ExternalSearchSource::VNDB,
+            // Bad metrics but it kinda works I guess?
+            nsfw: media.image.is_nsfw(),
         }
     }
 }
