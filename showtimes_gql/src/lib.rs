@@ -3,6 +3,7 @@ use async_graphql::extensions::Tracing;
 use async_graphql::{Context, EmptySubscription, ErrorExtensions, Object};
 use data_loader::{find_authenticated_user, DiscordIdLoad, UserDataLoader};
 use models::prelude::PaginatedGQL;
+use models::search::QuerySearchRoot;
 use models::servers::ServerGQL;
 use models::users::UserSessionGQL;
 use showtimes_db::{mongodb::bson::doc, DatabaseShared};
@@ -65,6 +66,13 @@ impl QueryRoot {
         let results = queries::servers::query_servers_paginated(ctx, queries).await?;
 
         Ok(results)
+    }
+
+    /// Do a external searvice metadata search
+    #[graphql(guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)")]
+    async fn search(&self) -> QuerySearchRoot {
+        // This is just an empty root which has dynamic fields
+        QuerySearchRoot::new()
     }
 }
 

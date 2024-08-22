@@ -113,6 +113,17 @@ async fn entrypoint() -> anyhow::Result<()> {
         showtimes_search::create_connection(&config.meilisearch.url, &config.meilisearch.api_key)
             .await?;
 
+    tracing::info!("🔌🐍 Loading external metadata services...");
+    let anilist_provider = showtimes_metadata::AnilistProvider::new(true);
+    let tmdb_provider = match &config.external.tmdb {
+        Some(api_key) => Some(Arc::new(showtimes_metadata::TMDbProvider::new(api_key))),
+        None => None,
+    };
+    let vndb_provider = match &config.external.vndb {
+        Some(api_key) => Some(Arc::new(showtimes_metadata::VndbProvider::new(api_key))),
+        None => None,
+    };
+
     tracing::info!("🔌🚀 Loading GraphQL schema...");
     let schema = showtimes_gql::create_schema(&mongo_conn.db);
 
@@ -124,6 +135,9 @@ async fn entrypoint() -> anyhow::Result<()> {
         config: Arc::new(config.clone()),
         schema,
         session: Arc::new(Mutex::new(session_manager)),
+        anilist_provider: Arc::new(Mutex::new(anilist_provider)),
+        tmdb_provider,
+        vndb_provider,
     };
 
     tracing::info!("🚀 Starting server...");

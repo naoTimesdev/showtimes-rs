@@ -27,6 +27,8 @@ pub enum ProjectTypeGQL {
     Games,
     /// The project is a visual novel.
     VisualNovel,
+    /// The project is an unknown type.
+    Unknown,
 }
 
 /// The project poster information

@@ -13,6 +13,8 @@ pub enum ProjectKind {
     Literature,
     /// The project is a game.
     Games,
+    /// The project is an unknown kind.
+    Unknown,
 }
 
 tosho_macros::enum_error!(ProjectKindFromStrError);
@@ -39,6 +41,7 @@ impl std::fmt::Display for ProjectKind {
             ProjectKind::Shows => write!(f, "SHOWS"),
             ProjectKind::Literature => write!(f, "LITERATURE"),
             ProjectKind::Games => write!(f, "GAMES"),
+            ProjectKind::Unknown => write!(f, "UNKNOWN"),
         }
     }
 }
@@ -65,6 +68,8 @@ pub enum ProjectType {
     Games,
     /// The project is a visual novel.
     VisualNovel,
+    /// The project is an unknown type.
+    Unknown,
 }
 
 tosho_macros::enum_error!(ProjectTypeFromStrError);
@@ -101,6 +106,7 @@ impl std::fmt::Display for ProjectType {
             ProjectType::LightNovel => write!(f, "LIGHT_NOVEL"),
             ProjectType::Games => write!(f, "GAMES"),
             ProjectType::VisualNovel => write!(f, "VISUAL_NOVEL"),
+            ProjectType::Unknown => write!(f, "UNKNOWN"),
         }
     }
 }
@@ -114,6 +120,7 @@ impl ProjectType {
                 ProjectKind::Literature
             }
             ProjectType::Games | ProjectType::VisualNovel => ProjectKind::Games,
+            ProjectType::Unknown => ProjectKind::Unknown,
         }
     }
 }
