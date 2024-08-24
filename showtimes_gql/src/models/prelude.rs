@@ -4,7 +4,7 @@ use async_graphql::{
     ComplexObject, Description, Enum, OutputType, Scalar, ScalarType, SimpleObject,
 };
 
-use super::{projects::ProjectGQL, servers::ServerGQL};
+use super::{projects::ProjectGQL, servers::ServerGQL, users::UserGQL};
 
 /// A wrapper around ULID to allow it to be used in GraphQL
 pub struct UlidGQL(showtimes_shared::ulid::Ulid);
@@ -238,8 +238,9 @@ pub struct PageInfoGQL {
 
 /// A paginated data structure
 #[derive(SimpleObject)]
-#[graphql(concrete(name = "ProjectPaginated", params(ProjectGQL)))]
-#[graphql(concrete(name = "ServerPaginated", params(ServerGQL)))]
+#[graphql(concrete(name = "ProjectPaginatedGQL", params(ProjectGQL)))]
+#[graphql(concrete(name = "ServerPaginatedGQL", params(ServerGQL)))]
+#[graphql(concrete(name = "UserPaginatedGQL", params(UserGQL)))]
 pub struct PaginatedGQL<T: OutputType> {
     /// The items list
     node: Vec<T>,
@@ -268,9 +269,28 @@ impl PageInfoGQL {
     }
 }
 
+impl Default for PageInfoGQL {
+    fn default() -> Self {
+        PageInfoGQL {
+            total: 0,
+            per_page: 20,
+            next_cursor: None,
+        }
+    }
+}
+
 impl<T: OutputType> PaginatedGQL<T> {
     /// Create a new PaginatedGQL
     pub fn new(node: Vec<T>, page_info: PageInfoGQL) -> Self {
         PaginatedGQL { node, page_info }
+    }
+}
+
+impl<T: OutputType> Default for PaginatedGQL<T> {
+    fn default() -> Self {
+        PaginatedGQL {
+            node: vec![],
+            page_info: PageInfoGQL::default(),
+        }
     }
 }

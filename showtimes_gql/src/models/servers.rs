@@ -1,4 +1,4 @@
-use crate::data_loader::UserDataLoader;
+use crate::{data_loader::UserDataLoader, queries::projects::MinimalServerUsers};
 
 use super::{prelude::*, projects::ProjectGQL, users::UserGQL};
 use async_graphql::{dataloader::DataLoader, Enum, ErrorExtensions, Object};
@@ -169,45 +169,15 @@ impl ServerGQL {
             return Err("Projects fetch from this context is disabled to avoid looping".into());
         }
 
-        let limit_projects = self.get_project_limits();
-        let mut queries =
-            crate::queries::projects::ProjectQuery::new().with_creators(vec![self.id]);
-        match ids {
-            Some(ids) => {
-                // limit the projects to the ones that the user is managing
-                let mapped_ids: Vec<showtimes_shared::ulid::Ulid> =
-                    ids.into_iter().map(|id| *id).collect();
-                // Filter out the projects that are not in the limit_projects
-                let filtered_ids: Vec<showtimes_shared::ulid::Ulid> =
-                    if let Some(limit_proj) = &limit_projects {
-                        if limit_proj.is_empty() {
-                            // Return an empty list if the limit_proj is empty
-                            let pg_info = PageInfoGQL::empty(per_page.unwrap_or(20));
-                            return Ok(PaginatedGQL::new(Vec::new(), pg_info));
-                        }
+        let mut queries = crate::queries::projects::ProjectQuery::new()
+            .with_creators(vec![self.id])
+            .with_allowed_servers_minimal(vec![MinimalServerUsers::new(
+                self.id,
+                self.owners.clone(),
+            )]);
 
-                        let limit_proj: Vec<showtimes_shared::ulid::Ulid> =
-                            limit_proj.iter().map(|id| id.parse().unwrap()).collect();
-                        mapped_ids
-                            .into_iter()
-                            .filter(|&id| limit_proj.contains(&id))
-                            .collect()
-                    } else {
-                        mapped_ids
-                    };
-
-                queries.set_ids(filtered_ids);
-            }
-            None => {
-                if let Some(limit_proj) = &limit_projects {
-                    if limit_proj.is_empty() {
-                        let pg_info = PageInfoGQL::empty(per_page.unwrap_or(20));
-                        return Ok(PaginatedGQL::new(Vec::new(), pg_info));
-                    }
-
-                    queries.set_ids(limit_proj.iter().map(|id| id.parse().unwrap()).collect());
-                }
-            }
+        if let Some(ids) = ids {
+            queries.set_ids(ids.into_iter().map(|i| *i).collect());
         }
         if let Some(per_page) = per_page {
             queries.set_per_page(per_page);
@@ -255,24 +225,6 @@ impl From<&showtimes_db::m::Server> for ServerGQL {
 }
 
 impl ServerGQL {
-    fn get_project_limits(&self) -> Option<Vec<String>> {
-        if let Some(user_id) = self.current_user {
-            let user_id = user_id.to_string();
-            let user = self.owners.iter().find(|u| u.id.to_string() == user_id);
-            if let Some(user) = user {
-                if user.privilege == showtimes_db::m::UserPrivilege::ProjectManager {
-                    Some(user.extras.clone())
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-
     pub fn with_current_user(mut self, user_id: showtimes_shared::ulid::Ulid) -> Self {
         self.current_user = Some(user_id);
         self

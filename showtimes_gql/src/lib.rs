@@ -1,11 +1,14 @@
 use async_graphql::dataloader::DataLoader;
 use async_graphql::extensions::Tracing;
 use async_graphql::{Context, EmptySubscription, ErrorExtensions, Object};
-use data_loader::{find_authenticated_user, DiscordIdLoad, UserDataLoader};
+use data_loader::{
+    find_authenticated_user, DiscordIdLoad, ServerDataLoader, ServerOwnerId, UserDataLoader,
+};
 use models::prelude::PaginatedGQL;
+use models::projects::ProjectGQL;
 use models::search::QuerySearchRoot;
 use models::servers::ServerGQL;
-use models::users::UserSessionGQL;
+use models::users::{UserGQL, UserSessionGQL};
 use showtimes_db::{mongodb::bson::doc, DatabaseShared};
 use showtimes_session::manager::SharedSessionManager;
 use showtimes_session::{oauth2::discord::DiscordClient, ShowtimesUserSession};
@@ -52,7 +55,7 @@ impl QueryRoot {
     ) -> async_graphql::Result<PaginatedGQL<ServerGQL>> {
         let user = find_authenticated_user(ctx).await?;
         let mut queries = queries::servers::ServerQuery::new()
-            .with_current_user(queries::servers::ServerQueryUser::from(&user));
+            .with_current_user(queries::ServerQueryUser::from(&user));
         if let Some(ids) = ids {
             queries.set_ids(ids.into_iter().map(|id| *id).collect());
         };
@@ -64,6 +67,98 @@ impl QueryRoot {
         }
 
         let results = queries::servers::query_servers_paginated(ctx, queries).await?;
+
+        Ok(results)
+    }
+
+    /// Get authenticated user associated projects
+    #[graphql(guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)")]
+    async fn projects(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "Specify project IDs to query")] ids: Option<
+            Vec<crate::models::prelude::UlidGQL>,
+        >,
+        #[graphql(name = "serverIds", desc = "Limit projects to specific server IDs")]
+        server_ids: Option<Vec<crate::models::prelude::UlidGQL>>,
+        #[graphql(
+            name = "perPage",
+            desc = "The number of project to return, default to 20",
+            validator(minimum = 2, maximum = 100)
+        )]
+        per_page: Option<u32>,
+        #[graphql(desc = "The cursor to start from")] cursor: Option<
+            crate::models::prelude::UlidGQL,
+        >,
+    ) -> async_graphql::Result<PaginatedGQL<ProjectGQL>> {
+        let user = find_authenticated_user(ctx).await?;
+        let allowed_servers = match user.kind {
+            showtimes_db::m::UserKind::User => {
+                let projector = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
+
+                let servers = projector.load_one(ServerOwnerId::new(user.id)).await?;
+
+                servers
+            }
+            _ => None,
+        };
+
+        let mut queries = queries::projects::ProjectQuery::new().with_current_user(user.into());
+        if let Some(ids) = ids {
+            queries.set_ids(ids.into_iter().map(|id| *id).collect());
+        };
+        if let Some(server_ids) = server_ids {
+            let server_ids: Vec<showtimes_shared::ulid::Ulid> =
+                server_ids.into_iter().map(|id| *id).collect();
+            queries.set_creators(&server_ids);
+        };
+        if let Some(per_page) = per_page {
+            queries.set_per_page(per_page);
+        }
+        if let Some(cursor) = cursor {
+            queries.set_cursor(*cursor);
+        }
+        if let Some(allowed_servers) = allowed_servers {
+            queries.set_allowed_servers(allowed_servers);
+        }
+
+        let results = queries::projects::query_projects_paginated(ctx, queries).await?;
+
+        Ok(results)
+    }
+
+    /// Get all available users, you need a minimum of admin role to access this
+    #[graphql(guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)")]
+    async fn users(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "Specify user IDs to query")] ids: Option<
+            Vec<crate::models::prelude::UlidGQL>,
+        >,
+        #[graphql(
+            name = "perPage",
+            desc = "The number of users to return, default to 20",
+            validator(minimum = 2, maximum = 100)
+        )]
+        per_page: Option<u32>,
+        #[graphql(desc = "The cursor to start from")] cursor: Option<
+            crate::models::prelude::UlidGQL,
+        >,
+    ) -> async_graphql::Result<PaginatedGQL<UserGQL>> {
+        let user = find_authenticated_user(ctx).await?;
+        let mut queries = queries::users::UserQuery::new()
+            .with_current_user(queries::ServerQueryUser::from(&user));
+        if let Some(ids) = ids {
+            queries.set_ids(ids.into_iter().map(|id| *id).collect());
+        };
+        if let Some(per_page) = per_page {
+            queries.set_per_page(per_page);
+        }
+        if let Some(cursor) = cursor {
+            queries.set_cursor(*cursor);
+        }
+
+        let results = queries::users::query_users_paginated(ctx, queries).await?;
 
         Ok(results)
     }

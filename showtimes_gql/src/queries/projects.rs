@@ -1,5 +1,8 @@
+use std::collections::HashMap;
+
 use futures::TryStreamExt;
 use showtimes_db::{
+    m::UserPrivilege,
     mongodb::bson::{doc, Document},
     DatabaseShared,
 };
@@ -9,6 +12,40 @@ use crate::models::{
     prelude::{PageInfoGQL, PaginatedGQL},
     projects::ProjectGQL,
 };
+
+use super::ServerQueryUser;
+
+#[derive(Debug, Clone)]
+pub struct MinimalServerUsers {
+    /// Server ID
+    pub id: Ulid,
+    /// Server users
+    pub owners: Vec<showtimes_db::m::ServerUser>,
+}
+
+impl MinimalServerUsers {
+    pub fn new(id: Ulid, owners: Vec<showtimes_db::m::ServerUser>) -> Self {
+        MinimalServerUsers { id, owners }
+    }
+}
+
+impl From<showtimes_db::m::Server> for MinimalServerUsers {
+    fn from(server: showtimes_db::m::Server) -> Self {
+        MinimalServerUsers {
+            id: server.id,
+            owners: server.owners,
+        }
+    }
+}
+
+impl From<&showtimes_db::m::Server> for MinimalServerUsers {
+    fn from(server: &showtimes_db::m::Server) -> Self {
+        MinimalServerUsers {
+            id: server.id,
+            owners: server.owners.clone(),
+        }
+    }
+}
 
 /// The config for querying servers
 #[derive(Debug, Clone, Default)]
@@ -21,6 +58,9 @@ pub struct ProjectQuery {
     cursor: Option<Ulid>,
     /// The server that created the project
     creators: Option<Vec<Ulid>>,
+    /// Allowed servers to query
+    servers_users: Option<Vec<MinimalServerUsers>>,
+    current_user: Option<ServerQueryUser>,
 }
 
 impl ProjectQuery {
@@ -59,7 +99,7 @@ impl ProjectQuery {
         self.cursor = Some(cursor);
     }
 
-    /// Set the current user fetching this data
+    /// Set the servers fetching this data
     pub fn with_creators(mut self, user: Vec<Ulid>) -> Self {
         self.creators = Some(user);
         self
@@ -67,6 +107,36 @@ impl ProjectQuery {
 
     pub fn set_creators(&mut self, user: &[Ulid]) {
         self.creators = Some(user.to_vec());
+    }
+
+    /// Set the allowed servers to query
+    pub fn with_allowed_servers(mut self, servers: Vec<showtimes_db::m::Server>) -> Self {
+        self.servers_users = Some(servers.into_iter().map(|s| s.into()).collect());
+        self
+    }
+
+    pub fn set_allowed_servers(&mut self, servers: Vec<showtimes_db::m::Server>) {
+        self.servers_users = Some(servers.into_iter().map(|s| s.into()).collect());
+    }
+
+    /// Set the allowed servers to query
+    pub fn with_allowed_servers_minimal(mut self, servers: Vec<MinimalServerUsers>) -> Self {
+        self.servers_users = Some(servers);
+        self
+    }
+
+    pub fn set_allowed_servers_minimal(&mut self, servers: Vec<MinimalServerUsers>) {
+        self.servers_users = Some(servers);
+    }
+
+    /// Set the current user fetching this data
+    pub fn with_current_user(mut self, user: ServerQueryUser) -> Self {
+        self.current_user = Some(user);
+        self
+    }
+
+    pub fn set_current_user(&mut self, user: ServerQueryUser) {
+        self.current_user = Some(user);
     }
 }
 
@@ -84,62 +154,157 @@ pub async fn query_projects_paginated(
 
     let prj_handler = showtimes_db::ProjectHandler::new(db);
 
-    let mut base_query = match (queries.ids, queries.creators) {
-        (Some(ids), Some(creators)) => {
-            let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
-            let creators: Vec<String> = creators.into_iter().map(|id| id.to_string()).collect();
-            doc! {
-                "$or": [
-                    { "id": { "$in": ids } },
-                    { "creator": { "$in": creators } }
-                ]
+    let fetch_docs = match (queries.servers_users, queries.current_user) {
+        (Some(servers), Some(user_info)) => {
+            // If provided with allowed servers, then filter out the projects that are not in the list
+            let mut user_methods: HashMap<Ulid, showtimes_db::m::ServerUser> = servers
+                .iter()
+                .filter_map(|s| match s.owners.iter().find(|&o| o.id == user_info.id) {
+                    Some(owner) => Some((s.id, owner.clone())),
+                    None => None,
+                })
+                .collect();
+
+            if let Some(creators) = queries.creators {
+                // Since creators is provided, remove the servers that are not in the list
+                user_methods.retain(|k, _| creators.contains(k));
             }
-        }
-        (Some(ids), None) => {
-            let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
-            doc! {
-                "id": { "$in": ids }
+
+            if user_methods.is_empty() {
+                return Err("User does not have access to any of the allowed servers".into());
             }
+
+            let document_fetchs = user_methods
+                .iter()
+                .map(|(s, m)| {
+                    if m.privilege == UserPrivilege::ProjectManager {
+                        match &queries.ids {
+                            Some(ids) => {
+                                // remove the extras that is not in IDs
+                                let req_ids: Vec<String> =
+                                    ids.into_iter().map(|id| id.to_string()).collect();
+                                let extras: Vec<String> = m
+                                    .extras
+                                    .iter()
+                                    .filter(|id| req_ids.contains(id))
+                                    .cloned()
+                                    .collect();
+                                doc! {
+                                    "creator": s.to_string(),
+                                    "id": { "$in": extras }
+                                }
+                            }
+                            None => {
+                                doc! {
+                                    "creator": s.to_string(),
+                                    "id": { "$in": m.extras.clone() }
+                                }
+                            }
+                        }
+                    } else {
+                        match &queries.ids {
+                            Some(ids) => {
+                                let ids: Vec<String> =
+                                    ids.into_iter().map(|id| id.to_string()).collect();
+                                doc! {
+                                    "creator": s.to_string(),
+                                    "id": { "$in": ids }
+                                }
+                            }
+                            None => {
+                                doc! {
+                                    "creator": s.to_string()
+                                }
+                            }
+                        }
+                    }
+                })
+                .collect::<Vec<Document>>();
+
+            document_fetchs
         }
-        (None, Some(creators)) => {
-            let creators: Vec<String> = creators.into_iter().map(|id| id.to_string()).collect();
-            doc! {
-                "creator": { "$in": creators }
-            }
+        _ => {
+            // If not provided with allowed servers, then fetch all projects
+            let all_queries = match (queries.ids, queries.creators) {
+                (Some(ids), Some(creators)) => {
+                    let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
+                    let creators: Vec<String> =
+                        creators.into_iter().map(|id| id.to_string()).collect();
+                    doc! {
+                        "$or": [
+                            { "id": { "$in": ids } },
+                            { "creator": { "$in": creators } }
+                        ]
+                    }
+                }
+                (Some(ids), None) => {
+                    let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
+                    doc! {
+                        "id": { "$in": ids }
+                    }
+                }
+                (None, Some(creators)) => {
+                    let creators: Vec<String> =
+                        creators.into_iter().map(|id| id.to_string()).collect();
+                    doc! {
+                        "creator": { "$in": creators }
+                    }
+                }
+                (None, None) => Document::new(),
+            };
+
+            vec![all_queries]
         }
-        (None, None) => Document::new(),
     };
 
-    let count_query = base_query.clone();
-    let doc_query = if let Some(cursor) = queries.cursor {
-        let cursor = cursor.to_string();
-
-        // Extend $id query to include $gte
-        let entry = base_query.entry("id".to_string()).or_insert_with(|| {
-            showtimes_db::mongodb::bson::Bson::Document({
-                // empty doc
-                showtimes_db::mongodb::bson::Document::new()
-            })
-        });
-
-        if let showtimes_db::mongodb::bson::Bson::Document(doc) = entry {
-            doc.insert("$gte".to_string(), cursor);
+    let actual_fetch = if fetch_docs.len() > 1 {
+        match queries.cursor {
+            Some(cursor) => {
+                doc! {
+                    "$or": fetch_docs,
+                    "id": { "$gte": cursor.to_string() }
+                }
+            }
+            None => {
+                doc! {
+                    "$or": fetch_docs
+                }
+            }
         }
-
-        base_query
     } else {
-        base_query
+        // Guaranteed to have at least one document
+        let mut base_query = fetch_docs.first().unwrap().clone();
+        match queries.cursor {
+            Some(cursor) => {
+                let cursor = cursor.to_string();
+
+                // Extend $id query to include $gte
+                let entry = base_query.entry("id".to_string()).or_insert_with(|| {
+                    showtimes_db::mongodb::bson::Bson::Document({
+                        // empty doc
+                        showtimes_db::mongodb::bson::Document::new()
+                    })
+                });
+
+                if let showtimes_db::mongodb::bson::Bson::Document(doc) = entry {
+                    doc.insert("$gte".to_string(), cursor);
+                }
+
+                base_query
+            }
+            None => base_query,
+        }
     };
 
     let cursor = prj_handler
         .get_collection()
-        .find(doc_query)
+        .find(actual_fetch.clone())
         .limit((per_page + 1) as i64)
         .sort(doc! { "id": 1 })
         .await?;
     let count = prj_handler
         .get_collection()
-        .count_documents(count_query)
+        .count_documents(actual_fetch)
         .await?;
 
     let mut all_servers: Vec<showtimes_db::m::Project> = cursor.try_collect().await?;

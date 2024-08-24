@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::OnceLock};
+use std::{collections::HashMap, ops::Deref, sync::OnceLock};
 
 use async_graphql::{
     dataloader::{DataLoader, Loader},
@@ -209,6 +209,25 @@ impl Loader<ProjectDataLoaderKey> for ProjectDataLoader {
     }
 }
 
+/// A simple owner data loader
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ServerOwnerId(Ulid);
+
+impl ServerOwnerId {
+    /// Initialize a new server owner ID
+    pub fn new(id: Ulid) -> Self {
+        Self(id)
+    }
+}
+
+impl Deref for ServerOwnerId {
+    type Target = Ulid;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 /// A data loader for the server model
 pub struct ServerDataLoader {
     col: showtimes_db::ServerHandler,
@@ -240,6 +259,42 @@ impl Loader<Ulid> for ServerDataLoader {
         let all_results = result.try_collect::<Vec<showtimes_db::m::Server>>().await?;
         let mapped_res: HashMap<Ulid, showtimes_db::m::Server> =
             all_results.iter().map(|u| (u.id, u.clone())).collect();
+
+        Ok(mapped_res)
+    }
+}
+
+impl Loader<ServerOwnerId> for ServerDataLoader {
+    type Value = Vec<showtimes_db::m::Server>;
+    type Error = FieldError;
+
+    async fn load(
+        &self,
+        keys: &[ServerOwnerId],
+    ) -> Result<HashMap<ServerOwnerId, Self::Value>, Self::Error> {
+        let keys_to_string = keys.iter().map(|k| (*k).to_string()).collect::<Vec<_>>();
+        let result = self
+            .col
+            .get_collection()
+            .find(doc! {
+                "owners.id": { "$in": keys_to_string }
+            })
+            .limit(keys.len() as i64)
+            .await?;
+
+        let all_results = result.try_collect::<Vec<showtimes_db::m::Server>>().await?;
+        let mapped_res: HashMap<ServerOwnerId, Vec<showtimes_db::m::Server>> = keys
+            .iter()
+            .map(|k| {
+                let res = all_results
+                    .iter()
+                    .filter(|u| u.owners.iter().any(|o| o.id == **k))
+                    .cloned()
+                    .collect();
+
+                (k.clone(), res)
+            })
+            .collect();
 
         Ok(mapped_res)
     }

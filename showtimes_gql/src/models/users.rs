@@ -1,4 +1,4 @@
-use crate::queries::servers::ServerQueryUser;
+use crate::queries::ServerQueryUser;
 
 use super::{prelude::*, servers::ServerGQL};
 use async_graphql::{Enum, Object, SimpleObject};
@@ -103,9 +103,8 @@ impl UserGQL {
             return Err("Servers fetch from this context is disabled to avoid looping".into());
         }
 
-        let mut queries = crate::queries::servers::ServerQuery::new().with_current_user(
-            crate::queries::servers::ServerQueryUser::new(self.id, self.kind),
-        );
+        let mut queries = crate::queries::servers::ServerQuery::new()
+            .with_current_user(crate::queries::ServerQueryUser::new(self.id, self.kind));
         if let Some(ids) = ids {
             queries.set_ids(ids.into_iter().map(|id| *id).collect());
         };
