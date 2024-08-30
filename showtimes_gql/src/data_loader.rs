@@ -227,7 +227,6 @@ impl Loader<ServerOwnerId> for ProjectDataLoader {
             .find(doc! {
                 "creator": { "$in": keys_to_string }
             })
-            .limit(keys.len() as i64)
             .await?;
 
         let all_results = result

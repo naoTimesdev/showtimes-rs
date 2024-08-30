@@ -181,9 +181,17 @@ impl QueryRoot {
         let user = find_authenticated_user(ctx).await?;
 
         let projector = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
-        let result = projector
-            .load_one(ServerAndOwnerId::new(*id, user.id))
-            .await?;
+        let result = match user.kind {
+            showtimes_db::m::UserKind::User => {
+                projector
+                    .load_one(ServerAndOwnerId::new(*id, user.id))
+                    .await?
+            }
+            _ => {
+                let server = projector.load_one(*id).await?;
+                server
+            }
+        };
 
         match result {
             Some(server) => Ok(StatsGQL::new(server)),
