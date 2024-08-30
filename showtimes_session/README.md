@@ -33,3 +33,7 @@ The verification process will check the following:
 - The token expiration date must be greater than the current time.
 - The token audience must be `user` or `discord-auth`.
 - The token metadata must be a valid ULID or a valid URL (this will be done on another crates).
+
+## License
+
+This crates has been licensed under the [MPL 2.0](https://github.com/naoTimesdev/showtimes-rs/blob/master/LICENSE-MPL) license. Anyone is free to use and redistribute this project and make sure to link back to the original project. More info: [Mozilla Public License 2.0](https://www.tldrlegal.com/license/mozilla-public-license-2-0-mpl-2)

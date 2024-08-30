@@ -1,10 +1,6 @@
-# metadata
+# shared
 
-A wrapper for external network fetching for a shows or books metadata information.
-
-## Supported Sources
-- Anilist (Anime, Manga, Novels)
-- TMDB (Shows, Movies, and more.)
+A collection of shared utilities and types used across the `showtimes-rs` project.
 
 ## License
 
