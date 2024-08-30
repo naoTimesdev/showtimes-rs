@@ -78,6 +78,7 @@ pub async fn graphql_handler(
     if let Some((kind, token)) = get_token_or_bearer(&headers, &state.config) {
         match state.session.lock().await.get_session(token, kind).await {
             Ok(session) => {
+                tracing::debug!("Got session: {:?}", session);
                 req = req.data(session.get_claims().clone());
                 req = req.data(session);
             }
