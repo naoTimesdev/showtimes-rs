@@ -61,6 +61,7 @@ pub struct ProjectQuery {
     /// Allowed servers to query
     servers_users: Option<Vec<MinimalServerUsers>>,
     current_user: Option<ServerQueryUser>,
+    unpaged: bool,
 }
 
 impl ProjectQuery {
@@ -137,6 +138,16 @@ impl ProjectQuery {
 
     pub fn set_current_user(&mut self, user: ServerQueryUser) {
         self.current_user = Some(user);
+    }
+
+    /// Do unpaged query
+    pub fn with_unpaged(mut self) -> Self {
+        self.unpaged = true;
+        self
+    }
+
+    pub fn set_unpaged(&mut self) {
+        self.unpaged = true;
     }
 }
 
@@ -257,57 +268,79 @@ pub async fn query_projects_paginated(
         }
     };
 
-    let actual_fetch = if fetch_docs.len() > 1 {
+    let (query_docs_fetch, query_count_fetch) = if fetch_docs.len() > 1 {
         match queries.cursor {
-            Some(cursor) => {
+            Some(cursor) => (
+                doc! {
+                    "$or": fetch_docs.clone(),
+                    "id": { "$gte": cursor.to_string() }
+                },
                 doc! {
                     "$or": fetch_docs,
-                    "id": { "$gte": cursor.to_string() }
-                }
-            }
-            None => {
+                },
+            ),
+            None => (
+                doc! {
+                    "$or": fetch_docs.clone()
+                },
                 doc! {
                     "$or": fetch_docs
-                }
-            }
+                },
+            ),
         }
     } else {
+        let count_query = fetch_docs.first().unwrap().clone();
         // Guaranteed to have at least one document
-        let mut base_query = fetch_docs.first().unwrap().clone();
+        let mut base_query = count_query.clone();
         match queries.cursor {
             Some(cursor) => {
-                let cursor = cursor.to_string();
+                if queries.unpaged {
+                    (base_query, count_query)
+                } else {
+                    let cursor = cursor.to_string();
 
-                // Extend $id query to include $gte
-                let entry = base_query.entry("id".to_string()).or_insert_with(|| {
-                    showtimes_db::mongodb::bson::Bson::Document({
-                        // empty doc
-                        showtimes_db::mongodb::bson::Document::new()
-                    })
-                });
+                    // Extend $id query to include $gte
+                    let entry = base_query.entry("id".to_string()).or_insert_with(|| {
+                        showtimes_db::mongodb::bson::Bson::Document({
+                            // empty doc
+                            showtimes_db::mongodb::bson::Document::new()
+                        })
+                    });
 
-                if let showtimes_db::mongodb::bson::Bson::Document(doc) = entry {
-                    doc.insert("$gte".to_string(), cursor);
+                    if let showtimes_db::mongodb::bson::Bson::Document(doc) = entry {
+                        doc.insert("$gte".to_string(), cursor);
+                    }
+
+                    (base_query, count_query)
                 }
-
-                base_query
             }
-            None => base_query,
+            None => (base_query, count_query),
         }
     };
 
-    let cursor = prj_handler
-        .get_collection()
-        .find(actual_fetch.clone())
-        .limit((per_page + 1) as i64)
-        .sort(doc! { "id": 1 })
-        .await?;
+    let col = prj_handler.get_collection();
+    let base_cursor = col.find(query_docs_fetch).sort(doc! { "id": 1 });
+
+    let cursor = if queries.unpaged {
+        base_cursor
+    } else {
+        base_cursor.limit((per_page + 1) as i64)
+    }
+    .await?;
     let count = prj_handler
         .get_collection()
-        .count_documents(actual_fetch)
+        .count_documents(query_count_fetch)
         .await?;
 
     let mut all_servers: Vec<showtimes_db::m::Project> = cursor.try_collect().await?;
+
+    if queries.unpaged {
+        let page_info = PageInfoGQL::new(count, per_page, None);
+        return Ok(PaginatedGQL::new(
+            all_servers.into_iter().map(|p| p.into()).collect(),
+            page_info,
+        ));
+    }
 
     // If all_servers is equal to per_page, then there is a next page
     let last_srv = if all_servers.len() > per_page as usize {

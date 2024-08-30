@@ -2,12 +2,14 @@ use async_graphql::dataloader::DataLoader;
 use async_graphql::extensions::Tracing;
 use async_graphql::{Context, EmptySubscription, ErrorExtensions, Object};
 use data_loader::{
-    find_authenticated_user, DiscordIdLoad, ServerDataLoader, ServerOwnerId, UserDataLoader,
+    find_authenticated_user, DiscordIdLoad, ServerAndOwnerId, ServerDataLoader, ServerOwnerId,
+    UserDataLoader,
 };
 use models::prelude::PaginatedGQL;
 use models::projects::ProjectGQL;
 use models::search::QuerySearchRoot;
 use models::servers::ServerGQL;
+use models::stats::StatsGQL;
 use models::users::{UserGQL, UserSessionGQL};
 use showtimes_db::{mongodb::bson::doc, DatabaseShared};
 use showtimes_session::manager::SharedSessionManager;
@@ -90,6 +92,8 @@ impl QueryRoot {
         #[graphql(desc = "The cursor to start from")] cursor: Option<
             crate::models::prelude::UlidGQL,
         >,
+        #[graphql(desc = "Remove pagination limit, this only works if you're an Admin")]
+        unpaged: bool,
     ) -> async_graphql::Result<PaginatedGQL<ProjectGQL>> {
         let user = find_authenticated_user(ctx).await?;
         let allowed_servers = match user.kind {
@@ -103,7 +107,8 @@ impl QueryRoot {
             _ => None,
         };
 
-        let mut queries = queries::projects::ProjectQuery::new().with_current_user(user.into());
+        let mut queries =
+            queries::projects::ProjectQuery::new().with_current_user(user.clone().into());
         if let Some(ids) = ids {
             queries.set_ids(ids.into_iter().map(|id| *id).collect());
         };
@@ -120,6 +125,9 @@ impl QueryRoot {
         }
         if let Some(allowed_servers) = allowed_servers {
             queries.set_allowed_servers(allowed_servers);
+        }
+        if unpaged && user.kind != showtimes_db::m::UserKind::User {
+            queries.set_unpaged();
         }
 
         let results = queries::projects::query_projects_paginated(ctx, queries).await?;
@@ -161,6 +169,26 @@ impl QueryRoot {
         let results = queries::users::query_users_paginated(ctx, queries).await?;
 
         Ok(results)
+    }
+
+    /// Get server statistics
+    #[graphql(guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)")]
+    async fn stats(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "Specify server ID to query")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<StatsGQL> {
+        let user = find_authenticated_user(ctx).await?;
+
+        let projector = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
+        let result = projector
+            .load_one(ServerAndOwnerId::new(*id, user.id))
+            .await?;
+
+        match result {
+            Some(server) => Ok(StatsGQL::new(server)),
+            None => Err("Server not found".into()),
+        }
     }
 
     /// Do a external searvice metadata search

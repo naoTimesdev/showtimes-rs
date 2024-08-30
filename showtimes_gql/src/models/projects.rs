@@ -72,7 +72,7 @@ impl Ord for RoleGQL {
 }
 
 /// The status of an episode for a role on the project
-#[derive(SimpleObject)]
+#[derive(SimpleObject, Clone)]
 pub struct RoleStatusGQL {
     /// The role information
     role: RoleGQL,
@@ -131,7 +131,7 @@ impl RoleAssigneeGQL {
 }
 
 /// An episode or chapter or progress in a project
-#[derive(SimpleObject)]
+#[derive(SimpleObject, Clone)]
 #[graphql(rename_fields = "camelCase")]
 pub struct ProjectProgressGQL {
     /// The episode or chapter number.
@@ -182,7 +182,21 @@ impl ProjectGQL {
     }
 
     /// The project progress, this can fails if the roles are not found
-    async fn progress(&self) -> async_graphql::Result<Vec<ProjectProgressGQL>> {
+    async fn progress(
+        &self,
+        #[graphql(
+            name = "limitLatest",
+            desc = "Get X latest of episode to be returned in status. If not provided all will be returned.",
+            validator(minimum = 1, maximum = 10)
+        )]
+        limit_latest: Option<u32>,
+        #[graphql(
+            name = "returnLast",
+            desc = "Always return the last episode when there is no progress left. Used in combination with `limitLatest`.",
+            default = true
+        )]
+        return_last: bool,
+    ) -> async_graphql::Result<Vec<ProjectProgressGQL>> {
         let mut progress = vec![];
 
         for p in &self.progress {
@@ -191,7 +205,35 @@ impl ProjectGQL {
 
         progress.sort_by(|a, b| a.number.cmp(&b.number));
 
-        Ok(progress)
+        let actual_progress: Vec<ProjectProgressGQL> = if let Some(limit) = limit_latest {
+            // Shift amount to the right
+            let unreleased_idx = progress.iter().position(|p| !p.finished);
+
+            match unreleased_idx {
+                Some(idx) => {
+                    let end_idx = idx + limit as usize;
+                    let results = progress[idx..end_idx].to_vec();
+
+                    if return_last && results.is_empty() {
+                        vec![progress.last().unwrap().clone()]
+                    } else {
+                        results
+                    }
+                }
+                None => {
+                    if return_last {
+                        // Return the last one
+                        vec![progress.last().unwrap().clone()]
+                    } else {
+                        vec![]
+                    }
+                }
+            }
+        } else {
+            progress
+        };
+
+        Ok(actual_progress)
     }
 
     /// The project assignees or people that are working on it
@@ -270,8 +312,8 @@ impl ProjectProgressGQL {
     ) -> Result<Self, String> {
         let mut statuses = vec![];
 
-        // XXX: We need to do this manually because we need to propagate the error
-        // XXX: Also `.try_collect()` is still nightly only :pensive:
+        // XXX: We need to do this manually because we need to propagate the error.
+        // XXX: Since `.try_collect()` is still nightly only :pensive:
         for status in &progress.statuses {
             let role = get_role(&roles, status.key())?;
             statuses.push(RoleStatusGQL::with_role(role, status.finished()));

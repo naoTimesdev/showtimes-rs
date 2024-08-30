@@ -50,6 +50,7 @@ impl From<&showtimes_shared::ulid::Ulid> for UlidGQL {
 }
 
 /// A wrapper around DateTime<Utc> to allow it to be used in GraphQL
+#[derive(Clone)]
 pub struct DateTimeGQL(
     /// A datetime timestamp format in UTC timezone, follows RFC3339 format
     chrono::DateTime<chrono::Utc>,

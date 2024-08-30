@@ -5,7 +5,10 @@ use async_graphql::{
     Context, FieldError,
 };
 use futures::TryStreamExt;
-use showtimes_db::{mongodb::bson::doc, DatabaseShared};
+use showtimes_db::{
+    mongodb::bson::{doc, Document},
+    DatabaseShared,
+};
 use showtimes_session::ShowtimesUserSession;
 use showtimes_shared::ulid::Ulid;
 
@@ -209,6 +212,44 @@ impl Loader<ProjectDataLoaderKey> for ProjectDataLoader {
     }
 }
 
+impl Loader<ServerOwnerId> for ProjectDataLoader {
+    type Error = FieldError;
+    type Value = Vec<showtimes_db::m::Project>;
+
+    async fn load(
+        &self,
+        keys: &[ServerOwnerId],
+    ) -> Result<HashMap<ServerOwnerId, Self::Value>, Self::Error> {
+        let keys_to_string = keys.iter().map(|k| (*k).to_string()).collect::<Vec<_>>();
+        let result = self
+            .col
+            .get_collection()
+            .find(doc! {
+                "creator": { "$in": keys_to_string }
+            })
+            .limit(keys.len() as i64)
+            .await?;
+
+        let all_results = result
+            .try_collect::<Vec<showtimes_db::m::Project>>()
+            .await?;
+        let mapped_res: HashMap<ServerOwnerId, Vec<showtimes_db::m::Project>> = keys
+            .iter()
+            .map(|k| {
+                let res = all_results
+                    .iter()
+                    .filter(|u| u.creator == **k)
+                    .cloned()
+                    .collect();
+
+                (k.clone(), res)
+            })
+            .collect();
+
+        Ok(mapped_res)
+    }
+}
+
 /// A simple owner data loader
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerOwnerId(Ulid);
@@ -225,6 +266,20 @@ impl Deref for ServerOwnerId {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+/// A simple server and owner ID data loader
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ServerAndOwnerId {
+    server: Ulid,
+    owner: Ulid,
+}
+
+impl ServerAndOwnerId {
+    /// Initialize a new server and owner ID
+    pub fn new(server: Ulid, owner: Ulid) -> Self {
+        Self { server, owner }
     }
 }
 
@@ -293,6 +348,49 @@ impl Loader<ServerOwnerId> for ServerDataLoader {
                     .collect();
 
                 (k.clone(), res)
+            })
+            .collect();
+
+        Ok(mapped_res)
+    }
+}
+
+impl Loader<ServerAndOwnerId> for ServerDataLoader {
+    type Value = showtimes_db::m::Server;
+    type Error = FieldError;
+
+    async fn load(
+        &self,
+        keys: &[ServerAndOwnerId],
+    ) -> Result<HashMap<ServerAndOwnerId, Self::Value>, Self::Error> {
+        let all_keys_mappings: Vec<Document> = keys
+            .iter()
+            .map(|k| {
+                doc! {
+                    "id": k.server.to_string(),
+                    "owners.id": k.owner.to_string()
+                }
+            })
+            .collect();
+
+        let result = self
+            .col
+            .get_collection()
+            .find(doc! {
+                "$or": all_keys_mappings
+            })
+            .limit(keys.len() as i64)
+            .await?;
+
+        let all_results = result.try_collect::<Vec<showtimes_db::m::Server>>().await?;
+        let mapped_res: HashMap<ServerAndOwnerId, showtimes_db::m::Server> = keys
+            .iter()
+            .filter_map(|k| {
+                let res = all_results
+                    .iter()
+                    .find(|u| u.id == k.server && u.owners.iter().any(|o| o.id == k.owner));
+
+                res.map(|r| (k.clone(), r.clone()))
             })
             .collect();
 
