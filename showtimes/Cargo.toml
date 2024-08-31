@@ -21,6 +21,7 @@ anyhow.workspace = true
 # Web server
 axum.workspace = true
 axum-extra = { version = "0.9.3", features = ["async-read-body"] }
+socket2 = { version = "0.5.7", features = ["all"] }
 futures.workspace = true
 async-graphql-axum.workspace = true
 tracing.workspace = true

@@ -1,10 +1,11 @@
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::{response::IntoResponse, routing::get, Router};
 use routes::graphql::GRAPHQL_ROUTE;
 use serde_json::json;
 use showtimes_fs::s3::{S3FsCredentialsProvider, S3FsRegionProvider};
 use showtimes_shared::Config;
+use socket2::{Domain, Socket, Type};
 use tokio::{net::TcpListener, sync::Mutex};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -161,12 +162,11 @@ async fn entrypoint() -> anyhow::Result<()> {
         .layer(CorsLayer::new().allow_origin(tower_http::cors::Any))
         .with_state(state);
 
-    let listener = TcpListener::bind(format!(
-        "{}:{}",
+    let listener = create_tcp_listener(
         config.host.clone().unwrap_or("127.0.0.1".to_string()),
-        config.port.unwrap_or(5560)
-    ))
-    .await?;
+        config.port.unwrap_or(5560),
+    )?;
+
     tracing::info!("🌍 Fast serving at http://{}", listener.local_addr()?);
     tracing::info!(
         "🌍 GraphQL playground: http://{}{}",
@@ -211,4 +211,27 @@ async fn shutdown_signal() {
             tracing::info!("Received SIGTERM, shutting down...");
         }
     }
+}
+
+/// Create a TCP listener with proper socket setup.
+///
+/// On Unix, it will enable `SO_REUSEPORT` and `SO_REUSEADDR`.
+///
+/// On Windows, it will only enable `SO_REUSEADDR`.
+///
+/// Both of this use `1024` as the maximum number of pending connections.
+fn create_tcp_listener(host: impl Into<String>, port: u16) -> anyhow::Result<TcpListener> {
+    let address: SocketAddr = format!("{}:{}", host.into(), port).parse()?;
+    let socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
+    socket.bind(&address.into())?;
+    socket.set_reuse_address(true)?;
+    // In Unix, also enable SO_REUSEPORT
+    #[cfg(unix)]
+    {
+        socket.set_reuse_port(true)?;
+    }
+    socket.listen(1024)?;
+    let std_tcp: std::net::TcpListener = socket.into();
+    let tokio_tcp = TcpListener::from_std(std_tcp)?;
+    Ok(tokio_tcp)
 }
