@@ -326,10 +326,11 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
             /// Arguments:
             /// - `client`: The MeiliSearch client
             pub async fn update_document(&self, client: &std::sync::Arc<tokio::sync::Mutex<meilisearch_sdk::client::Client>>) -> Result<(), meilisearch_sdk::errors::Error> {
+                let index = #name::get_index(client).await?;
                 let client_ref = client.lock().await;
                 tracing::debug!("Updating document in index: {}", #model_attr_name);
-                let index = #name::get_index(client).await?;
                 let task = index.add_or_update(&[self.clone()], Some(#name::primary_key())).await?;
+                tracing::debug!("Waiting for document update of {:?} in \"{}\" to complete...", &self, #model_attr_name);
                 task.wait_for_completion(client_ref.deref(), None, None).await?;
                 Ok(())
             }

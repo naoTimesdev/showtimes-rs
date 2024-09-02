@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::sync::Arc;
 
 use axum::{response::IntoResponse, routing::get, Router};
 use routes::graphql::GRAPHQL_ROUTE;

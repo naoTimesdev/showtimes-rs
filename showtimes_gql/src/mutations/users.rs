@@ -97,6 +97,11 @@ pub async fn mutate_users_update(
         return Err(Error::new("Owner cannot be updated"));
     }
 
+    if user.requester.kind == UserKind::User && user_info.id != user.requester.id {
+        // Fails, User cannot be updated by another user
+        return Err(Error::new("User cannot be updated by another user"));
+    }
+
     let proceed_user_kind = match (user_info.kind, input.kind) {
         // Disallow User -> Admin
         (UserKind::User, Some(UserKindGQL::Admin)) => {
