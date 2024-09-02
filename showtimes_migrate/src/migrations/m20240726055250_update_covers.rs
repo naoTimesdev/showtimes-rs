@@ -43,10 +43,7 @@ impl Migration for M20240726055250UpdateCovers {
 
         tracing::info!("Creating Meilisearch client instances...");
         let meilisearch = showtimes_search::create_connection(&meili_url, &meili_key).await?;
-        let s_project_index = meilisearch
-            .lock()
-            .await
-            .index(showtimes_search::models::Project::index_name());
+        let s_project_index = meilisearch.index(showtimes_search::models::Project::index_name());
         let s_project_pk = showtimes_search::models::Project::primary_key();
 
         tracing::info!("Setting up filesystem...");

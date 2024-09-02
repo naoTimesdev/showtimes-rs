@@ -111,7 +111,7 @@ pub async fn run_migration_down(handler: &MigrationHandler, migration: Box<dyn M
     }
 }
 
-async fn meili_create_index(client: &showtimes_search::ClientMutex) -> anyhow::Result<()> {
+async fn meili_create_index(client: &showtimes_search::SearchClientShared) -> anyhow::Result<()> {
     tracing::info!("Creating or getting Meilisearch indexes...");
     // This will create the index if it doesn't exist
     showtimes_search::models::Project::get_index(client).await?;
@@ -123,7 +123,7 @@ async fn meili_create_index(client: &showtimes_search::ClientMutex) -> anyhow::R
     Ok(())
 }
 
-async fn meili_fixup_index(client: &showtimes_search::ClientMutex) -> anyhow::Result<()> {
+async fn meili_fixup_index(client: &showtimes_search::SearchClientShared) -> anyhow::Result<()> {
     tracing::info!("Fixing Meilisearch indexes schemas...");
     showtimes_search::models::Project::update_schema(client).await?;
     showtimes_search::models::Server::update_schema(client).await?;
@@ -157,8 +157,6 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
 
     meili_create_index(&client).await?;
 
-    let client_lock = client.lock().await;
-
     // Reindex all models
     tracing::info!("Reindexing all models...");
 
@@ -172,7 +170,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
         .collect::<Vec<_>>();
 
     tracing::info!(" Committing users to Meilisearch...");
-    let m_user_commit = client_lock
+    let m_user_commit = client
         .index(showtimes_search::models::User::index_name())
         .add_or_replace(
             &mapped_users,
@@ -184,7 +182,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
         &m_user_commit.task_uid
     );
     m_user_commit
-        .wait_for_completion(&*client_lock, None, None)
+        .wait_for_completion(&*client, None, None)
         .await?;
 
     tracing::info!("Reindexing servers...");
@@ -197,7 +195,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
         .collect::<Vec<_>>();
 
     tracing::info!(" Committing servers to Meilisearch...");
-    let m_server_commit = client_lock
+    let m_server_commit = client
         .index(showtimes_search::models::Server::index_name())
         .add_or_replace(
             &mapped_servers,
@@ -209,7 +207,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
         &m_server_commit.task_uid
     );
     m_server_commit
-        .wait_for_completion(&*client_lock, None, None)
+        .wait_for_completion(&*client, None, None)
         .await?;
 
     tracing::info!("Reindexing projects...");
@@ -222,7 +220,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
         .collect::<Vec<_>>();
 
     tracing::info!(" Committing projects to Meilisearch...");
-    let m_project_commit = client_lock
+    let m_project_commit = client
         .index(showtimes_search::models::Project::index_name())
         .add_or_replace(
             &mapped_projects,
@@ -234,7 +232,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
         &m_project_commit.task_uid
     );
     m_project_commit
-        .wait_for_completion(&*client_lock, None, None)
+        .wait_for_completion(&*client, None, None)
         .await?;
 
     tracing::info!("Reindexing server collab syncs...");
@@ -248,7 +246,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
             .collect::<Vec<_>>();
 
     tracing::info!(" Committing server collab syncs to Meilisearch...");
-    let m_server_collab_sync_commit = client_lock
+    let m_server_collab_sync_commit = client
         .index(showtimes_search::models::ServerCollabSync::index_name())
         .add_or_replace(
             &mapped_server_collab_syncs,
@@ -260,7 +258,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
         &m_server_collab_sync_commit.task_uid
     );
     m_server_collab_sync_commit
-        .wait_for_completion(&*client_lock, None, None)
+        .wait_for_completion(&*client, None, None)
         .await?;
 
     tracing::info!("Reindexing server collab invites...");
@@ -274,7 +272,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
             .collect::<Vec<_>>();
 
     tracing::info!(" Committing server collab invites to Meilisearch...");
-    let m_server_collab_invite_commit = client_lock
+    let m_server_collab_invite_commit = client
         .index(showtimes_search::models::ServerCollabInvite::index_name())
         .add_or_replace(
             &mapped_server_collab_invites,
@@ -286,7 +284,7 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
         &m_server_collab_invite_commit.task_uid
     );
     m_server_collab_invite_commit
-        .wait_for_completion(&*client_lock, None, None)
+        .wait_for_completion(&*client, None, None)
         .await?;
 
     tracing::info!("All models reindexed");

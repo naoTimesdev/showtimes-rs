@@ -51,15 +51,9 @@ impl Migration for M20240821113204FallbackImagesInvalids {
 
         tracing::info!("Creating Meilisearch client instances...");
         let meilisearch = showtimes_search::create_connection(&meili_url, &meili_key).await?;
-        let s_server_index = meilisearch
-            .lock()
-            .await
-            .index(showtimes_search::models::Server::index_name());
+        let s_server_index = meilisearch.index(showtimes_search::models::Server::index_name());
         let s_server_pk = showtimes_search::models::Server::primary_key();
-        let s_user_index = meilisearch
-            .lock()
-            .await
-            .index(showtimes_search::models::User::index_name());
+        let s_user_index = meilisearch.index(showtimes_search::models::User::index_name());
         let s_user_pk = showtimes_search::models::User::primary_key();
 
         tracing::info!("Setting up filesystem...");

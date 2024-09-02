@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_graphql::{dataloader::DataLoader, Error, ErrorExtensions, InputObject, Upload};
 use showtimes_db::{m::UserKind, DatabaseShared, UserHandler};
 use showtimes_fs::FsPool;
-use showtimes_search::ClientMutex;
+use showtimes_search::SearchClientShared;
 use tokio::io::AsyncSeekExt;
 
 use crate::{
@@ -80,7 +80,7 @@ pub async fn mutate_users_update(
     let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
     let db = ctx.data_unchecked::<DatabaseShared>();
     let storages = ctx.data_unchecked::<Arc<FsPool>>();
-    let meili = ctx.data_unchecked::<ClientMutex>();
+    let meili = ctx.data_unchecked::<SearchClientShared>();
 
     let user_info = match user.id {
         Some(id) => loader.load_one(id).await?.ok_or_else(|| {

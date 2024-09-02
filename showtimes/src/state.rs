@@ -12,7 +12,7 @@ pub struct ShowtimesState {
     /// Storage handler
     pub storage: StorageShared,
     /// Meilisearch handler
-    pub meili: showtimes_search::ClientMutex,
+    pub meili: showtimes_search::SearchClientShared,
     /// Configuration
     pub config: Arc<showtimes_shared::Config>,
     /// The GraphQL request schema

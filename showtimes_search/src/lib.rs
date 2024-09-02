@@ -1,11 +1,11 @@
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 use meilisearch_sdk::client::Client;
 
 pub mod models;
 
-pub type ClientMutex = Arc<Mutex<Client>>;
+/// The shared MeiliSearch client
+pub type SearchClientShared = Arc<Client>;
 
 /// Create a connection to the MeiliSearch server
 ///
@@ -15,12 +15,12 @@ pub type ClientMutex = Arc<Mutex<Client>>;
 pub async fn create_connection(
     url: &str,
     api_key: &str,
-) -> Result<ClientMutex, meilisearch_sdk::errors::Error> {
+) -> Result<SearchClientShared, meilisearch_sdk::errors::Error> {
     let client = Client::new(url, Some(api_key))?;
 
     // Test the connection
     client.get_version().await?;
 
     // It works! Return the client with Arc<Mutex<T>>
-    Ok(Arc::new(Mutex::new(client)))
+    Ok(Arc::new(client))
 }

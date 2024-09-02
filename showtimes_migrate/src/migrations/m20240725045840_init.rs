@@ -283,10 +283,7 @@ impl Migration for M20240725045840Init {
         }
 
         tracing::info!("Comitting all users into search index...");
-        let m_user_index = meilisearch
-            .lock()
-            .await
-            .index(showtimes_search::models::User::index_name());
+        let m_user_index = meilisearch.index(showtimes_search::models::User::index_name());
         let m_users_docs: Vec<showtimes_search::models::User> =
             users.iter().map(|user| user.clone().into()).collect();
         let m_use_commit = m_user_index
@@ -297,14 +294,11 @@ impl Migration for M20240725045840Init {
             .await?;
         tracing::info!("Waiting for users search index to be completely committed...");
         m_use_commit
-            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .wait_for_completion(&*meilisearch, None, None)
             .await?;
 
         tracing::info!("Comitting all servers into search index...");
-        let m_server_index = meilisearch
-            .lock()
-            .await
-            .index(showtimes_search::models::Server::index_name());
+        let m_server_index = meilisearch.index(showtimes_search::models::Server::index_name());
         let m_server_docs: Vec<showtimes_search::models::Server> = mapped_servers
             .iter()
             .map(|server| server.clone().into())
@@ -317,14 +311,11 @@ impl Migration for M20240725045840Init {
             .await?;
         tracing::info!("Waiting for server search index to be completely committed...");
         m_server_commit
-            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .wait_for_completion(&*meilisearch, None, None)
             .await?;
 
         tracing::info!("Comitting all projects into search index...");
-        let m_project_index = meilisearch
-            .lock()
-            .await
-            .index(showtimes_search::models::Project::index_name());
+        let m_project_index = meilisearch.index(showtimes_search::models::Project::index_name());
         let m_project_docs: Vec<showtimes_search::models::Project> = transformed_projects
             .iter()
             .map(|project| project.clone().into())
@@ -337,14 +328,12 @@ impl Migration for M20240725045840Init {
             .await?;
         tracing::info!("Waiting for project search index to be completely committed...");
         m_project_commit
-            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .wait_for_completion(&*meilisearch, None, None)
             .await?;
 
         tracing::info!("Comitting all server collaborations into search index...");
-        let m_collab_index = meilisearch
-            .lock()
-            .await
-            .index(showtimes_search::models::ServerCollabSync::index_name());
+        let m_collab_index =
+            meilisearch.index(showtimes_search::models::ServerCollabSync::index_name());
         let m_collab_docs: Vec<showtimes_search::models::ServerCollabSync> =
             transformed_collab_sync
                 .iter()
@@ -360,14 +349,12 @@ impl Migration for M20240725045840Init {
             "Waiting for server collaboration search index to be completely committed..."
         );
         m_collab_commit
-            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .wait_for_completion(&*meilisearch, None, None)
             .await?;
 
         tracing::info!("Comitting all server collab invites into search index...");
-        let m_invite_index = meilisearch
-            .lock()
-            .await
-            .index(showtimes_search::models::ServerCollabInvite::index_name());
+        let m_invite_index =
+            meilisearch.index(showtimes_search::models::ServerCollabInvite::index_name());
         let m_invite_docs: Vec<showtimes_search::models::ServerCollabInvite> = transformed_invites
             .iter()
             .map(|invite| invite.clone().into())
@@ -382,7 +369,7 @@ impl Migration for M20240725045840Init {
             "Waiting for server collab invite search index to be completely committed..."
         );
         m_invite_commit
-            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .wait_for_completion(&*meilisearch, None, None)
             .await?;
 
         M20240725045840Init::setup_meilisearch_index(&meilisearch).await?;
@@ -423,72 +410,59 @@ impl Migration for M20240725045840Init {
 
         // Remove projects from the search index
         tracing::info!("Dropping projects search index...");
-        let m_project_index = meilisearch
-            .lock()
-            .await
-            .index(showtimes_search::models::Project::index_name());
+        let m_project_index = meilisearch.index(showtimes_search::models::Project::index_name());
         let m_project_cm = m_project_index.delete_all_documents().await?;
         tracing::info!(" Waiting for projects search index to be completely deleted...");
         m_project_cm
-            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .wait_for_completion(&*meilisearch, None, None)
             .await?;
         tracing::info!("Projects search index has been deleted");
 
         // Remove servers from the search index
         tracing::info!("Dropping servers search index...");
-        let m_server_index = meilisearch
-            .lock()
-            .await
-            .index(showtimes_search::models::Server::index_name());
+        let m_server_index = meilisearch.index(showtimes_search::models::Server::index_name());
         let m_server_cm = m_server_index.delete_all_documents().await?;
         tracing::info!(" Waiting for servers search index to be completely deleted...");
         m_server_cm
-            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .wait_for_completion(&*meilisearch, None, None)
             .await?;
         tracing::info!("Servers search index has been deleted");
 
         // Remove users from the search index
         tracing::info!("Dropping users search index...");
-        let m_user_index = meilisearch
-            .lock()
-            .await
-            .index(showtimes_search::models::User::index_name());
+        let m_user_index = meilisearch.index(showtimes_search::models::User::index_name());
 
         let m_user_cm = m_user_index.delete_all_documents().await?;
         tracing::info!(" Waiting for users search index to be completely deleted...");
         m_user_cm
-            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .wait_for_completion(&*meilisearch, None, None)
             .await?;
         tracing::info!("Users search index has been deleted");
 
         // Remove server collaborations from the search index
         tracing::info!("Dropping server collaborations search index...");
-        let m_collab_index = meilisearch
-            .lock()
-            .await
-            .index(showtimes_search::models::ServerCollabSync::index_name());
+        let m_collab_index =
+            meilisearch.index(showtimes_search::models::ServerCollabSync::index_name());
 
         let m_collab_cm = m_collab_index.delete_all_documents().await?;
         tracing::info!(
             " Waiting for server collaborations search index to be completely deleted..."
         );
         m_collab_cm
-            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .wait_for_completion(&*meilisearch, None, None)
             .await?;
 
         // Remove server collab invites from the search index
         tracing::info!("Dropping server collab invites search index...");
-        let m_invite_index = meilisearch
-            .lock()
-            .await
-            .index(showtimes_search::models::ServerCollabInvite::index_name());
+        let m_invite_index =
+            meilisearch.index(showtimes_search::models::ServerCollabInvite::index_name());
 
         let m_invite_cm = m_invite_index.delete_all_documents().await?;
         tracing::info!(
             " Waiting for server collab invites search index to be completely deleted..."
         );
         m_invite_cm
-            .wait_for_completion(&*meilisearch.lock().await, None, None)
+            .wait_for_completion(&*meilisearch, None, None)
             .await?;
 
         Ok(())
@@ -503,7 +477,7 @@ impl M20240725045840Init {
     async fn setup_meilisearch(
         meili_url: &str,
         meili_key: &str,
-    ) -> anyhow::Result<showtimes_search::ClientMutex> {
+    ) -> anyhow::Result<showtimes_search::SearchClientShared> {
         tracing::info!("Creating Meilisearch client instances...");
         let client = showtimes_search::create_connection(meili_url, meili_key).await?;
 
@@ -518,7 +492,9 @@ impl M20240725045840Init {
         Ok(client)
     }
 
-    async fn setup_meilisearch_index(client: &showtimes_search::ClientMutex) -> anyhow::Result<()> {
+    async fn setup_meilisearch_index(
+        client: &showtimes_search::SearchClientShared,
+    ) -> anyhow::Result<()> {
         tracing::info!("Updating Meilisearch indexes schema information...");
         showtimes_search::models::Project::update_schema(client).await?;
         showtimes_search::models::Server::update_schema(client).await?;
