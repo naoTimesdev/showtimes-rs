@@ -155,7 +155,7 @@ pub async fn mutate_users_update(
 
         let filename = format!("avatar.{}", format.as_extension());
 
-        let result = storages
+        storages
             .file_stream_upload(
                 user_info.id.to_string(),
                 &filename,
@@ -168,7 +168,7 @@ pub async fn mutate_users_update(
         let image_meta = showtimes_db::m::ImageMetadata::new(
             showtimes_fs::FsFileKind::Images.as_path_name(),
             user_info.id,
-            &result.filename,
+            &filename,
             format.as_extension(),
             None::<String>,
         );
