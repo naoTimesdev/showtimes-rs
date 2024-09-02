@@ -3722,7 +3722,6 @@ dependencies = [
  "showtimes-search",
  "showtimes-session",
  "showtimes-shared",
- "socket2",
  "tokio",
  "toml",
  "tower-http",
