@@ -100,7 +100,7 @@ pub async fn query_servers_paginated(
 
     let mut doc_query = match (queries.cursor, &queries.ids) {
         (Some(cursor), Some(ids)) => {
-            let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
+            let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
             doc! {
                 "id": { "$gte": cursor.to_string(), "$in": ids }
             }
@@ -111,7 +111,7 @@ pub async fn query_servers_paginated(
             }
         }
         (None, Some(ids)) => {
-            let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
+            let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
             doc! {
                 "id": { "$in": ids }
             }
@@ -120,7 +120,7 @@ pub async fn query_servers_paginated(
     };
     let mut count_query = match &queries.ids {
         Some(ids) => {
-            let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
+            let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
             doc! {
                 "id": { "$in": ids }
             }

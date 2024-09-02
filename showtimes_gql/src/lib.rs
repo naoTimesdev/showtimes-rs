@@ -18,7 +18,9 @@ use std::sync::Arc;
 
 mod data_loader;
 mod guard;
+mod image;
 mod models;
+mod mutations;
 mod queries;
 
 pub type ShowtimesGQLSchema = async_graphql::Schema<QueryRoot, MutationRoot, EmptySubscription>;
@@ -100,9 +102,7 @@ impl QueryRoot {
             showtimes_db::m::UserKind::User => {
                 let projector = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
 
-                let servers = projector.load_one(ServerOwnerId::new(user.id)).await?;
-
-                servers
+                projector.load_one(ServerOwnerId::new(user.id)).await?
             }
             _ => None,
         };
@@ -187,10 +187,7 @@ impl QueryRoot {
                     .load_one(ServerAndOwnerId::new(*id, user.id))
                     .await?
             }
-            _ => {
-                let server = projector.load_one(*id).await?;
-                server
-            }
+            _ => projector.load_one(*id).await?,
         };
 
         match result {
@@ -325,6 +322,28 @@ impl MutationRoot {
                 Ok(UserSessionGQL::new(user, oauth_token))
             }
         }
+    }
+
+    /// Update user information
+    #[graphql(
+        name = "updateUser",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)"
+    )]
+    async fn update_user(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The user ID to update, when NOT provided will use the current user")] id: Option<crate::models::prelude::UlidGQL>,
+        #[graphql(desc = "The user information to update")] input: mutations::users::UserInputGQL,
+    ) -> async_graphql::Result<UserGQL> {
+        let user = find_authenticated_user(ctx).await?;
+        let requested = mutations::users::UserRequester::new(user);
+        let requested = if let Some(id) = id {
+            requested.with_id(*id)
+        } else {
+            requested
+        };
+
+        mutations::users::mutate_users_update(ctx, requested, input).await
     }
 }
 

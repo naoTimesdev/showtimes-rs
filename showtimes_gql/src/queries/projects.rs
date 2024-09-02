@@ -170,9 +170,11 @@ pub async fn query_projects_paginated(
             // If provided with allowed servers, then filter out the projects that are not in the list
             let mut user_methods: HashMap<Ulid, showtimes_db::m::ServerUser> = servers
                 .iter()
-                .filter_map(|s| match s.owners.iter().find(|&o| o.id == user_info.id) {
-                    Some(owner) => Some((s.id, owner.clone())),
-                    None => None,
+                .filter_map(|s| {
+                    s.owners
+                        .iter()
+                        .find(|&o| o.id == user_info.id)
+                        .map(|o| (s.id, o.clone()))
                 })
                 .collect();
 
@@ -193,7 +195,7 @@ pub async fn query_projects_paginated(
                             Some(ids) => {
                                 // remove the extras that is not in IDs
                                 let req_ids: Vec<String> =
-                                    ids.into_iter().map(|id| id.to_string()).collect();
+                                    ids.iter().map(|id| id.to_string()).collect();
                                 let extras: Vec<String> = m
                                     .extras
                                     .iter()
@@ -216,7 +218,7 @@ pub async fn query_projects_paginated(
                         match &queries.ids {
                             Some(ids) => {
                                 let ids: Vec<String> =
-                                    ids.into_iter().map(|id| id.to_string()).collect();
+                                    ids.iter().map(|id| id.to_string()).collect();
                                 doc! {
                                     "creator": s.to_string(),
                                     "id": { "$in": ids }

@@ -5,7 +5,19 @@ use showtimes_shared::{generate_uuid, ulid_serializer};
 use super::{ImageMetadata, ShowModelHandler};
 
 /// Enum to hold user kinds
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Serialize,
+    Deserialize,
+    Default,
+    PartialEq,
+    PartialOrd,
+    Eq,
+    Ord,
+    tosho_macros::EnumName,
+)]
 pub enum UserKind {
     /// A normal user
     #[default]

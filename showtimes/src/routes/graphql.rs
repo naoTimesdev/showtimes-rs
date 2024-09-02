@@ -67,6 +67,7 @@ pub async fn graphql_handler(
     req = req.data(discord_client.clone());
     req = req.data(state.meili.clone());
     req = req.data(state.session.clone());
+    req = req.data(state.storage.clone());
     req = req.data(state.anilist_provider.clone());
     if let Some(tmdb_provider) = state.tmdb_provider.as_ref() {
         req = req.data(tmdb_provider.clone());

@@ -19,6 +19,7 @@ tracing.workspace = true
 futures.workspace = true
 
 async-graphql.workspace = true
+image = { version = "0.25.2", default-features = false, features = ["jpeg", "png", "webp", "gif", "avif"] }
 
 # Showtimes related
 showtimes-shared = { path = "../showtimes_shared" }
@@ -27,3 +28,4 @@ showtimes-fs = { path = "../showtimes_fs" }
 showtimes-metadata = { path = "../showtimes_metadata" }
 showtimes-search = { path = "../showtimes_search" }
 showtimes-session = { path = "../showtimes_session" }
+tosho-macros.workspace = true

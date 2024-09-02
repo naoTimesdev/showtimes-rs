@@ -183,12 +183,13 @@ impl FsImpl for S3Fs {
 
     async fn file_stat(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<FsFileObject> {
-        let key = make_file_path(base_key, filename, parent_id, kind);
+        let filename: String = filename.into();
+        let key = make_file_path(&base_key.into(), &filename, parent_id, kind.clone());
         let client = self.client.lock().await;
         tracing::debug!("Checking file stat for: {}", &key);
         let object = client
@@ -239,12 +240,12 @@ impl FsImpl for S3Fs {
 
     async fn file_exists(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<bool> {
-        let key = make_file_path(base_key, filename, parent_id, kind);
+        let key = make_file_path(&base_key.into(), &filename.into(), parent_id, kind.clone());
         let client = self.client.lock().await;
         tracing::debug!("Checking file existence for: {}", &key);
         let object = client
@@ -259,17 +260,19 @@ impl FsImpl for S3Fs {
 
     async fn file_stream_upload<R: AsyncReadExt + Unpin + Send>(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         stream: &mut R,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<FsFileObject> {
-        let key = make_file_path(base_key, filename, parent_id, kind.clone());
+        let base_key: String = base_key.into();
+        let filename: String = filename.into();
+        let key = make_file_path(&base_key, &filename, parent_id, kind.clone());
         let client = self.client.lock().await;
         // Create a temporary writer since AWS SDK s3 FUCKING SUCKS!
         tracing::debug!("Initializing file upload to: {}", &key);
-        let guessed = mime_guess::from_path(filename);
+        let guessed = mime_guess::from_path(&filename);
         let content_type = guessed.first_or_octet_stream().to_string();
 
         let mut target = CustomS3Writer::new();
@@ -295,13 +298,13 @@ impl FsImpl for S3Fs {
 
     async fn file_stream_download<W: AsyncWriteExt + Unpin + Send>(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         writer: &mut W,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()> {
-        let key = make_file_path(base_key, filename, parent_id, kind);
+        let key = make_file_path(&base_key.into(), &filename.into(), parent_id, kind.clone());
         let client = self.client.lock().await;
         tracing::debug!("Initializing file download for: {}", &key);
         let mut resp = client
@@ -342,12 +345,12 @@ impl FsImpl for S3Fs {
 
     async fn file_delete(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()> {
-        let key = make_file_path(base_key, filename, parent_id, kind);
+        let key = make_file_path(&base_key.into(), &filename.into(), parent_id, kind.clone());
         let client = self.client.lock().await;
         tracing::debug!("Deleting file: {}", &key);
         client
@@ -362,12 +365,12 @@ impl FsImpl for S3Fs {
 
     async fn directory_delete(
         &self,
-        base_key: &str,
+        base_key: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()> {
         let client = self.client.lock().await;
-        let prefix = make_file_path(base_key, "", parent_id, kind);
+        let prefix = make_file_path(&base_key.into(), "", parent_id, kind);
 
         tracing::debug!("Collecting objects with prefix: {}", &prefix);
         let mut pages = client

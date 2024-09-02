@@ -5,7 +5,7 @@ use async_graphql::{Enum, Object, SimpleObject};
 use showtimes_db::mongodb::bson::doc;
 
 /// Enum to hold user kinds
-#[derive(Enum, Default, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Enum, Default, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, tosho_macros::EnumName)]
 #[graphql(remote = "showtimes_db::m::UserKind")]
 pub enum UserKindGQL {
     /// A normal user

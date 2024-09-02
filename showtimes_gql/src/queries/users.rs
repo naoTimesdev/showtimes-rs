@@ -87,7 +87,7 @@ pub async fn query_users_paginated(
 
     let doc_query = match (queries.cursor, &queries.ids) {
         (Some(cursor), Some(ids)) => {
-            let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
+            let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
             doc! {
                 "id": { "$gte": cursor.to_string(), "$in": ids }
             }
@@ -98,7 +98,7 @@ pub async fn query_users_paginated(
             }
         }
         (None, Some(ids)) => {
-            let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
+            let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
             doc! {
                 "id": { "$in": ids }
             }
@@ -108,7 +108,7 @@ pub async fn query_users_paginated(
 
     let count_query = match &queries.ids {
         Some(ids) => {
-            let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
+            let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
             doc! {
                 "id": { "$in": ids }
             }
@@ -144,7 +144,7 @@ pub async fn query_users_paginated(
             .map(|p| {
                 let usr_gql = UserGQL::from(p);
                 if let Some(user) = &queries.current_user {
-                    usr_gql.with_requester(user.clone())
+                    usr_gql.with_requester(*user)
                 } else {
                     usr_gql
                 }

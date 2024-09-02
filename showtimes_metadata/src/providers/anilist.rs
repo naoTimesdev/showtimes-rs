@@ -232,11 +232,10 @@ impl AnilistProvider {
 
         let res = self.query(queries, &variables).await?;
         let air_schedules = res.data.page.nodes.airing_schedules().unwrap();
-        let page_info = res.data.page.page_info.clone();
 
         Ok(AnilistAiringSchedulePaged {
             airing_schedules: air_schedules.clone(),
-            page_info,
+            page_info: res.data.page.page_info,
         })
     }
 }

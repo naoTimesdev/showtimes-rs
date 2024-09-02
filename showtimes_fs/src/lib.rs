@@ -61,24 +61,24 @@ pub trait FsImpl {
     /// Stat or get a file information in the filesystem.
     async fn file_stat(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<FsFileObject>;
     /// Check if a file exists in the filesystem.
     async fn file_exists(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<bool>;
     /// Upload a file to the filesystem.
     async fn file_stream_upload<R: AsyncReadExt + Unpin + Send>(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         stream: &mut R,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
@@ -86,8 +86,8 @@ pub trait FsImpl {
     /// Download a file from the filesystem.
     async fn file_stream_download<W: AsyncWriteExt + Unpin + Send>(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         writer: &mut W,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
@@ -95,15 +95,15 @@ pub trait FsImpl {
     /// Delete a file from the filesystem.
     async fn file_delete(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()>;
     /// Delete a directory from the filesystem.
     async fn directory_delete(
         &self,
-        base_key: &str,
+        base_key: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()>;
@@ -140,8 +140,8 @@ impl FsPool {
     /// Stat or get a file information in the filesystem.
     pub async fn file_stat(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<FsFileObject> {
@@ -153,8 +153,8 @@ impl FsPool {
     /// Check if a file exists in the filesystem.
     pub async fn file_exists(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<bool> {
@@ -166,8 +166,8 @@ impl FsPool {
     /// Upload a file to the filesystem.
     pub async fn file_stream_upload<R: AsyncReadExt + Unpin + Send>(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         stream: &mut R,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
@@ -186,8 +186,8 @@ impl FsPool {
     /// Download a file from the filesystem.
     pub async fn file_stream_download<W: AsyncWriteExt + Unpin + Send>(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         writer: &mut W,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
@@ -206,8 +206,8 @@ impl FsPool {
     /// Delete a file from the filesystem.
     pub async fn file_delete(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()> {

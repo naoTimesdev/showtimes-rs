@@ -30,7 +30,8 @@ pub enum ExternalSearchSource {
     Anilist,
     #[graphql(name = "TMDB")]
     TMDb,
-    VNDB,
+    #[graphql(name = "VNDB")]
+    Vndb,
 }
 
 /// A "fuzzy"-date, where we might not have all the information
@@ -182,7 +183,7 @@ impl ExternalSearch {
             release_date: rls_date,
             image: Some(media.image.url.clone()),
             episodes: None,
-            source: ExternalSearchSource::VNDB,
+            source: ExternalSearchSource::Vndb,
             // Bad metrics but it kinda works I guess?
             nsfw: media.image.is_nsfw(),
         }

@@ -41,12 +41,12 @@ impl FsImpl for LocalFs {
 
     async fn file_stat(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<FsFileObject> {
-        let key = make_file_path(base_key, filename, parent_id, kind);
+        let key = make_file_path(&base_key.into(), &filename.into(), parent_id, kind);
         let path = self.directory.join(&key);
 
         tracing::debug!("Checking file stat for: {}", &key);
@@ -74,12 +74,12 @@ impl FsImpl for LocalFs {
 
     async fn file_exists(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<bool> {
-        let key = make_file_path(base_key, filename, parent_id, kind);
+        let key = make_file_path(&base_key.into(), &filename.into(), parent_id, kind.clone());
         let path = self.directory.join(&key);
 
         tracing::debug!("Checking file existence for: {}", &key);
@@ -90,13 +90,15 @@ impl FsImpl for LocalFs {
 
     async fn file_stream_upload<R: AsyncRead + Unpin + Send>(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         stream: &mut R,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<FsFileObject> {
-        let key = make_file_path(base_key, filename, parent_id, kind.clone());
+        let base_key: String = base_key.into();
+        let filename: String = filename.into();
+        let key = make_file_path(&base_key, &filename, parent_id, kind.clone());
         let path = self.directory.join(&key);
 
         tracing::debug!("Sending file stream into: {}", &key);
@@ -108,13 +110,13 @@ impl FsImpl for LocalFs {
 
     async fn file_stream_download<W: AsyncWriteExt + Unpin + Send>(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         writer: &mut W,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()> {
-        let key = make_file_path(base_key, filename, parent_id, kind);
+        let key = make_file_path(&base_key.into(), &filename.into(), parent_id, kind.clone());
         let path = self.directory.join(&key);
 
         tracing::debug!("Downloading file stream for: {}", &key);
@@ -129,12 +131,12 @@ impl FsImpl for LocalFs {
 
     async fn file_delete(
         &self,
-        base_key: &str,
-        filename: &str,
+        base_key: impl Into<String> + std::marker::Send,
+        filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()> {
-        let key = make_file_path(base_key, filename, parent_id, kind);
+        let key = make_file_path(&base_key.into(), &filename.into(), parent_id, kind.clone());
         let path = self.directory.join(&key);
 
         tracing::debug!("Deleting file: {}", &key);
@@ -145,11 +147,11 @@ impl FsImpl for LocalFs {
 
     async fn directory_delete(
         &self,
-        base_key: &str,
+        base_key: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()> {
-        let key = make_file_path(base_key, "", parent_id, kind);
+        let key = make_file_path(&base_key.into(), "", parent_id, kind);
         let path = self.directory.join(&key);
 
         tracing::debug!("Deleting directory: {}", &key);

@@ -116,14 +116,16 @@ async fn entrypoint() -> anyhow::Result<()> {
 
     tracing::info!("🔌🐍 Loading external metadata services...");
     let anilist_provider = showtimes_metadata::AnilistProvider::new(true);
-    let tmdb_provider = match &config.external.tmdb {
-        Some(api_key) => Some(Arc::new(showtimes_metadata::TMDbProvider::new(api_key))),
-        None => None,
-    };
-    let vndb_provider = match &config.external.vndb {
-        Some(api_key) => Some(Arc::new(showtimes_metadata::VndbProvider::new(api_key))),
-        None => None,
-    };
+    let tmdb_provider = config
+        .external
+        .tmdb
+        .as_ref()
+        .map(|api_key| Arc::new(showtimes_metadata::TMDbProvider::new(api_key)));
+    let vndb_provider = config
+        .external
+        .vndb
+        .as_ref()
+        .map(|api_key| Arc::new(showtimes_metadata::VndbProvider::new(api_key)));
 
     tracing::info!("🔌🚀 Loading GraphQL schema...");
     let schema = showtimes_gql::create_schema(&mongo_conn.db);
