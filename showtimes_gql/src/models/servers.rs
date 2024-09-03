@@ -27,6 +27,14 @@ pub enum UserPrivilegeGQL {
     /// - Add and remove users
     /// - Manage the server settings
     Admin,
+    /// A user with complete control over the server
+    ///
+    /// In addition to admin, this user can:
+    /// - Delete the server
+    /// - Add or remove admins
+    ///
+    /// Only one user can have this privilege
+    Owner,
 }
 
 /// Owner information in the server

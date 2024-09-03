@@ -67,7 +67,9 @@ impl Default for ImageMetadata {
 }
 
 /// The list of possible integration types.
-#[derive(Debug, Copy, Clone, tosho_macros::DeserializeEnum, tosho_macros::SerializeEnum)]
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, tosho_macros::DeserializeEnum, tosho_macros::SerializeEnum,
+)]
 pub enum IntegrationType {
     // Related to Discord
     /// A Discord Role ID
@@ -184,5 +186,11 @@ impl IntegrationId {
     /// Set the kind
     pub fn set_kind(&mut self, kind: IntegrationType) {
         self.kind = kind;
+    }
+}
+
+impl PartialEq for IntegrationId {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id && self.kind == other.kind
     }
 }

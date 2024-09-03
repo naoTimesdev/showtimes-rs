@@ -656,10 +656,14 @@ impl M20240725045840Init {
         let owners: Vec<showtimes_db::m::ServerUser> = server
             .serverowner
             .iter()
-            .filter_map(|owner| match actors.get(owner) {
+            .enumerate()
+            .filter_map(|(idx, owner)| match actors.get(owner) {
                 Some(user) => Some(showtimes_db::m::ServerUser::new(
                     user.id,
-                    showtimes_db::m::UserPrivilege::Admin,
+                    match idx {
+                        0 => showtimes_db::m::UserPrivilege::Owner,
+                        _ => showtimes_db::m::UserPrivilege::Admin,
+                    },
                 )),
                 None => {
                     tracing::warn!("Owner {} not found in {}", owner, &server.id);

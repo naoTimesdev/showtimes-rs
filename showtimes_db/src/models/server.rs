@@ -26,6 +26,25 @@ pub enum UserPrivilege {
     /// - Add and remove users
     /// - Manage the server settings
     Admin,
+    /// A user with complete control over the server
+    ///
+    /// In addition to admin, this user can:
+    /// - Delete the server
+    /// - Add or remove admins
+    ///
+    /// Only one user can have this privilege
+    Owner,
+}
+
+impl std::fmt::Display for UserPrivilege {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UserPrivilege::ProjectManager => write!(f, "Project Manager"),
+            UserPrivilege::Manager => write!(f, "Manager"),
+            UserPrivilege::Admin => write!(f, "Admin"),
+            UserPrivilege::Owner => write!(f, "Owner"),
+        }
+    }
 }
 
 /// A model to hold user information on a server
@@ -112,6 +131,14 @@ impl Server {
     pub fn with_integrations(mut self, integrations: Vec<IntegrationId>) -> Self {
         self.integrations = integrations;
         self
+    }
+
+    pub fn add_integration(&mut self, integration: IntegrationId) {
+        self.integrations.push(integration);
+    }
+
+    pub fn remove_integration(&mut self, integration: &IntegrationId) {
+        self.integrations.retain(|i| i != integration);
     }
 }
 

@@ -197,6 +197,24 @@ pub enum IntegrationTypeGQL {
     ProviderTmdb,
 }
 
+impl std::fmt::Display for IntegrationTypeGQL {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IntegrationTypeGQL::DiscordRole => write!(f, "Discord Role"),
+            IntegrationTypeGQL::DiscordUser => write!(f, "Discord User"),
+            IntegrationTypeGQL::DiscordChannel => write!(f, "Discord Text Channel"),
+            IntegrationTypeGQL::DiscordGuild => write!(f, "Discord Guild"),
+            IntegrationTypeGQL::FansubDB => write!(f, "FansubDB ID"),
+            IntegrationTypeGQL::FansubDBProject => write!(f, "FansubDB Project ID"),
+            IntegrationTypeGQL::FansubDBShows => write!(f, "FansubDB Shows ID"),
+            IntegrationTypeGQL::ProviderAnilist => write!(f, "Anilist ID"),
+            IntegrationTypeGQL::ProviderAnilistMal => write!(f, "Anilist MAL ID"),
+            IntegrationTypeGQL::ProviderVndb => write!(f, "VNDB ID"),
+            IntegrationTypeGQL::ProviderTmdb => write!(f, "TMDB ID"),
+        }
+    }
+}
+
 /// A metadata collection to hold integration information with other platform
 #[derive(SimpleObject)]
 pub struct IntegrationIdGQL {
