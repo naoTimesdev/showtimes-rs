@@ -346,6 +346,23 @@ impl MutationRoot {
 
         mutations::users::mutate_users_update(ctx, requested, input).await
     }
+
+    /// Update server information
+    #[graphql(
+        name = "updateServer",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)"
+    )]
+    async fn update_server(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The server ID to update")] id: crate::models::prelude::UlidGQL,
+        #[graphql(desc = "The server information to update")]
+        input: mutations::servers::ServerInputGQL,
+    ) -> async_graphql::Result<ServerGQL> {
+        let user = find_authenticated_user(ctx).await?;
+
+        mutations::servers::mutate_servers_update(ctx, id, user, input).await
+    }
 }
 
 /// Create the GraphQL schema

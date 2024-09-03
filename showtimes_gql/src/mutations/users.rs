@@ -17,6 +17,7 @@ use crate::{
 #[derive(InputObject)]
 pub struct UserInputGQL {
     /// The user's username
+    #[graphql(validator(min_length = 5, max_length = 128))]
     username: Option<String>,
     /// The user's kind
     ///
@@ -184,5 +185,7 @@ pub async fn mutate_users_update(
     let user_search = showtimes_search::models::User::from(user_info.clone());
     user_search.update_document(meili).await?;
 
-    Ok(user_info.into())
+    let user_gql: UserGQL = user_info.into();
+
+    Ok(user_gql.with_requester(user.requester.into()))
 }
