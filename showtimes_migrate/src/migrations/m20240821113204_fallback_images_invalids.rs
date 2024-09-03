@@ -145,57 +145,84 @@ impl Migration for M20240821113204FallbackImagesInvalids {
 
         tracing::info!("Updating projects with unknown covers...");
         let users_db = showtimes_db::UserHandler::new(&self.db);
-        let mut users = users_db
+        let users = users_db
             .find_all_by(doc! {
                 "avatar": null
             })
             .await?;
 
         tracing::info!("Updating {} users with unknown avatars...", users.len());
+        users_db
+            .get_collection()
+            .update_many(
+                doc! {
+                    "avatar": null
+                },
+                doc! {
+                    "$set": {
+                        "avatar": {
+                            "kind": FsFileKind::Invalids.as_path_name(),
+                            "key": "user",
+                            "filename": "default.png",
+                            "format": "png",
+                            "parent": null
+                        }
+                    }
+                },
+            )
+            .await?;
 
-        for user in &mut users {
-            user.avatar = Some(showtimes_db::m::ImageMetadata::new(
-                FsFileKind::Invalids.as_path_name(),
-                "user",
-                "default.png",
-                "png",
-                None::<String>,
-            ));
+        let s_users: Vec<showtimes_search::models::User> = users
+            .into_iter()
+            .map(showtimes_search::models::User::from)
+            .collect();
 
-            tracing::info!("  Updating user: {}", user.id);
-            users_db.save(user, None).await?;
-            tracing::info!("  Updating user in search index: {}", user.id);
-            let s_user = vec![showtimes_search::models::User::from(user.clone())];
-            s_user_index.add_or_update(&s_user, Some(s_user_pk)).await?;
-        }
+        tracing::info!("Updating users in search index...");
+        let task = s_user_index
+            .add_or_update(&s_users, Some(s_user_pk))
+            .await?;
+        tracing::info!(" Waiting for search index update to complete...");
+        task.wait_for_completion(&*meilisearch, None, None).await?;
 
         tracing::info!("Updating servers with unknown covers...");
         let servers_db = showtimes_db::ServerHandler::new(&self.db);
-        let mut servers = servers_db
+        let servers = servers_db
             .find_all_by(doc! {
                 "avatar": null
             })
             .await?;
 
         tracing::info!("Updating {} servers with unknown avatars...", servers.len());
-        for server in &mut servers {
-            server.avatar = Some(showtimes_db::m::ImageMetadata::new(
-                FsFileKind::Invalids.as_path_name(),
-                "server",
-                "default.png",
-                "png",
-                None::<String>,
-            ));
+        servers_db
+            .get_collection()
+            .update_many(
+                doc! {
+                    "avatar": null
+                },
+                doc! {
+                    "$set": {
+                        "avatar": {
+                            "kind": FsFileKind::Invalids.as_path_name(),
+                            "key": "server",
+                            "filename": "default.png",
+                            "format": "png",
+                            "parent": null
+                        }
+                    }
+                },
+            )
+            .await?;
+        let s_servers: Vec<showtimes_search::models::Server> = servers
+            .into_iter()
+            .map(showtimes_search::models::Server::from)
+            .collect();
 
-            tracing::info!("  Updating server: {}", server.id);
-            servers_db.save(server, None).await?;
-            // Update meilisearch index
-            tracing::info!("  Updating server in search index: {}", server.id);
-            let s_server = vec![showtimes_search::models::Server::from(server.clone())];
-            s_server_index
-                .add_or_update(&s_server, Some(s_server_pk))
-                .await?;
-        }
+        tracing::info!("Updating servers in search index...");
+        let task = s_server_index
+            .add_or_update(&s_servers, Some(s_server_pk))
+            .await?;
+        tracing::info!(" Waiting for servers index update to complete...");
+        task.wait_for_completion(&*meilisearch, None, None).await?;
 
         tracing::info!("Migration completed successfully");
 
