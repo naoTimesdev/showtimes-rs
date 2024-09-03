@@ -143,7 +143,7 @@ pub async fn mutate_users_update(
         user_info.kind = kind.into();
     }
     if let Some(true) = input.reset_api_key {
-        user_info.api_key = showtimes_shared::generate_uuid().to_string();
+        user_info.api_key = showtimes_shared::APIKey::new();
     }
     if let Some(avatar_upload) = input.avatar {
         let info_up = avatar_upload.value(ctx)?;

@@ -1,6 +1,6 @@
 use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
-use showtimes_shared::{generate_uuid, ulid_serializer};
+use showtimes_shared::ulid_serializer;
 
 use super::{ImageMetadata, ShowModelHandler};
 
@@ -84,7 +84,7 @@ pub struct User {
     /// This can be changed by the user.
     pub avatar: Option<ImageMetadata>,
     /// The user API key
-    pub api_key: String,
+    pub api_key: showtimes_shared::APIKey,
     /// The user kind
     pub kind: UserKind,
     /// The user discord information
@@ -115,7 +115,7 @@ impl User {
             id: ulid_serializer::default(),
             username,
             avatar: None,
-            api_key: generate_uuid().to_string(),
+            api_key: showtimes_shared::APIKey::new(),
             kind: UserKind::User,
             registered: true,
             discord_meta,
@@ -133,7 +133,7 @@ impl User {
             id: ulid_serializer::default(),
             username,
             avatar: None,
-            api_key: generate_uuid().to_string(),
+            api_key: showtimes_shared::APIKey::new(),
             kind: UserKind::Admin,
             registered: true,
             discord_meta,
@@ -147,15 +147,21 @@ impl User {
     pub fn stub_owner(master_key: impl Into<String>) -> Self {
         let now = chrono::Utc::now();
 
+        let mut discord = DiscordUser::stub();
+        discord.id = master_key.into();
+        discord.username = "Showtimes Administrator".to_string();
+        discord.access_token = "stub".to_string();
+        discord.refresh_token = "stub".to_string();
+
         Self {
             id: ulid_serializer::default(),
             username: "Showtimes Administrator".to_string(),
             avatar: None,
-            api_key: master_key.into(),
+            api_key: showtimes_shared::APIKey::new(),
             kind: UserKind::Owner,
             registered: true,
             // Stub discord user since this is a master key
-            discord_meta: DiscordUser::stub(),
+            discord_meta: discord,
             _id: None,
             created: now,
             updated: now,

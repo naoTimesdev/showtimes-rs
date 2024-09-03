@@ -9,6 +9,8 @@ pub use config::Config;
 /// Re-exports of the [`ulid`] crate
 pub use ulid;
 
+const API_KEY_PREFIX: &str = "nsh_";
+
 /// Generate v7 UUID for the current timestamp
 ///
 /// # Examples
@@ -128,6 +130,116 @@ impl<'de> serde::Deserialize<'de> for PrefixUlid {
         let ulid = parts[1];
         let ulid = ulid::Ulid::from_string(ulid).map_err(serde::de::Error::custom)?;
         PrefixUlid::with_ulid(prefix, ulid).map_err(serde::de::Error::custom)
+    }
+}
+
+/// An API key for authentication
+///
+/// This is a UUIDv4 with a prefix of `nsh_`
+///
+/// Internally, this is only a UUIDv4
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct APIKey {
+    inner: uuid::Uuid,
+}
+
+impl APIKey {
+    /// Create a new API key
+    pub fn new() -> Self {
+        let inner = uuid::Uuid::new_v4();
+        Self { inner }
+    }
+
+    /// Convert the internal UUID into an API key string
+    pub fn as_api_key(&self) -> String {
+        let inner_str = self.inner.to_string().replace("-", "");
+        format!("{}{}", API_KEY_PREFIX, inner_str)
+    }
+
+    /// Get the inner UUID
+    pub fn as_uuid(&self) -> uuid::Uuid {
+        self.inner
+    }
+
+    /// Parse a string into an API key
+    pub fn from_string(input: impl Into<String>) -> Result<Self, String> {
+        let input: String = input.into();
+        if !input.starts_with(API_KEY_PREFIX) {
+            return Err("Invalid API key format".to_string());
+        }
+
+        let input: String = input.replace(API_KEY_PREFIX, "");
+        // UUID dash is replaced with empty string, so we need to insert it back
+        // ex: cd427fdabb04495688aa97422a3f0320
+        //     cd427fda-bb04-4956-88aa-97422a3f0320
+        let uuid_a = input.get(0..8).ok_or("Invalid UUID (incomplete part A)")?;
+        let uuid_b = input.get(8..12).ok_or("Invalid UUID (incomplete part B)")?;
+        let uuid_c = input
+            .get(12..16)
+            .ok_or("Invalid UUID (incomplete part C)")?;
+        let uuid_d = input
+            .get(16..20)
+            .ok_or("Invalid UUID (incomplete part D)")?;
+        let uuid_e = input
+            .get(20..32)
+            .ok_or("Invalid UUID (incomplete part E)")?;
+        let rfmt_s = format!("{}-{}-{}-{}-{}", uuid_a, uuid_b, uuid_c, uuid_d, uuid_e);
+
+        let inner = uuid::Uuid::parse_str(&rfmt_s).map_err(|_| "Invalid UUID")?;
+        Ok(APIKey { inner })
+    }
+
+    /// Parse a UUID into an API key
+    pub fn from_uuid(input: uuid::Uuid) -> Self {
+        Self { inner: input }
+    }
+}
+
+impl std::fmt::Display for APIKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_api_key())
+    }
+}
+
+impl Default for APIKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// serde
+impl serde::Serialize for APIKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.as_api_key())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for APIKey {
+    fn deserialize<D>(deserializer: D) -> Result<APIKey, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        APIKey::from_string(s).map_err(serde::de::Error::custom)
+    }
+}
+
+impl TryFrom<String> for APIKey {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        APIKey::from_string(value)
+    }
+}
+
+impl TryFrom<&str> for APIKey {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        APIKey::from_string(value.to_string())
     }
 }
 
@@ -349,5 +461,31 @@ mod tests {
         assert_eq!(uuid.get_variant(), uuid::Variant::RFC4122);
         assert_eq!(uuid.get_timestamp(), Some(ts));
         assert_eq!(uuid_act, uuid);
+    }
+
+    #[test]
+    fn parse_api_key() {
+        let api_key = "nsh_cd427fdabb04495688aa97422a3f0320";
+        let expect_key = uuid::Uuid::parse_str("cd427fda-bb04-4956-88aa-97422a3f0320").unwrap();
+        let api_key = APIKey::from_string(api_key).unwrap();
+
+        assert_eq!(api_key.as_uuid().get_version(), Some(uuid::Version::Random));
+        assert_eq!(api_key.as_uuid(), expect_key);
+    }
+
+    #[test]
+    fn test_api_key_fails() {
+        let api_key = "shn_cd427fdabb04495688aa97422a3f0320";
+        let api_key = APIKey::from_string(api_key);
+
+        assert!(api_key.is_err(), "Invalid API key format (expect nsh_)");
+    }
+
+    #[test]
+    fn test_api_key_fails_uuid() {
+        let api_key = "nsh_cd427fdabb04495688aa97422a3f03";
+
+        let api_key = APIKey::from_string(api_key);
+        assert!(api_key.is_err(), "Invalid UUID");
     }
 }

@@ -22,7 +22,7 @@ pub struct UserGQL {
     id: showtimes_shared::ulid::Ulid,
     username: String,
     kind: showtimes_db::m::UserKind,
-    api_key: String,
+    api_key: showtimes_shared::APIKey,
     registered: bool,
     avatar: Option<showtimes_db::m::ImageMetadata>,
     created: chrono::DateTime<chrono::Utc>,
@@ -49,11 +49,11 @@ impl UserGQL {
     }
 
     /// The user's API key, this will be `null` if you're not *this* user.
-    async fn api_key(&self) -> Option<String> {
+    async fn api_key(&self) -> Option<APIKeyGQL> {
         if let Some(requester) = self.requester {
             // Only return the API key if the requester is the same user or the requester is not a user
             if requester.id() == self.id || requester.kind() != showtimes_db::m::UserKind::User {
-                Some(self.api_key.clone())
+                Some(self.api_key.into())
             } else {
                 None
             }

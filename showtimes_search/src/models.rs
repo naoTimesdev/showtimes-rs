@@ -128,7 +128,7 @@ pub struct User {
     /// Their username on Discord
     pub discord_username: String,
     /// Their API key
-    pub api_key: String,
+    pub api_key: showtimes_shared::APIKey,
     /// Their user kind
     pub kind: showtimes_db::m::UserKind,
     /// Is the user registered or not

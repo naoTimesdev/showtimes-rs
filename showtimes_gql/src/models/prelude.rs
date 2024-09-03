@@ -49,6 +49,53 @@ impl From<&showtimes_shared::ulid::Ulid> for UlidGQL {
     }
 }
 
+/// A wrapper around APIKey to be allowed in GraphQL
+pub struct APIKeyGQL(showtimes_shared::APIKey);
+
+impl Deref for APIKeyGQL {
+    type Target = showtimes_shared::APIKey;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Description for APIKeyGQL {
+    fn description() -> &'static str {
+        "A unique API key used to authenticate users, based on UUIDv4"
+    }
+}
+
+#[Scalar(use_type_description = true)]
+impl ScalarType for APIKeyGQL {
+    fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
+        match value {
+            async_graphql::Value::String(s) => {
+                let api_key = showtimes_shared::APIKey::from_string(&s)?;
+
+                Ok(APIKeyGQL(api_key))
+            }
+            _ => Err(async_graphql::InputValueError::expected_type(value)),
+        }
+    }
+
+    fn to_value(&self) -> async_graphql::Value {
+        async_graphql::Value::String(self.0.to_string())
+    }
+}
+
+impl From<showtimes_shared::APIKey> for APIKeyGQL {
+    fn from(ulid: showtimes_shared::APIKey) -> Self {
+        APIKeyGQL(ulid)
+    }
+}
+
+impl From<&showtimes_shared::APIKey> for APIKeyGQL {
+    fn from(ulid: &showtimes_shared::APIKey) -> Self {
+        APIKeyGQL(*ulid)
+    }
+}
+
 /// A wrapper around DateTime<Utc> to allow it to be used in GraphQL
 #[derive(Clone)]
 pub struct DateTimeGQL(

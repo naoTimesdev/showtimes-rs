@@ -86,15 +86,15 @@ impl Loader<DiscordIdLoad> for UserDataLoader {
     }
 }
 
-impl Loader<ApiKeyLoad> for UserDataLoader {
+impl Loader<showtimes_shared::APIKey> for UserDataLoader {
     type Value = showtimes_db::m::User;
     type Error = FieldError;
 
     async fn load(
         &self,
-        keys: &[ApiKeyLoad],
-    ) -> Result<HashMap<ApiKeyLoad, Self::Value>, Self::Error> {
-        let keys_to_string = keys.iter().map(|k| k.0.clone()).collect::<Vec<_>>();
+        keys: &[showtimes_shared::APIKey],
+    ) -> Result<HashMap<showtimes_shared::APIKey, Self::Value>, Self::Error> {
+        let keys_to_string = keys.iter().map(|k| k.to_string()).collect::<Vec<_>>();
         let result = self
             .col
             .get_collection()
@@ -105,10 +105,8 @@ impl Loader<ApiKeyLoad> for UserDataLoader {
             .await?;
 
         let all_results = result.try_collect::<Vec<showtimes_db::m::User>>().await?;
-        let mapped_res: HashMap<ApiKeyLoad, showtimes_db::m::User> = all_results
-            .iter()
-            .map(|u| (ApiKeyLoad(u.api_key.clone()), u.clone()))
-            .collect();
+        let mapped_res: HashMap<showtimes_shared::APIKey, showtimes_db::m::User> =
+            all_results.iter().map(|u| (u.api_key, u.clone())).collect();
 
         Ok(mapped_res)
     }
@@ -414,8 +412,9 @@ pub(crate) async fn find_authenticated_user(
         showtimes_session::ShowtimesAudience::APIKey => {
             // load as API key
             let api_key = session.get_claims().get_metadata();
+            let parse_api = showtimes_shared::APIKey::try_from(api_key)?;
 
-            loader.load_one(ApiKeyLoad(api_key.to_string())).await
+            loader.load_one(parse_api).await
         }
         showtimes_session::ShowtimesAudience::MasterKey => {
             let result = STUBBED_OWNER.get_or_init(|| {
