@@ -3725,6 +3725,8 @@ dependencies = [
  "tokio",
  "toml",
  "tower-http",
+ "tower-layer",
+ "tower-service",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",

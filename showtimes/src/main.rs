@@ -9,6 +9,7 @@ use tokio::{net::TcpListener, sync::Mutex};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod onion;
 mod routes;
 mod state;
 
@@ -147,7 +148,9 @@ async fn entrypoint() -> anyhow::Result<()> {
         .route("/", get(index))
         .route(
             GRAPHQL_ROUTE,
-            get(routes::graphql::graphql_playground).post(routes::graphql::graphql_handler),
+            get(routes::graphql::graphql_playground)
+                .post(routes::graphql::graphql_handler)
+                .layer(onion::GraphQLRequestLimit::new()),
         )
         .route("/_/health", get(|| async { "OK" }))
         .route("/images/:id/:filename", get(routes::image::image_by_id))
