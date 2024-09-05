@@ -45,7 +45,7 @@ bytes = "1"
 mime_guess = "2.0.5"
 aws-config = { version = "1.5.5", features = ["behavior-version-latest"] }
 aws-credential-types = "1.2.1"
-aws-sdk-s3 = { version = "1.47.0", features = ["http-1x"] }
+aws-sdk-s3 = { version = "1.48.0", features = ["http-1x"] }
 
 # Web server
 axum = { version = "0.7.5", features = ["ws", "tracing"] }
