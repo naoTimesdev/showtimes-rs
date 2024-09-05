@@ -163,7 +163,21 @@ async fn entrypoint() -> anyhow::Result<()> {
             get(routes::oauth2::oauth2_discord_authorize),
         )
         .layer(TraceLayer::new_for_http())
-        .layer(CorsLayer::new().allow_origin(tower_http::cors::Any))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(tower_http::cors::Any)
+                .allow_methods(vec![
+                    // GET/POST for GraphQL stuff
+                    axum::http::Method::GET,
+                    axum::http::Method::POST,
+                    // HEAD for additional metadata
+                    axum::http::Method::HEAD,
+                    // OPTIONS for CORS preflight
+                    axum::http::Method::OPTIONS,
+                    // CONNECT for other stuff
+                    axum::http::Method::CONNECT,
+                ]),
+        )
         .with_state(state);
 
     let listener = TcpListener::bind(format!(
