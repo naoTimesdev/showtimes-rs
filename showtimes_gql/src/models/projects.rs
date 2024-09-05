@@ -212,6 +212,7 @@ impl ProjectGQL {
             match unreleased_idx {
                 Some(idx) => {
                     let end_idx = idx + limit as usize;
+                    let end_idx = end_idx.min(progress.len());
                     let results = progress[idx..end_idx].to_vec();
 
                     if return_last && results.is_empty() {
