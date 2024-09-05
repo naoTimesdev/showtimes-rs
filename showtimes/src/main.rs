@@ -176,7 +176,8 @@ async fn entrypoint() -> anyhow::Result<()> {
                     axum::http::Method::OPTIONS,
                     // CONNECT for other stuff
                     axum::http::Method::CONNECT,
-                ]),
+                ])
+                .allow_headers(tower_http::cors::Any),
         )
         .with_state(state);
 
