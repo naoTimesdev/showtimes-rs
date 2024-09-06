@@ -331,9 +331,9 @@ impl ProjectGQL {
                     &sync,
                     CollaborationSyncRequester::new(self.creator, self.id),
                 );
-                Ok(mapped)
+                Ok(Some(mapped))
             }
-            None => None,
+            None => Ok(None),
         }
     }
 
