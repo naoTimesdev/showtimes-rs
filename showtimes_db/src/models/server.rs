@@ -1,6 +1,6 @@
 use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
-use showtimes_shared::{ulid_list_serializer, ulid_opt_serializer, ulid_serializer};
+use showtimes_shared::{ulid_opt_serializer, ulid_serializer};
 
 use super::{ImageMetadata, IntegrationId, ShowModelHandler};
 
@@ -142,6 +142,38 @@ impl Server {
     }
 }
 
+/// A model to hold each server that is synchronized
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct ServerCollaborationSyncTarget {
+    /// The server ID
+    #[serde(with = "ulid_serializer")]
+    pub server: showtimes_shared::ulid::Ulid,
+    /// The project ID
+    #[serde(with = "ulid_serializer")]
+    pub project: showtimes_shared::ulid::Ulid,
+}
+
+impl ServerCollaborationSyncTarget {
+    pub fn new(
+        server: showtimes_shared::ulid::Ulid,
+        project: showtimes_shared::ulid::Ulid,
+    ) -> Self {
+        ServerCollaborationSyncTarget { server, project }
+    }
+}
+
+impl From<super::Project> for ServerCollaborationSyncTarget {
+    fn from(value: super::Project) -> Self {
+        ServerCollaborationSyncTarget::new(value.creator, value.id)
+    }
+}
+
+impl From<&super::Project> for ServerCollaborationSyncTarget {
+    fn from(value: &super::Project) -> Self {
+        ServerCollaborationSyncTarget::new(value.creator, value.id)
+    }
+}
+
 /// A model to hold server synchronization information on a project
 #[derive(Debug, Clone, Serialize, Deserialize, showtimes_derive::ShowModelHandler)]
 #[col_name("ShowtimesCollaborationSync")]
@@ -149,9 +181,8 @@ pub struct ServerCollaborationSync {
     /// The collaboration ID
     #[serde(with = "ulid_serializer")]
     pub id: showtimes_shared::ulid::Ulid,
-    /// The list of projects
-    #[serde(with = "ulid_list_serializer")]
-    pub projects: Vec<showtimes_shared::ulid::Ulid>,
+    /// The list of projects target
+    pub projects: Vec<ServerCollaborationSyncTarget>,
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
@@ -167,7 +198,7 @@ pub struct ServerCollaborationSync {
 }
 
 impl ServerCollaborationSync {
-    pub fn new(projects: Vec<showtimes_shared::ulid::Ulid>) -> Self {
+    pub fn new(projects: Vec<ServerCollaborationSyncTarget>) -> Self {
         ServerCollaborationSync {
             id: ulid_serializer::default(),
             projects,
@@ -179,7 +210,7 @@ impl ServerCollaborationSync {
 }
 
 /// An information for a collaboration invite (for source)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ServerCollaborationInviteSource {
     /// The server ID
     #[serde(with = "ulid_serializer")]
@@ -199,7 +230,7 @@ impl ServerCollaborationInviteSource {
 }
 
 /// An information for a collaboration invite (for target)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ServerCollaborationInviteTarget {
     /// The server ID
     #[serde(with = "ulid_serializer")]

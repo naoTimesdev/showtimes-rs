@@ -52,6 +52,7 @@ struct ServerCollab {
     id: Ulid,
     // Project ID (old ver, Anilist)
     old_id: String,
+    server_id: Ulid,
     // old linked project ID
     servers: Vec<String>,
 }
@@ -198,6 +199,7 @@ impl Migration for M20240725045840Init {
                                     temp_projects.push(ServerCollab {
                                         id: t_project.id,
                                         old_id: project.id.clone(),
+                                        server_id: t_server.id,
                                         servers: collab_data,
                                     })
                                 }
@@ -888,6 +890,11 @@ impl M20240725045840Init {
         }
 
         new_project.integrations = integrations;
+        let last_update = chrono::DateTime::<chrono::Utc>::try_from(project.last_update)
+            .unwrap_or_else(|_| chrono::Utc::now());
+        new_project.updated = last_update;
+        // Created just do last_update minus 1 day
+        new_project.created = last_update - chrono::Duration::days(1);
 
         Ok(new_project)
     }
@@ -905,16 +912,21 @@ impl M20240725045840Init {
                 // ProjectId-FirstServerId
                 let key = format!("{}-{}", &collab.old_id, &merged_servers[0]);
 
-                let all_project_ids: Vec<Ulid> = merged_servers
-                    .iter()
-                    .filter_map(|server_id| match top_collab_info.get(server_id) {
-                        Some(top_c) => top_c
-                            .iter()
-                            .find(|c| c.old_id == collab.old_id)
-                            .map(|c| c.id),
-                        None => None,
-                    })
-                    .collect();
+                let all_project_ids: Vec<showtimes_db::m::ServerCollaborationSyncTarget> =
+                    merged_servers
+                        .iter()
+                        .filter_map(|server_id| match top_collab_info.get(server_id) {
+                            Some(top_c) => {
+                                top_c.iter().find(|c| c.old_id == collab.old_id).map(|c| {
+                                    showtimes_db::m::ServerCollaborationSyncTarget::new(
+                                        c.server_id,
+                                        c.id,
+                                    )
+                                })
+                            }
+                            None => None,
+                        })
+                        .collect();
 
                 mapped_temp.insert(
                     key,

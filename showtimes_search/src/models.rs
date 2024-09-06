@@ -166,6 +166,35 @@ impl From<showtimes_db::m::User> for User {
     }
 }
 
+/// The information of each collaborator
+#[derive(Debug, Clone, Copy, Serialize, Default, Deserialize)]
+pub struct ServerCollabTarget {
+    /// The server ID
+    #[serde(with = "ulid_serializer")]
+    pub server: showtimes_shared::ulid::Ulid,
+    /// The project ID
+    #[serde(with = "ulid_serializer")]
+    pub project: showtimes_shared::ulid::Ulid,
+}
+
+impl From<showtimes_db::m::ServerCollaborationSyncTarget> for ServerCollabTarget {
+    fn from(value: showtimes_db::m::ServerCollaborationSyncTarget) -> Self {
+        Self {
+            server: value.server,
+            project: value.project,
+        }
+    }
+}
+
+impl From<&showtimes_db::m::ServerCollaborationSyncTarget> for ServerCollabTarget {
+    fn from(value: &showtimes_db::m::ServerCollaborationSyncTarget) -> Self {
+        Self {
+            server: value.server,
+            project: value.project,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-collab-sync",
@@ -180,8 +209,7 @@ pub struct ServerCollabSync {
     #[primary_key]
     pub id: showtimes_shared::ulid::Ulid,
     /// The project being linked together
-    #[serde(with = "ulid_list_serializer")]
-    pub projects: Vec<showtimes_shared::ulid::Ulid>,
+    pub projects: Vec<ServerCollabTarget>,
     #[serde(
         with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
@@ -198,7 +226,11 @@ impl From<showtimes_db::m::ServerCollaborationSync> for ServerCollabSync {
     fn from(value: showtimes_db::m::ServerCollaborationSync) -> Self {
         Self {
             id: value.id,
-            projects: value.projects.clone(),
+            projects: value
+                .projects
+                .iter()
+                .map(|project| project.into())
+                .collect(),
             created: value.created,
             updated: value.updated,
         }
@@ -206,7 +238,7 @@ impl From<showtimes_db::m::ServerCollaborationSync> for ServerCollabSync {
 }
 
 /// An information for a collaboration invite (for source)
-#[derive(Debug, Clone, Serialize, Default, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Default, Deserialize)]
 pub struct ServerCollabInviteSource {
     /// The server ID
     #[serde(with = "ulid_serializer")]
@@ -217,7 +249,7 @@ pub struct ServerCollabInviteSource {
 }
 
 /// An information for a collaboration invite (for target)
-#[derive(Debug, Clone, Serialize, Default, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Default, Deserialize)]
 pub struct ServerCollabInviteTarget {
     /// The server ID
     #[serde(with = "ulid_serializer")]
