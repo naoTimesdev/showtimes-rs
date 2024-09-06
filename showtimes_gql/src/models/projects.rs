@@ -312,7 +312,7 @@ impl ProjectGQL {
     async fn collaboration(
         &self,
         ctx: &async_graphql::Context<'_>,
-    ) -> async_graphql::Result<CollaborationSyncGQL> {
+    ) -> async_graphql::Result<Option<CollaborationSyncGQL>> {
         if self.disable_collaboration_fetch {
             return Err(
                 "Collaboration fetch from this context is disabled to avoid looping".into(),
@@ -333,7 +333,7 @@ impl ProjectGQL {
                 );
                 Ok(mapped)
             }
-            None => Err("Collaboration not found".into()),
+            None => None,
         }
     }
 
