@@ -67,7 +67,7 @@ impl SessionManager {
 
         let mut con = client.get_multiplexed_async_connection().await?;
         // Test the connection
-        cmd("PING").query_async(&mut con).await?;
+        cmd("PING").exec_async(&mut con).await?;
 
         // Set the client name
         cmd("CLIENT")

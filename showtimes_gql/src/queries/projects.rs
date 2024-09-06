@@ -64,6 +64,7 @@ pub struct ProjectQuery {
     unpaged: bool,
 }
 
+#[allow(dead_code)]
 impl ProjectQuery {
     /// Create a new server query
     pub fn new() -> Self {

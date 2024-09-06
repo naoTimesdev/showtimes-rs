@@ -24,6 +24,7 @@ pub struct UserQuery {
     current_user: Option<ServerQueryUser>,
 }
 
+#[allow(dead_code)]
 impl UserQuery {
     /// Create a new server query
     pub fn new() -> Self {

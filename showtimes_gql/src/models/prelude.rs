@@ -337,11 +337,7 @@ impl PageInfoGQL {
 
 impl Default for PageInfoGQL {
     fn default() -> Self {
-        PageInfoGQL {
-            total: 0,
-            per_page: 20,
-            next_cursor: None,
-        }
+        PageInfoGQL::empty(20)
     }
 }
 

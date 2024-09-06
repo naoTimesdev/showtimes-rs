@@ -27,6 +27,7 @@ pub struct ServerQuery {
     disable_projects: bool,
 }
 
+#[allow(dead_code)]
 impl ServerQuery {
     /// Create a new server query
     pub fn new() -> Self {

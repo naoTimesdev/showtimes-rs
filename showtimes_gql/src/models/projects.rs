@@ -416,6 +416,7 @@ impl From<&showtimes_db::m::Project> for ProjectGQL {
 }
 
 impl ProjectGQL {
+    #[allow(dead_code)]
     pub fn with_disable_server_fetch(mut self) -> Self {
         self.disable_server_fetch = true;
         self
