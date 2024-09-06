@@ -296,13 +296,10 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
                 }
             }
 
-            #[doc = "Save a document in the"]
-            #[doc = #model_name_full]
-            #[doc = "collection"]
-            pub async fn save(&self, doc: &mut #model_ident, filter: Option<mongodb::bson::Document>) -> anyhow::Result<()> {
+            /// Internally used to save a document
+            async fn internal_save(&self, doc: &mut #model_ident, filter: Option<mongodb::bson::Document>) -> anyhow::Result<()> {
                 let mut wc = mongodb::options::WriteConcern::default();
                 wc.journal = Some(true);
-                doc.updated();
 
                 let mut id_needs_update = false;
                 let filter = match (doc.id(), filter) {
@@ -339,6 +336,21 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
                     }
                     None => anyhow::bail!("Failed to save document"),
                 }
+            }
+
+            #[doc = "Save a document in the"]
+            #[doc = #model_name_full]
+            #[doc = "collection"]
+            pub async fn save(&self, doc: &mut #model_ident, filter: Option<mongodb::bson::Document>) -> anyhow::Result<()> {
+                doc.updated();
+                self.internal_save(doc, filter).await
+            }
+
+            #[doc = "Save a document in the"]
+            #[doc = #model_name_full]
+            #[doc = "collection without updating the `updated` field"]
+            pub async fn save_direct(&self, doc: &mut #model_ident, filter: Option<mongodb::bson::Document>) -> anyhow::Result<()> {
+                self.internal_save(doc, filter).await
             }
 
             #[doc = "Delete a document in the"]

@@ -165,7 +165,7 @@ impl Migration for M20240726055250UpdateCovers {
                 project.poster.image = image_meta;
 
                 tracing::info!("  Updating project: {}", project.id);
-                project_db.save(project, None).await?;
+                project_db.save_direct(project, None).await?;
                 tracing::info!("  Updating project in search index: {}", project.id);
                 let s_project = vec![showtimes_search::models::Project::from(project.clone())];
                 s_project_index
