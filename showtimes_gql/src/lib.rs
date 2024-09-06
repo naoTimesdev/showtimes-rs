@@ -5,7 +5,7 @@ use data_loader::{
     find_authenticated_user, DiscordIdLoad, ServerAndOwnerId, ServerDataLoader, ServerOwnerId,
     UserDataLoader,
 };
-use models::prelude::PaginatedGQL;
+use models::prelude::{OkResponse, PaginatedGQL};
 use models::projects::ProjectGQL;
 use models::search::QuerySearchRoot;
 use models::servers::ServerGQL;
@@ -321,6 +321,40 @@ impl MutationRoot {
                     .set_session(&oauth_token, oauth_user)
                     .await?;
                 Ok(UserSessionGQL::new(user, oauth_token))
+            }
+        }
+    }
+
+    /// Disconnect/logout from Showtimes, this can also be used to revoke OAuth2 token
+    #[graphql(guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)")]
+    async fn disconnect<'a>(
+        &self,
+        ctx: &'a Context<'_>,
+        #[graphql(desc = "Revoke specific token, this only works for Owner auth")] token: Option<
+            String,
+        >,
+    ) -> async_graphql::Result<OkResponse> {
+        let jwt = ctx.data_unchecked::<ShowtimesUserSession>();
+        let sessions = ctx.data_unchecked::<SharedSessionManager>();
+
+        match (token, jwt.get_claims().get_audience()) {
+            (_, showtimes_session::ShowtimesAudience::User) => {
+                sessions
+                    .lock()
+                    .await
+                    .remove_session(jwt.get_token())
+                    .await?;
+
+                Ok(OkResponse::ok("Successfully logged out"))
+            }
+            (Some(token), showtimes_session::ShowtimesAudience::MasterKey) => {
+                sessions.lock().await.remove_session(&token).await?;
+
+                Ok(OkResponse::ok("Successfully revoked token"))
+            }
+            _ => {
+                // Just stub for now
+                Ok(OkResponse::ok("Successfully disconnected"))
             }
         }
     }

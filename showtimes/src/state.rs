@@ -4,7 +4,6 @@ use tokio::sync::Mutex;
 
 pub type StorageShared = Arc<showtimes_fs::FsPool>;
 
-#[allow(dead_code)]
 #[derive(Clone)]
 pub struct ShowtimesState {
     /// The `showtimes_db` database

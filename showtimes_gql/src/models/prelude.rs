@@ -356,3 +356,31 @@ impl<T: OutputType> Default for PaginatedGQL<T> {
         }
     }
 }
+
+/// A simple OK response
+#[derive(SimpleObject)]
+pub struct OkResponse {
+    /// The message of the response
+    message: String,
+    /// The success status of the response
+    success: bool,
+}
+
+impl OkResponse {
+    /// Create a new success OkResponse
+    pub fn ok(message: impl Into<String>) -> Self {
+        OkResponse {
+            message: message.into(),
+            success: true,
+        }
+    }
+
+    /// Create a new error OkResponse
+    #[allow(dead_code)]
+    pub fn err(message: impl Into<String>) -> Self {
+        OkResponse {
+            message: message.into(),
+            success: false,
+        }
+    }
+}
