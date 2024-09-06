@@ -1,4 +1,5 @@
 use bson::doc;
+use mongodb::{options::IndexOptions, IndexModel};
 use showtimes_db::{m::ShowModelHandler, MigrationHandler};
 
 use crate::{common::env_or_exit, migrations::Migration};
@@ -288,6 +289,218 @@ pub async fn run_meilisearch_reindex(conn: &showtimes_db::Connection) -> anyhow:
         .await?;
 
     tracing::info!("All models reindexed");
+
+    Ok(())
+}
+
+pub async fn run_database_create_indexes(conn: &showtimes_db::Connection) -> anyhow::Result<()> {
+    let user_db = showtimes_db::UserHandler::new(&conn.db);
+    let project_db = showtimes_db::ProjectHandler::new(&conn.db);
+    let server_db = showtimes_db::ServerHandler::new(&conn.db);
+    let collab_sync_db = showtimes_db::CollaborationSyncHandler::new(&conn.db);
+    let collab_invite_db = showtimes_db::CollaborationInviteHandler::new(&conn.db);
+
+    let basic_ids = IndexModel::builder()
+        .keys(doc! { "id": 1 })
+        .options(Some(
+            IndexOptions::builder()
+                .name(Some("ID".to_string()))
+                .unique(true)
+                .build(),
+        ))
+        .build();
+
+    tracing::info!("Creating basic ID's indexes for all collections...");
+    user_db
+        .get_collection()
+        .create_index(basic_ids.clone())
+        .await?;
+    project_db
+        .get_collection()
+        .create_index(basic_ids.clone())
+        .await?;
+    server_db
+        .get_collection()
+        .create_index(basic_ids.clone())
+        .await?;
+    collab_sync_db
+        .get_collection()
+        .create_index(basic_ids.clone())
+        .await?;
+    collab_invite_db
+        .get_collection()
+        .create_index(basic_ids.clone())
+        .await?;
+
+    // User specific indexes
+    let user_indexes = vec![
+        IndexModel::builder()
+            .keys(doc! { "kind": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("Kind".to_string()))
+                    .build(),
+            ))
+            .build(),
+        IndexModel::builder()
+            .keys(doc! { "discord_meta.id": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("Discord ID".to_string()))
+                    .build(),
+            ))
+            .build(),
+        IndexModel::builder()
+            .keys(doc! { "discord_meta.id": 1, "id": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("ID + Discord ID".to_string()))
+                    .build(),
+            ))
+            .build(),
+    ];
+
+    tracing::info!("Creating user specific indexes...");
+    user_db
+        .get_collection()
+        .create_indexes(user_indexes)
+        .await?;
+
+    // Project specific indexes
+    let project_indexes = vec![
+        IndexModel::builder()
+            .keys(doc! { "integrations.id": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("Integration IDs".to_string()))
+                    .build(),
+            ))
+            .build(),
+        IndexModel::builder()
+            .keys(doc! { "creator": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("Creator".to_string()))
+                    .build(),
+            ))
+            .build(),
+        IndexModel::builder()
+            .keys(doc! { "id": 1, "creator": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("ID + Creator ID".to_string()))
+                    .build(),
+            ))
+            .build(),
+    ];
+
+    tracing::info!("Creating project specific indexes...");
+    project_db
+        .get_collection()
+        .create_indexes(project_indexes)
+        .await?;
+
+    // Server specific indexes
+    let server_indexes = vec![
+        IndexModel::builder()
+            .keys(doc! { "integrations.id": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("Integration IDs".to_string()))
+                    .build(),
+            ))
+            .build(),
+        IndexModel::builder()
+            .keys(doc! { "owners.id": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("Owners IDs".to_string()))
+                    .build(),
+            ))
+            .build(),
+    ];
+
+    tracing::info!("Creating server specific indexes...");
+    server_db
+        .get_collection()
+        .create_indexes(server_indexes)
+        .await?;
+
+    // Collab sync indexes
+    let collab_sync_indexes = vec![
+        IndexModel::builder()
+            .keys(doc! { "projects.server": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("Server IDs".to_string()))
+                    .build(),
+            ))
+            .build(),
+        IndexModel::builder()
+            .keys(doc! { "projects.project": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("Project IDs".to_string()))
+                    .build(),
+            ))
+            .build(),
+        IndexModel::builder()
+            .keys(doc! { "projects.server": 1, "projects.project": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("Server + Project IDs".to_string()))
+                    .build(),
+            ))
+            .build(),
+    ];
+
+    tracing::info!("Creating server specific indexes...");
+    collab_sync_db
+        .get_collection()
+        .create_indexes(collab_sync_indexes)
+        .await?;
+
+    // Collab invite indexes
+    let collab_invite_indexes = vec![
+        IndexModel::builder()
+            .keys(doc! { "source.server": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("Source Server ID".to_string()))
+                    .build(),
+            ))
+            .build(),
+        IndexModel::builder()
+            .keys(doc! { "source.project": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("Source Project ID".to_string()))
+                    .build(),
+            ))
+            .build(),
+        IndexModel::builder()
+            .keys(doc! { "source.server": 1, "source.project": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("Source Server + Project".to_string()))
+                    .build(),
+            ))
+            .build(),
+        IndexModel::builder()
+            .keys(doc! { "target.server": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("Target Server ID".to_string()))
+                    .build(),
+            ))
+            .build(),
+    ];
+
+    tracing::info!("Creating server specific indexes...");
+    collab_invite_db
+        .get_collection()
+        .create_indexes(collab_invite_indexes)
+        .await?;
 
     Ok(())
 }

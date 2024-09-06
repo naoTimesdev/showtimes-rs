@@ -119,6 +119,9 @@ async fn main() -> anyhow::Result<()> {
                 runner::run_meilisearch_reindex(&connection).await?;
             }
         },
+        MigrationCommands::Indexes => {
+            runner::run_database_create_indexes(&connection).await?;
+        }
     }
 
     Ok(())

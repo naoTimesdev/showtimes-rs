@@ -51,6 +51,9 @@ pub(crate) enum MigrationCommands {
         #[command(subcommand)]
         command: MigrationMeiliCommands,
     },
+    /// Create database indexes
+    #[command(name = "indexes")]
+    Indexes,
 }
 
 #[derive(Subcommand)]
