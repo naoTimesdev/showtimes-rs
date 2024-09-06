@@ -280,6 +280,23 @@ impl ProjectGQL {
         }
     }
 
+    /// The project first airing date, taken from the first episode.
+    #[graphql(name = "startTime")]
+    async fn start_time(&self) -> Option<DateTimeGQL> {
+        let mut sorted_progress = self.progress.clone();
+        sorted_progress.sort_by(|a, b| a.number.cmp(&b.number));
+
+        sorted_progress
+            .first()
+            .map(|p| p.aired.map(|d| d.into()))
+            .flatten()
+    }
+
+    /// The project episode/progress total count.
+    async fn count(&self) -> u64 {
+        self.progress.len() as u64
+    }
+
     /// The project kind or type.
     async fn kind(&self) -> ProjectTypeGQL {
         self.kind.into()
