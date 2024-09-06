@@ -928,6 +928,14 @@ impl M20240725045840Init {
                         })
                         .collect();
 
+                if all_project_ids.len() <= 1 {
+                    tracing::warn!(
+                        "Project collab {} has less than 2 servers, skipping...",
+                        &collab.old_id
+                    );
+                    continue;
+                }
+
                 mapped_temp.insert(
                     key,
                     showtimes_db::m::ServerCollaborationSync::new(all_project_ids),
