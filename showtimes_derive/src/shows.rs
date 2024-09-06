@@ -262,8 +262,6 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
                 for doc in docs.iter_mut() {
                     if doc.id().is_none() {
                         doc.set_id(mongodb::bson::oid::ObjectId::new());
-                    } else {
-                        doc.updated();
                     }
                 }
                 self.col.insert_many(docs).await?;
