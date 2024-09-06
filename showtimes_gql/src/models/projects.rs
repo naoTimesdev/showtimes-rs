@@ -1,6 +1,11 @@
-use crate::data_loader::{ServerDataLoader, UserDataLoader};
+use crate::data_loader::{ServerDataLoader, ServerSyncIds, ServerSyncLoader, UserDataLoader};
 
-use super::{prelude::*, servers::ServerGQL, users::UserGQL};
+use super::{
+    collaborations::{CollaborationSyncGQL, CollaborationSyncRequester},
+    prelude::*,
+    servers::ServerGQL,
+    users::UserGQL,
+};
 use async_graphql::{dataloader::DataLoader, Enum, Object, SimpleObject};
 
 /// Enum to hold project types or kinds.
@@ -162,6 +167,7 @@ pub struct ProjectGQL {
     created: chrono::DateTime<chrono::Utc>,
     updated: chrono::DateTime<chrono::Utc>,
     disable_server_fetch: bool,
+    disable_collaboration_fetch: bool,
 }
 
 #[Object]
@@ -302,6 +308,35 @@ impl ProjectGQL {
         self.kind.into()
     }
 
+    /// The project collaboration information
+    async fn collaboration(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+    ) -> async_graphql::Result<CollaborationSyncGQL> {
+        if self.disable_collaboration_fetch {
+            return Err(
+                "Collaboration fetch from this context is disabled to avoid looping".into(),
+            );
+        }
+
+        let loader = ctx.data_unchecked::<DataLoader<ServerSyncLoader>>();
+
+        let res = loader
+            .load_one(ServerSyncIds::new(self.creator, self.id))
+            .await?;
+
+        match res {
+            Some(sync) => {
+                let mapped = CollaborationSyncGQL::new(
+                    &sync,
+                    CollaborationSyncRequester::new(self.creator, self.id),
+                );
+                Ok(mapped)
+            }
+            None => Err("Collaboration not found".into()),
+        }
+    }
+
     /// The project creation date
     async fn created(&self) -> DateTimeGQL {
         self.created.into()
@@ -392,6 +427,7 @@ impl From<showtimes_db::m::Project> for ProjectGQL {
             created: project.created,
             updated: project.updated,
             disable_server_fetch: false,
+            disable_collaboration_fetch: false,
         }
     }
 }
@@ -411,14 +447,19 @@ impl From<&showtimes_db::m::Project> for ProjectGQL {
             created: project.created,
             updated: project.updated,
             disable_server_fetch: false,
+            disable_collaboration_fetch: false,
         }
     }
 }
 
 impl ProjectGQL {
-    #[allow(dead_code)]
     pub fn with_disable_server_fetch(mut self) -> Self {
         self.disable_server_fetch = true;
+        self
+    }
+
+    pub fn with_disable_collaboration_fetch(mut self) -> Self {
+        self.disable_collaboration_fetch = true;
         self
     }
 }

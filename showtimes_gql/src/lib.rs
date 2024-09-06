@@ -381,5 +381,9 @@ pub fn create_schema(db_pool: &DatabaseShared) -> ShowtimesGQLSchema {
             data_loader::ServerDataLoader::new(db_pool),
             tokio::spawn,
         ))
+        .data(DataLoader::new(
+            data_loader::ServerSyncLoader::new(db_pool),
+            tokio::spawn,
+        ))
         .finish()
 }

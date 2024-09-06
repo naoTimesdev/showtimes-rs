@@ -1,3 +1,4 @@
+pub mod collaborations;
 pub mod prelude;
 pub mod projects;
 pub mod search;

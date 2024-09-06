@@ -161,7 +161,7 @@ impl Loader<ProjectDataLoaderKey> for ProjectDataLoader {
         let col_ids = self.col.get_collection();
         let col_creator = self.col.get_collection();
         let doc_fetch_ids = doc! {
-            "api_key": { "$in": fetch_by_ids.clone() }
+            "id": { "$in": fetch_by_ids.clone() }
         };
         let mut tasks = vec![];
         tasks.push(tokio::spawn(async move {
@@ -386,6 +386,141 @@ impl Loader<ServerAndOwnerId> for ServerDataLoader {
                 let res = all_results
                     .iter()
                     .find(|u| u.id == k.server && u.owners.iter().any(|o| o.id == k.owner));
+
+                res.map(|r| (k.clone(), r.clone()))
+            })
+            .collect();
+
+        Ok(mapped_res)
+    }
+}
+
+/// A data loader for the server sync model
+pub struct ServerSyncLoader {
+    col: showtimes_db::CollaborationSyncHandler,
+}
+
+impl ServerSyncLoader {
+    /// Create a new server sync data loader
+    pub fn new(col: &DatabaseShared) -> Self {
+        let col = showtimes_db::CollaborationSyncHandler::new(col);
+        ServerSyncLoader { col }
+    }
+}
+
+#[derive(Clone, Hash, PartialEq, Eq)]
+pub struct ServerSyncServerId(Ulid);
+
+impl ServerSyncServerId {
+    #[allow(dead_code)]
+    pub fn new(id: Ulid) -> Self {
+        Self(id)
+    }
+}
+
+impl Deref for ServerSyncServerId {
+    type Target = Ulid;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Clone, Hash, PartialEq, Eq)]
+pub struct ServerSyncIds {
+    /// The server ID
+    id: Ulid,
+    /// Project ID
+    project: Ulid,
+}
+
+impl ServerSyncIds {
+    pub fn new(id: Ulid, project: Ulid) -> Self {
+        Self { id, project }
+    }
+}
+
+impl Loader<ServerSyncServerId> for ServerSyncLoader {
+    type Value = Vec<showtimes_db::m::ServerCollaborationSync>;
+    type Error = FieldError;
+
+    async fn load(
+        &self,
+        keys: &[ServerSyncServerId],
+    ) -> Result<HashMap<ServerSyncServerId, Self::Value>, Self::Error> {
+        let keys_to_string = keys.iter().map(|k| (*k).to_string()).collect::<Vec<_>>();
+
+        let result = self
+            .col
+            .get_collection()
+            .find(doc! {
+                "projects.server": { "$in": keys_to_string }
+            })
+            .limit(keys.len() as i64)
+            .await?;
+
+        let all_results = result
+            .try_collect::<Vec<showtimes_db::m::ServerCollaborationSync>>()
+            .await?;
+        let mapped_res: HashMap<ServerSyncServerId, Vec<showtimes_db::m::ServerCollaborationSync>> =
+            keys.iter()
+                .filter_map(|k| {
+                    let res: Vec<showtimes_db::m::ServerCollaborationSync> = all_results
+                        .iter()
+                        .filter(|u| u.projects.iter().any(|p| p.server == **k))
+                        .cloned()
+                        .collect();
+
+                    Some((k.clone(), res))
+                })
+                .collect();
+
+        Ok(mapped_res)
+    }
+}
+
+impl Loader<ServerSyncIds> for ServerSyncLoader {
+    type Error = FieldError;
+    type Value = showtimes_db::m::ServerCollaborationSync;
+
+    async fn load(
+        &self,
+        keys: &[ServerSyncIds],
+    ) -> Result<HashMap<ServerSyncIds, Self::Value>, Self::Error> {
+        let all_keys_mappings: Vec<Document> = keys
+            .iter()
+            .map(|k| {
+                doc! {
+                    "$and": [
+                        {
+                            "projects.server": k.id.to_string(),
+                            "projects.project": k.project.to_string()
+                        }
+                    ]
+                }
+            })
+            .collect();
+
+        let result = self
+            .col
+            .get_collection()
+            .find(doc! {
+                "$or": all_keys_mappings
+            })
+            .limit(keys.len() as i64)
+            .await?;
+
+        let all_results = result
+            .try_collect::<Vec<showtimes_db::m::ServerCollaborationSync>>()
+            .await?;
+        let mapped_res: HashMap<ServerSyncIds, showtimes_db::m::ServerCollaborationSync> = keys
+            .iter()
+            .filter_map(|k| {
+                let res = all_results.iter().find(|u| {
+                    u.projects
+                        .iter()
+                        .any(|p| p.server == k.id && p.project == k.project)
+                });
 
                 res.map(|r| (k.clone(), r.clone()))
             })
