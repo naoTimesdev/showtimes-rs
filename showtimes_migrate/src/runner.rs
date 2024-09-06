@@ -454,7 +454,7 @@ pub async fn run_database_create_indexes(conn: &showtimes_db::Connection) -> any
             .build(),
     ];
 
-    tracing::info!("Creating server specific indexes...");
+    tracing::info!("Creating collab sync specific indexes...");
     collab_sync_db
         .get_collection()
         .create_indexes(collab_sync_indexes)
@@ -496,7 +496,7 @@ pub async fn run_database_create_indexes(conn: &showtimes_db::Connection) -> any
             .build(),
     ];
 
-    tracing::info!("Creating server specific indexes...");
+    tracing::info!("Creating collab invite specific indexes...");
     collab_invite_db
         .get_collection()
         .create_indexes(collab_invite_indexes)

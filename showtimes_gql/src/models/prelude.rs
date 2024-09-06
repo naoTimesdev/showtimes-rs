@@ -3,6 +3,7 @@ use std::ops::Deref;
 use async_graphql::{
     ComplexObject, Description, Enum, OutputType, Scalar, ScalarType, SimpleObject,
 };
+use showtimes_db::mongodb::bson::doc;
 
 use super::{projects::ProjectGQL, servers::ServerGQL, users::UserGQL};
 
@@ -353,6 +354,75 @@ impl<T: OutputType> Default for PaginatedGQL<T> {
         PaginatedGQL {
             node: vec![],
             page_info: PageInfoGQL::default(),
+        }
+    }
+}
+
+/// Global sort order for the list
+#[derive(Enum, Debug, Default, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+pub enum SortOrderGQL {
+    /// Sort by ID (Ascending)
+    #[default]
+    IdAsc,
+    /// Sort by ID (Descending)
+    IdDesc,
+    /// Sort by Name (Ascending)
+    NameAsc,
+    /// Sort by Name (Descending)
+    NameDesc,
+    /// Sort by Created At (Ascending)
+    CreatedAtAsc,
+    /// Sort by Created At (Descending)
+    CreatedAtDesc,
+    /// Sort by Updated At (Ascending)
+    UpdatedAtAsc,
+    /// Sort by Updated At (Descending)
+    UpdatedAtDesc,
+}
+
+impl SortOrderGQL {
+    pub(crate) fn into_sort_doc(
+        &self,
+        title: impl Into<Option<String>>,
+    ) -> showtimes_db::mongodb::bson::Document {
+        let title: Option<String> = title.into();
+        match (self, title) {
+            (SortOrderGQL::IdAsc, _) => {
+                doc! { "id": 1 }
+            }
+            (SortOrderGQL::IdDesc, _) => {
+                doc! { "id": -1 }
+            }
+            (SortOrderGQL::NameAsc, Some(title)) => {
+                let mut data = showtimes_db::mongodb::bson::Document::new();
+                data.insert(title, 1);
+                data
+            }
+            (SortOrderGQL::NameDesc, Some(title)) => {
+                let mut data = showtimes_db::mongodb::bson::Document::new();
+                data.insert(title, -1);
+                data
+            }
+            (SortOrderGQL::NameAsc, None) => {
+                // Fallback to ID
+                doc! { "id": 1 }
+            }
+            (SortOrderGQL::NameDesc, None) => {
+                // Fallback to ID
+                doc! { "id": -1 }
+            }
+            (SortOrderGQL::CreatedAtAsc, _) => {
+                doc! { "created": 1 }
+            }
+            (SortOrderGQL::CreatedAtDesc, _) => {
+                doc! { "created": -1 }
+            }
+            (SortOrderGQL::UpdatedAtAsc, _) => {
+                doc! { "updated": 1 }
+            }
+            (SortOrderGQL::UpdatedAtDesc, _) => {
+                doc! { "updated": -1 }
+            }
         }
     }
 }

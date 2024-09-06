@@ -98,6 +98,9 @@ impl UserGQL {
         #[graphql(desc = "The cursor to start from")] cursor: Option<
             crate::models::prelude::UlidGQL,
         >,
+        #[graphql(desc = "Sort order, default to ID_ASC")] sort: Option<
+            crate::models::prelude::SortOrderGQL,
+        >,
     ) -> async_graphql::Result<PaginatedGQL<ServerGQL>> {
         if self.disallow_server_fetch {
             return Err("Servers fetch from this context is disabled to avoid looping".into());
@@ -113,6 +116,9 @@ impl UserGQL {
         }
         if let Some(cursor) = cursor {
             queries.set_cursor(*cursor);
+        }
+        if let Some(sort) = sort {
+            queries.set_sort(sort);
         }
 
         let results = crate::queries::servers::query_servers_paginated(ctx, queries).await?;

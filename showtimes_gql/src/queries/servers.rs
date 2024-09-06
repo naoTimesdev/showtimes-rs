@@ -8,7 +8,7 @@ use showtimes_shared::ulid::Ulid;
 
 use super::ServerQueryUser;
 use crate::models::{
-    prelude::{PageInfoGQL, PaginatedGQL},
+    prelude::{PageInfoGQL, PaginatedGQL, SortOrderGQL},
     servers::ServerGQL,
 };
 
@@ -23,6 +23,8 @@ pub struct ServerQuery {
     cursor: Option<Ulid>,
     /// The current user fetching this data
     current_user: Option<ServerQueryUser>,
+    /// Sort order
+    sort: SortOrderGQL,
     /// Disable project fetch
     disable_projects: bool,
 }
@@ -62,6 +64,10 @@ impl ServerQuery {
 
     pub fn set_cursor(&mut self, cursor: Ulid) {
         self.cursor = Some(cursor);
+    }
+
+    pub fn set_sort(&mut self, sort: SortOrderGQL) {
+        self.sort = sort;
     }
 
     /// Set the current user fetching this data
@@ -140,7 +146,7 @@ pub async fn query_servers_paginated(
         .get_collection()
         .find(doc_query)
         .limit((per_page + 1) as i64)
-        .sort(doc! { "id": 1 })
+        .sort(queries.sort.into_sort_doc(Some("name".to_string())))
         .await?;
     let count = srv_handler
         .get_collection()

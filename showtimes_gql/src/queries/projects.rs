@@ -9,7 +9,7 @@ use showtimes_db::{
 use showtimes_shared::ulid::Ulid;
 
 use crate::models::{
-    prelude::{PageInfoGQL, PaginatedGQL},
+    prelude::{PageInfoGQL, PaginatedGQL, SortOrderGQL},
     projects::ProjectGQL,
 };
 
@@ -56,6 +56,8 @@ pub struct ProjectQuery {
     per_page: Option<u32>,
     /// The cursor to start from
     cursor: Option<Ulid>,
+    /// Sort order
+    sort: SortOrderGQL,
     /// The server that created the project
     creators: Option<Vec<Ulid>>,
     /// Allowed servers to query
@@ -99,6 +101,10 @@ impl ProjectQuery {
 
     pub fn set_cursor(&mut self, cursor: Ulid) {
         self.cursor = Some(cursor);
+    }
+
+    pub fn set_sort(&mut self, sort: SortOrderGQL) {
+        self.sort = sort;
     }
 
     /// Set the servers fetching this data
@@ -322,7 +328,9 @@ pub async fn query_projects_paginated(
     };
 
     let col = prj_handler.get_collection();
-    let base_cursor = col.find(query_docs_fetch).sort(doc! { "id": 1 });
+    let base_cursor = col
+        .find(query_docs_fetch)
+        .sort(queries.sort.into_sort_doc(Some("title".to_string())));
 
     let cursor = if queries.unpaged {
         base_cursor
