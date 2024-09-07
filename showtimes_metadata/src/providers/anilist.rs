@@ -1,6 +1,8 @@
 use serde_json::json;
 
-use crate::models::{AnilistAiringSchedulePaged, AnilistMedia, AnilistResponse};
+use crate::models::{
+    AnilistAiringSchedulePaged, AnilistMedia, AnilistPagedData, AnilistResponse, AnilistSingleMedia,
+};
 
 const ANILIST_GRAPHQL_URL: &str = "https://graphql.anilist.co/";
 
@@ -85,11 +87,14 @@ impl AnilistProvider {
     ///
     /// * `query` - The query to send
     /// * `variables` - The variables to send
-    async fn query(
+    async fn query<T>(
         &mut self,
         query: &str,
         variables: &serde_json::Value,
-    ) -> anyhow::Result<AnilistResponse> {
+    ) -> anyhow::Result<AnilistResponse<T>>
+    where
+        T: serde::de::DeserializeOwned,
+    {
         let json_data = json!({
             "query": query,
             "variables": variables,
@@ -129,7 +134,7 @@ impl AnilistProvider {
             reset: rate_reset,
         };
 
-        let json_data: AnilistResponse = req.json().await?;
+        let json_data: AnilistResponse<T> = req.json().await?;
 
         Ok(json_data)
     }
@@ -180,10 +185,55 @@ impl AnilistProvider {
             "search": title.into(),
         });
 
-        let res = self.query(queries, &variables).await?;
+        let res = self.query::<AnilistPagedData>(queries, &variables).await?;
         let media_data = res.data.page.nodes.media().unwrap();
 
         Ok(media_data.clone())
+    }
+
+    /// Get specific media information
+    ///
+    /// * `id` - The ID of the media
+    pub async fn get_media(&mut self, id: i32) -> anyhow::Result<AnilistMedia> {
+        let queries = r#"query mediaInfo($id:Int) {
+            Media(id:$id) {
+                id
+                idMal
+                format
+                type
+                season
+                seasonYear
+                episodes
+                chapters
+                volumes
+                isAdult
+                startDate {
+                    year
+                    month
+                    day
+                }
+                title {
+                    romaji
+                    native
+                    english
+                }
+                coverImage {
+                    medium
+                    large
+                    extraLarge
+                }
+            }
+        }"#;
+
+        let variables = json!({
+            "id": id,
+        });
+
+        let res = self
+            .query::<AnilistSingleMedia>(queries, &variables)
+            .await?;
+
+        Ok(res.data.media.clone())
     }
 
     /// Get the airing schedules for a media
@@ -230,7 +280,7 @@ impl AnilistProvider {
             "page": act_page,
         });
 
-        let res = self.query(queries, &variables).await?;
+        let res = self.query::<AnilistPagedData>(queries, &variables).await?;
         let air_schedules = res.data.page.nodes.airing_schedules().unwrap();
 
         Ok(AnilistAiringSchedulePaged {

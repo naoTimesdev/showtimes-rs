@@ -1,3 +1,4 @@
+use chrono::TimeZone;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
@@ -29,6 +30,18 @@ pub struct AnilistFuzzyDate {
     pub year: Option<i32>,
     pub month: Option<i32>,
     pub day: Option<i32>,
+}
+
+impl AnilistFuzzyDate {
+    /// Parse the fuzzy date into a [`chrono::DateTime`]
+    pub fn into_chrono(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        match (self.year, self.month, self.day) {
+            (Some(year), Some(month), Some(day)) => chrono::Utc
+                .with_ymd_and_hms(year, month as u32, day as u32, 0, 0, 0)
+                .single(),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
@@ -139,7 +152,7 @@ pub struct AnilistAiringSchedulePaged {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct AnilistPage {
+pub struct AnilistPageInnerData {
     #[serde(flatten)]
     pub nodes: AnilistPaginatedNodes,
     #[serde(rename = "pageInfo")]
@@ -147,14 +160,21 @@ pub struct AnilistPage {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct AnilistData {
+pub struct AnilistPagedData {
     #[serde(rename = "Page")]
-    pub page: AnilistPage,
+    pub page: AnilistPageInnerData,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub struct AnilistResponse {
-    pub data: AnilistData,
+pub struct AnilistSingleMedia {
+    #[serde(rename = "Media")]
+    pub media: AnilistMedia,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct AnilistResponse<T> {
+    #[serde(bound(deserialize = "T: Deserialize<'de>", serialize = "T: Serialize"))]
+    pub data: T,
 }
 
 #[cfg(test)]
@@ -227,7 +247,8 @@ mod tests {
             }
         }"#;
 
-        let data: super::AnilistResponse = serde_json::from_str(test_str).unwrap();
+        let data: super::AnilistResponse<super::AnilistPagedData> =
+            serde_json::from_str(test_str).unwrap();
 
         assert_eq!(
             data.data.page.nodes,
