@@ -33,6 +33,70 @@ pub enum TMDbBackdropSize {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+pub struct TMDbMovieResult {
+    /// The ID of the result
+    pub id: i32,
+    /// Is this an adult/NSFW item
+    pub adult: bool,
+    /// The media type of the result
+    pub media_type: TMDbMediaType,
+    /// The title of the result.
+    pub title: Option<String>,
+    /// The original title of the result.
+    pub original_title: Option<String>,
+    /// The original language of the result
+    pub original_language: Option<String>,
+    /// The poster path of the result
+    ///
+    /// This is not a full URL, but need to be appended with some base URL.
+    ///
+    /// See [TMDb Image API](https://developers.themoviedb.org/3/getting-started/images) for more information
+    pub poster_path: Option<String>,
+    /// The backdrop path of the result
+    ///
+    /// Same with `poster_path`, this is not a full URL, but need to be appended with some base URL.
+    pub backdrop_path: Option<String>,
+    /// The release date of the result
+    pub release_date: Option<String>,
+    /// Overview/description of the result
+    pub overview: Option<String>,
+}
+
+impl TMDbMovieResult {
+    /// Get the full URL of the poster path.
+    ///
+    /// This will utilize the `original` size of the image and will
+    /// return `None` if the `poster_path` is `None`.
+    pub fn poster_url(&self) -> Option<String> {
+        self.poster_url_sized(TMDbPosterSize::Original)
+    }
+
+    /// Get the full URL of the poster path with a specific size.
+    ///
+    /// This will return `None` if the `poster_path` is `None`.
+    pub fn poster_url_sized(&self, size: TMDbPosterSize) -> Option<String> {
+        self.poster_path.as_ref().map(|path| get_poster(path, size))
+    }
+
+    /// Get the full URL of the backdrop path.
+    ///
+    /// This will utilize the `original` size of the image and will
+    /// return `None` if the `backdrop_path` is `None`.
+    pub fn backdrop_url(&self) -> Option<String> {
+        self.backdrop_url_sized(TMDbBackdropSize::Original)
+    }
+
+    /// Get the full URL of the backdrop path with a specific size.
+    ///
+    /// This will return `None` if the `backdrop_path` is `None`.
+    pub fn backdrop_url_sized(&self, size: TMDbBackdropSize) -> Option<String> {
+        self.backdrop_path
+            .as_ref()
+            .map(|path| get_backdrop(path, size))
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct TMDbMultiResult {
     /// The ID of the result
     pub id: i32,
@@ -85,11 +149,7 @@ impl TMDbMultiResult {
     ///
     /// This will return `None` if the `poster_path` is `None`.
     pub fn poster_url_sized(&self, size: TMDbPosterSize) -> Option<String> {
-        let downcast = size.to_name().to_lowercase();
-
-        self.poster_path
-            .as_ref()
-            .map(|path| format!("{}{}{}", BASE_IMAGE, downcast, path))
+        self.poster_path.as_ref().map(|path| get_poster(path, size))
     }
 
     /// Get the full URL of the backdrop path.
@@ -104,11 +164,9 @@ impl TMDbMultiResult {
     ///
     /// This will return `None` if the `backdrop_path` is `None`.
     pub fn backdrop_url_sized(&self, size: TMDbBackdropSize) -> Option<String> {
-        let downcast = size.to_name().to_lowercase();
-
         self.backdrop_path
             .as_ref()
-            .map(|path| format!("{}{}{}", BASE_IMAGE, downcast, path))
+            .map(|path| get_backdrop(path, size))
     }
 
     /// Get the title of the result.
@@ -170,4 +228,12 @@ impl std::fmt::Display for TMDbErrorResponse {
             self.status_code, self.status_message
         )
     }
+}
+
+fn get_backdrop(url: &str, size: TMDbBackdropSize) -> String {
+    format!("{}{}{}", BASE_IMAGE, size.to_name().to_lowercase(), url)
+}
+
+fn get_poster(url: &str, size: TMDbPosterSize) -> String {
+    format!("{}{}{}", BASE_IMAGE, size.to_name().to_lowercase(), url)
 }

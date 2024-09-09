@@ -1,4 +1,4 @@
-use crate::models::{TMDbErrorResponse, TMDbMultiResponse, TMDbMultiResult};
+use crate::models::{TMDbErrorResponse, TMDbMovieResult, TMDbMultiResponse, TMDbMultiResult};
 
 const TMDB_API_URL: &str = "https://api.themoviedb.org/3";
 
@@ -84,7 +84,7 @@ impl TMDbProvider {
         }
     }
 
-    /// Search for a movie or TV show
+    /// Search for a movie
     ///
     /// This will also search for people and companies, so make sure to filter the results.
     ///
@@ -93,11 +93,21 @@ impl TMDbProvider {
     pub async fn search(&self, query: &str) -> Result<Vec<TMDbMultiResult>, TMDbErrorResponse> {
         let response: TMDbMultiResponse = self
             .request(
-                "search/multi",
+                "search/movie",
                 &[("query", query), ("include_adult", "true")],
             )
             .await?;
 
         Ok(response.results)
+    }
+
+    /// Get specific movie details
+    ///
+    /// # Arguments
+    /// * `id` - The movie ID
+    pub async fn get_movie_details(&self, id: i32) -> Result<TMDbMovieResult, TMDbErrorResponse> {
+        let response: TMDbMovieResult = self.request(&format!("movie/{}", id), &[]).await?;
+
+        Ok(response)
     }
 }
