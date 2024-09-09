@@ -7,7 +7,10 @@ use showtimes_metadata::{
     AnilistProvider, TMDbProvider, VndbProvider,
 };
 
-use super::projects::ProjectTypeGQL;
+use super::{
+    prelude::ProjectKindGQL,
+    projects::{ProjectTypeGQL, RoleGQL},
+};
 
 type AnilistProviderShared = Arc<Mutex<AnilistProvider>>;
 type TMDbProviderShared = Arc<TMDbProvider>;
@@ -254,6 +257,14 @@ impl From<AnilistFuzzyDate> for ExternalSearchFuzzyDate {
     }
 }
 
+/// The list of defualt roles that can be used
+#[derive(SimpleObject)]
+struct DefaultRolesGQL {
+    /// The list of default roles
+    roles: Vec<RoleGQL>,
+    kind: ProjectKindGQL,
+}
+
 /// Do a search on external source or internal database
 pub struct QuerySearchRoot;
 
@@ -346,4 +357,33 @@ impl QuerySearchRoot {
             None => Ok(vec![]),
         }
     }
+
+    /// Get all the default roles list that can be used
+    #[graphql(name = "defaultRoles")]
+    async fn default_roles(&self) -> Vec<DefaultRolesGQL> {
+        let all_results = vec![
+            DefaultRolesGQL {
+                roles: into_rolegql(showtimes_db::m::ProjectKind::Shows.default_roles()),
+                kind: ProjectKindGQL::Shows,
+            },
+            DefaultRolesGQL {
+                roles: into_rolegql(showtimes_db::m::ProjectKind::Literature.default_roles()),
+                kind: ProjectKindGQL::Literature,
+            },
+            DefaultRolesGQL {
+                roles: into_rolegql(showtimes_db::m::ProjectKind::Games.default_roles()),
+                kind: ProjectKindGQL::Games,
+            },
+            DefaultRolesGQL {
+                roles: into_rolegql(showtimes_db::m::ProjectKind::Manga.default_roles()),
+                kind: ProjectKindGQL::Manga,
+            },
+        ];
+
+        all_results
+    }
+}
+
+fn into_rolegql(origin: Vec<showtimes_db::m::Role>) -> Vec<RoleGQL> {
+    origin.into_iter().map(|r| r.into()).collect()
 }

@@ -454,3 +454,22 @@ impl OkResponse {
         }
     }
 }
+
+/// The default roles for each project kind
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[graphql(
+    remote = "showtimes_db::m::ProjectKind",
+    rename_items = "SCREAMING_SNAKE_CASE"
+)]
+pub enum ProjectKindGQL {
+    /// The project is a shows, movies, or anything relevant to it
+    Shows,
+    /// The project is a literature types
+    Literature,
+    /// The project is a manga types
+    Manga,
+    /// The project is a games types
+    Games,
+    /// The project is a unknown type
+    Unknown,
+}
