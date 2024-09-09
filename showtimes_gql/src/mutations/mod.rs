@@ -2,6 +2,7 @@ use async_graphql::{CustomValidator, Enum, InputObject};
 
 use crate::models::prelude::IntegrationTypeGQL;
 
+pub mod projects;
 pub mod servers;
 pub mod users;
 
@@ -57,12 +58,25 @@ impl IntegrationInputGQL {
 }
 
 /// A simple validator for the integration input
-pub struct IntegrationValidator;
+pub struct IntegrationValidator {
+    limit: Vec<IntegrationActionGQL>,
+}
 
 impl IntegrationValidator {
     /// Create a new integration validator
     pub fn new() -> Self {
-        Self
+        Self {
+            limit: vec![
+                IntegrationActionGQL::Add,
+                IntegrationActionGQL::Update,
+                IntegrationActionGQL::Remove,
+            ],
+        }
+    }
+
+    /// Create a new integration validator with a custom limit
+    pub fn with_limit(limit: Vec<IntegrationActionGQL>) -> Self {
+        Self { limit }
     }
 }
 
@@ -79,7 +93,17 @@ impl CustomValidator<Vec<IntegrationInputGQL>> for IntegrationValidator {
                     .with_extension("kind", vs.kind)
                     .with_extension("action", vs.action)
                     .with_extension("id", vs.id.clone())
-            })?
+            })?;
+
+            // Check if the action is valid
+            if !self.limit.contains(&vs.action) {
+                return Err(async_graphql::InputValueError::custom(
+                    "Action not allowed for this input field",
+                )
+                .with_extension("index", idx)
+                .with_extension("id", vs.id.clone())
+                .with_extension("action", vs.action));
+            }
         }
 
         Ok(())
@@ -92,6 +116,15 @@ impl CustomValidator<IntegrationInputGQL> for IntegrationValidator {
         value: &IntegrationInputGQL,
     ) -> Result<(), async_graphql::InputValueError<IntegrationInputGQL>> {
         value.raise_if_invalid()?;
+
+        // Check if the action is valid
+        if !self.limit.contains(&value.action) {
+            return Err(async_graphql::InputValueError::custom(
+                "Action not allowed for this input field",
+            )
+            .with_extension("id", value.id.clone())
+            .with_extension("action", value.action));
+        }
 
         Ok(())
     }
@@ -109,7 +142,16 @@ impl CustomValidator<Option<IntegrationInputGQL>> for IntegrationValidator {
                     .with_extension("kind", vs.kind)
                     .with_extension("action", vs.action)
                     .with_extension("id", vs.id.clone())
-            })?
+            })?;
+
+            // Check if the action is valid
+            if !self.limit.contains(&vs.action) {
+                return Err(async_graphql::InputValueError::custom(
+                    "Action not allowed for this input field",
+                )
+                .with_extension("id", vs.id.clone())
+                .with_extension("action", vs.action));
+            }
         }
 
         Ok(())
@@ -130,7 +172,17 @@ impl CustomValidator<Option<Vec<IntegrationInputGQL>>> for IntegrationValidator 
                         .with_extension("kind", vs.kind)
                         .with_extension("action", vs.action)
                         .with_extension("id", vs.id.clone())
-                })?
+                })?;
+
+                // Check if the action is valid
+                if !self.limit.contains(&vs.action) {
+                    return Err(async_graphql::InputValueError::custom(
+                        "Action not allowed for this input field",
+                    )
+                    .with_extension("index", idx)
+                    .with_extension("id", vs.id.clone())
+                    .with_extension("action", vs.action));
+                }
             }
         }
 

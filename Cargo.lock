@@ -3815,6 +3815,7 @@ dependencies = [
  "chrono",
  "futures",
  "image",
+ "reqwest",
  "serde",
  "serde_json",
  "showtimes-db",

@@ -377,6 +377,39 @@ impl MutationRoot {
         }
     }
 
+    /// Create a new server in Showtimes
+    #[graphql(
+        name = "createServer",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)"
+    )]
+    async fn create_server(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The server information to be created")]
+        input: mutations::servers::ServerCreateInputGQL,
+    ) -> async_graphql::Result<ServerGQL> {
+        let user = find_authenticated_user(ctx).await?;
+
+        mutations::servers::mutate_servers_create(ctx, user, input).await
+    }
+
+    /// Create a new project in Showtimes
+    #[graphql(
+        name = "createProject",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)"
+    )]
+    async fn create_project(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The server ID for the project")] id: crate::models::prelude::UlidGQL,
+        #[graphql(desc = "The project information to be created")]
+        input: mutations::projects::ProjectCreateInputGQL,
+    ) -> async_graphql::Result<ProjectGQL> {
+        let user = find_authenticated_user(ctx).await?;
+
+        mutations::projects::mutate_projects_create(ctx, user, id, input).await
+    }
+
     /// Update user information
     #[graphql(
         name = "updateUser",
@@ -409,7 +442,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The server ID to update")] id: crate::models::prelude::UlidGQL,
         #[graphql(desc = "The server information to update")]
-        input: mutations::servers::ServerInputGQL,
+        input: mutations::servers::ServerUpdateInputGQL,
     ) -> async_graphql::Result<ServerGQL> {
         let user = find_authenticated_user(ctx).await?;
 

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_graphql::{dataloader::DataLoader, Error, ErrorExtensions, InputObject, Upload};
 use showtimes_db::{m::UserKind, DatabaseShared, ServerHandler};
-use showtimes_fs::FsPool;
+use showtimes_fs::{FsFileKind, FsPool};
 use showtimes_search::SearchClientShared;
 use tokio::io::AsyncSeekExt;
 
@@ -13,11 +13,28 @@ use crate::{
 
 use super::{IntegrationActionGQL, IntegrationInputGQL, IntegrationValidator};
 
+/// The server input object for creating a new server
+#[derive(InputObject)]
+pub struct ServerCreateInputGQL {
+    /// The server name
+    #[graphql(validator(min_length = 5, max_length = 128))]
+    name: String,
+    /// The list of integration to add, update, or remove
+    #[graphql(validator(
+        custom = "IntegrationValidator::with_limit(vec![IntegrationActionGQL::Add])"
+    ))]
+    integrations: Option<Vec<IntegrationInputGQL>>,
+    /// The server avatar
+    avatar: Option<Upload>,
+    /// Other owners of the server
+    owners: Option<Vec<ServerOwnerInputGQL>>,
+}
+
 /// The server input object on what to update
 ///
 /// All fields are optional
 #[derive(InputObject)]
-pub struct ServerInputGQL {
+pub struct ServerUpdateInputGQL {
     /// The server name
     #[graphql(validator(min_length = 5, max_length = 128))]
     name: Option<String>,
@@ -28,7 +45,7 @@ pub struct ServerInputGQL {
     avatar: Option<Upload>,
 }
 
-impl ServerInputGQL {
+impl ServerUpdateInputGQL {
     /// Check if any field is set
     fn is_any_set(&self) -> bool {
         self.name.is_some() || self.integrations.is_some() || self.avatar.is_some()
@@ -46,11 +63,98 @@ pub struct ServerOwnerInputGQL {
     extras: Option<Vec<String>>,
 }
 
+pub async fn mutate_servers_create(
+    ctx: &async_graphql::Context<'_>,
+    user: showtimes_db::m::User,
+    input: ServerCreateInputGQL,
+) -> async_graphql::Result<ServerGQL> {
+    let db = ctx.data_unchecked::<DatabaseShared>();
+    let meili = ctx.data_unchecked::<SearchClientShared>();
+
+    let current_user = vec![showtimes_db::m::ServerUser::new(
+        user.id,
+        showtimes_db::m::UserPrivilege::Owner,
+    )];
+
+    let mut server = showtimes_db::m::Server::new(&input.name, current_user);
+
+    if let Some(integrations) = input.integrations {
+        for integration in integrations {
+            match integration.action {
+                IntegrationActionGQL::Add => {
+                    server.add_integration(integration.into());
+                }
+                _ => {
+                    return Err(Error::new("Only add action is allowed for new servers")
+                        .extend_with(|_, e| {
+                            e.set("id", integration.id.clone());
+                            e.set("kind", integration.kind.to_string());
+                        }));
+                }
+            }
+        }
+    }
+
+    match input.avatar {
+        Some(avatar_upload) => {
+            let info_up = avatar_upload.value(ctx)?;
+            let mut file_target = tokio::fs::File::from_std(info_up.content);
+
+            // Get format
+            let format = crate::image::detect_upload_data(&mut file_target).await?;
+            // Seek back to the start of the file
+            file_target.seek(std::io::SeekFrom::Start(0)).await?;
+
+            let filename = format!("avatar.{}", format.as_extension());
+
+            let storages = ctx.data_unchecked::<Arc<FsPool>>();
+            storages
+                .file_stream_upload(
+                    server.id,
+                    &filename,
+                    &mut file_target,
+                    None,
+                    Some(showtimes_fs::FsFileKind::Images),
+                )
+                .await?;
+
+            let image_meta = showtimes_db::m::ImageMetadata::new(
+                showtimes_fs::FsFileKind::Images.as_path_name(),
+                server.id,
+                &filename,
+                format.as_extension(),
+                None::<String>,
+            );
+
+            server.avatar = Some(image_meta);
+        }
+        None => {
+            server.avatar = Some(showtimes_db::m::ImageMetadata::new(
+                FsFileKind::Invalids.as_path_name(),
+                "server",
+                "default.png",
+                "png",
+                None::<String>,
+            ));
+        }
+    }
+
+    // Commit to database
+    let srv_handler = ServerHandler::new(db);
+    srv_handler.save_direct(&mut server, None).await?;
+
+    // Commit to search engine
+    let srv_search = showtimes_search::models::Server::from(server.clone());
+    srv_search.update_document(meili).await?;
+
+    Ok(server.into())
+}
+
 pub async fn mutate_servers_update(
     ctx: &async_graphql::Context<'_>,
     id: UlidGQL,
     user: showtimes_db::m::User,
-    input: ServerInputGQL,
+    input: ServerUpdateInputGQL,
 ) -> async_graphql::Result<ServerGQL> {
     if !input.is_any_set() {
         return Err(Error::new("No fields to update"));
