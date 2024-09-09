@@ -448,6 +448,21 @@ impl MutationRoot {
 
         mutations::servers::mutate_servers_update(ctx, id, user, input).await
     }
+
+    /// Delete a project from Showtimes
+    #[graphql(
+        name = "deleteProject",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)"
+    )]
+    async fn delete_project(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The project ID to delete")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<OkResponse> {
+        let user = find_authenticated_user(ctx).await?;
+
+        mutations::projects::mutate_project_delete(ctx, user, id).await
+    }
 }
 
 /// Create the GraphQL schema

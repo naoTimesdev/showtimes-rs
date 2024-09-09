@@ -2,16 +2,16 @@ use std::{collections::VecDeque, sync::Arc};
 
 use async_graphql::{dataloader::DataLoader, Error, ErrorExtensions, InputObject, Upload};
 use chrono::TimeZone;
-use showtimes_db::{DatabaseShared, ProjectHandler};
+use showtimes_db::{mongodb::bson::doc, DatabaseShared, ProjectHandler};
 use showtimes_fs::FsPool;
 use showtimes_metadata::m::AnilistMediaFormat;
 use showtimes_search::SearchClientShared;
 use tokio::{io::AsyncSeekExt, sync::Mutex};
 
 use crate::{
-    data_loader::{ServerDataLoader, UserDataLoader},
+    data_loader::{ProjectDataLoader, ProjectDataLoaderKey, ServerDataLoader, UserDataLoader},
     models::{
-        prelude::{DateTimeGQL, UlidGQL},
+        prelude::{DateTimeGQL, OkResponse, UlidGQL},
         projects::ProjectGQL,
         search::ExternalSearchSource,
     },
@@ -684,4 +684,148 @@ async fn download_cover(url: &str) -> anyhow::Result<Vec<u8>> {
     let bytes = resp.bytes().await?;
     let bytes_map = bytes.to_vec();
     Ok(bytes_map)
+}
+
+pub async fn mutate_project_delete(
+    ctx: &async_graphql::Context<'_>,
+    user: showtimes_db::m::User,
+    id: UlidGQL,
+) -> async_graphql::Result<OkResponse> {
+    let srv_loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
+    let prj_loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
+    let db = ctx.data_unchecked::<DatabaseShared>();
+    let storages = ctx.data_unchecked::<Arc<FsPool>>();
+    let meili = ctx.data_unchecked::<SearchClientShared>();
+
+    let prj_info = prj_loader.load_one(ProjectDataLoaderKey::Id(*id)).await?;
+
+    if prj_info.is_none() {
+        return Err(Error::new("Project not found").extend_with(|_, e| {
+            e.set("id", id.to_string());
+            e.set("reason", "invalid_project");
+        }));
+    }
+
+    let prj_info = prj_info.unwrap();
+
+    let srv = srv_loader.load_one(prj_info.creator).await?;
+
+    if srv.is_none() {
+        return Err(Error::new("Server not found").extend_with(|_, e| {
+            e.set("id", id.to_string());
+            e.set("reason", "invalid_server");
+        }));
+    }
+
+    let srv = srv.unwrap();
+    let find_user = srv.owners.iter().find(|o| o.id == user.id);
+    match (find_user, user.kind) {
+        (Some(user), showtimes_db::m::UserKind::User) => {
+            // Check if we are allowed to create a project
+            if user.privilege < showtimes_db::m::UserPrivilege::Manager {
+                return Err(
+                    Error::new("User not allowed to create projects").extend_with(|_, e| {
+                        e.set("id", id.to_string());
+                        e.set("reason", "invalid_privilege");
+                    }),
+                );
+            }
+        }
+        (None, showtimes_db::m::UserKind::User) => {
+            return Err(
+                Error::new("User not allowed to create projects").extend_with(|_, e| {
+                    e.set("id", id.to_string());
+                    e.set("reason", "invalid_user");
+                }),
+            );
+        }
+        _ => {
+            // Allow anyone to create a project
+        }
+    }
+
+    let collab_handler = showtimes_db::CollaborationSyncHandler::new(db);
+    let collab_info = collab_handler
+        .find_by(doc! {
+            "projects.project": prj_info.id.to_string(),
+            "projects.server": srv.id.to_string()
+        })
+        .await?;
+
+    if let Some(collab_info) = collab_info {
+        collab_handler.delete(&collab_info).await?;
+
+        // Delete from search engine
+        let index_collab = meili.index(showtimes_search::models::ServerCollabSync::index_name());
+        let task_del = index_collab
+            .delete_document(&collab_info.id.to_string())
+            .await?;
+
+        task_del.wait_for_completion(&*meili, None, None).await?;
+    }
+
+    let collab_invite_handler = showtimes_db::CollaborationInviteHandler::new(db);
+    let collab_invite_info = collab_invite_handler
+        .find_all_by(doc! {
+            "$or": [
+                {
+                    "source.project": prj_info.id.to_string(),
+                    "source.server": srv.id.to_string()
+                },
+                {
+                    "target.project": prj_info.id.to_string(),
+                }
+            ]
+        })
+        .await?;
+
+    let all_ids = collab_invite_info
+        .iter()
+        .map(|c| c.id.to_string())
+        .collect::<Vec<String>>();
+
+    if !all_ids.is_empty() {
+        // Delete from DB
+        collab_invite_handler
+            .delete_by(doc! {
+                "id": {
+                    "$in": all_ids.clone()
+                }
+            })
+            .await?;
+
+        // Delete from search engine
+        let index_invite = meili.index(showtimes_search::models::ServerCollabInvite::index_name());
+
+        let task_del = index_invite.delete_documents(&all_ids).await?;
+        task_del.wait_for_completion(&*meili, None, None).await?;
+    }
+
+    // Delete poster
+    let poster_info = &prj_info.poster.image;
+    if poster_info.kind == showtimes_fs::FsFileKind::Images.as_path_name() {
+        storages
+            .file_delete(
+                poster_info.key.clone(),
+                &poster_info.filename,
+                poster_info.parent.as_deref(),
+                Some(showtimes_fs::FsFileKind::Images),
+            )
+            .await?;
+    }
+
+    // Delete project
+    let prj_handler = ProjectHandler::new(db);
+    prj_handler.delete(&prj_info).await?;
+
+    // Delete from search engine
+    let index_project = meili.index(showtimes_search::models::Project::index_name());
+    let task_prj_del = index_project
+        .delete_document(&prj_info.id.to_string())
+        .await?;
+    task_prj_del
+        .wait_for_completion(&*meili, None, None)
+        .await?;
+
+    Ok(OkResponse::ok("Project deleted"))
 }

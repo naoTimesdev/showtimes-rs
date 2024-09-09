@@ -437,7 +437,7 @@ pub struct OkResponse {
 }
 
 impl OkResponse {
-    /// Create a new success OkResponse
+    /// Create a new success [`OkResponse`]
     pub fn ok(message: impl Into<String>) -> Self {
         OkResponse {
             message: message.into(),
@@ -445,7 +445,7 @@ impl OkResponse {
         }
     }
 
-    /// Create a new error OkResponse
+    /// Create a new error [`OkResponse`]
     #[allow(dead_code)]
     pub fn err(message: impl Into<String>) -> Self {
         OkResponse {
