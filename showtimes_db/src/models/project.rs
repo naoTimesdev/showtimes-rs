@@ -1,8 +1,90 @@
+use std::sync::LazyLock;
+
 use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
 use showtimes_shared::{bson_datetime_opt_serializer, ulid_opt_serializer, ulid_serializer};
 
 use super::{ImageMetadata, IntegrationId, ShowModelHandler};
+
+static DEFAULT_ROLES_SHOWS: LazyLock<Vec<Role>> = LazyLock::new(|| {
+    vec![
+        Role::new("TL", "Translator").expect("Failed to create role TL"),
+        Role::new("TLC", "Translation Checker")
+            .expect("Failed to create role TLC")
+            .with_order(1),
+        Role::new("ENC", "Encoder")
+            .expect("Failed to create role ENC")
+            .with_order(2),
+        Role::new("ED", "Editor")
+            .expect("Failed to create role ED")
+            .with_order(3),
+        Role::new("TM", "Timer")
+            .expect("Failed to create role TM")
+            .with_order(4),
+        Role::new("TS", "Typesetter")
+            .expect("Failed to create role TS")
+            .with_order(5),
+        Role::new("QC", "Quality Checker")
+            .expect("Failed to create role QC")
+            .with_order(6),
+    ]
+});
+static DEFAULT_ROLES_LITERATURE: LazyLock<Vec<Role>> = LazyLock::new(|| {
+    vec![
+        Role::new("TL", "Translator").expect("Failed to create role TL"),
+        Role::new("TLC", "Translation Checker")
+            .expect("Failed to create role TLC")
+            .with_order(1),
+        Role::new("ED", "Editor")
+            .expect("Failed to create role ED")
+            .with_order(2),
+        Role::new("PR", "Proofreader")
+            .expect("Failed to create role PR")
+            .with_order(3),
+        Role::new("QC", "Quality Checker")
+            .expect("Failed to create role QC")
+            .with_order(4),
+    ]
+});
+static DEFAULT_ROLES_MANGA: LazyLock<Vec<Role>> = LazyLock::new(|| {
+    vec![
+        Role::new("TL", "Translator").expect("Failed to create role TL"),
+        Role::new("CL", "Cleaner")
+            .expect("Failed to create role CL")
+            .with_order(1),
+        Role::new("RD", "Redrawer")
+            .expect("Failed to create role RD")
+            .with_order(2),
+        Role::new("PR", "Proofreader")
+            .expect("Failed to create role PR")
+            .with_order(3),
+        Role::new("TS", "Typesetter")
+            .expect("Failed to create role TS")
+            .with_order(4),
+        Role::new("QC", "Quality Checker")
+            .expect("Failed to create role QC")
+            .with_order(5),
+    ]
+});
+static DEFAULT_ROLES_GAMES: LazyLock<Vec<Role>> = LazyLock::new(|| {
+    vec![
+        Role::new("TL", "Translator").expect("Failed to create role TL"),
+        Role::new("TLC", "Translation Checker")
+            .expect("Failed to create role TLC")
+            .with_order(1),
+        Role::new("ED", "Editor")
+            .expect("Failed to create role ED")
+            .with_order(2),
+        Role::new("CD", "Programming")
+            .expect("Failed to create role CD")
+            .with_order(3),
+        Role::new("QC", "Quality Checker")
+            .expect("Failed to create role QC")
+            .with_order(4),
+    ]
+});
+static DEFAULT_ROLES_UNKNOWN: LazyLock<Vec<Role>> =
+    LazyLock::new(|| vec![Role::new("TL", "Translator").expect("Failed to create role TL")]);
 
 /// The list of enums holding the project kinds.
 #[derive(Debug, Copy, Clone, tosho_macros::SerializeEnum, tosho_macros::DeserializeEnum)]
@@ -11,6 +93,8 @@ pub enum ProjectKind {
     Shows,
     /// The project is a literature.
     Literature,
+    /// The project is a manga or comics.
+    Manga,
     /// The project is a game.
     Games,
     /// The project is an unknown kind.
@@ -27,6 +111,7 @@ impl std::str::FromStr for ProjectKind {
         match s_low.as_str() {
             "shows" | "show" => Ok(ProjectKind::Shows),
             "literature" | "literatures" | "books" | "book" => Ok(ProjectKind::Literature),
+            "manga" | "comics" => Ok(ProjectKind::Manga),
             "games" | "game" => Ok(ProjectKind::Games),
             _ => Err(ProjectKindFromStrError {
                 original: s.to_string(),
@@ -40,8 +125,21 @@ impl std::fmt::Display for ProjectKind {
         match self {
             ProjectKind::Shows => write!(f, "SHOWS"),
             ProjectKind::Literature => write!(f, "LITERATURE"),
+            ProjectKind::Manga => write!(f, "MANGA"),
             ProjectKind::Games => write!(f, "GAMES"),
             ProjectKind::Unknown => write!(f, "UNKNOWN"),
+        }
+    }
+}
+
+impl ProjectKind {
+    pub fn default_roles(&self) -> Vec<Role> {
+        match self {
+            ProjectKind::Shows => DEFAULT_ROLES_SHOWS.clone(),
+            ProjectKind::Literature => DEFAULT_ROLES_LITERATURE.clone(),
+            ProjectKind::Manga => DEFAULT_ROLES_MANGA.clone(),
+            ProjectKind::Games => DEFAULT_ROLES_GAMES.clone(),
+            ProjectKind::Unknown => DEFAULT_ROLES_UNKNOWN.clone(),
         }
     }
 }
@@ -116,12 +214,23 @@ impl ProjectType {
     pub fn kind(&self) -> ProjectKind {
         match self {
             ProjectType::Movies | ProjectType::Series | ProjectType::OVAs => ProjectKind::Shows,
-            ProjectType::Books | ProjectType::Manga | ProjectType::LightNovel => {
-                ProjectKind::Literature
-            }
+            ProjectType::Books | ProjectType::LightNovel => ProjectKind::Literature,
+            ProjectType::Manga => ProjectKind::Manga,
             ProjectType::Games | ProjectType::VisualNovel => ProjectKind::Games,
             ProjectType::Unknown => ProjectKind::Unknown,
         }
+    }
+}
+
+impl From<ProjectType> for ProjectKind {
+    fn from(t: ProjectType) -> ProjectKind {
+        t.kind()
+    }
+}
+
+impl From<&ProjectType> for ProjectKind {
+    fn from(t: &ProjectType) -> ProjectKind {
+        t.kind()
     }
 }
 

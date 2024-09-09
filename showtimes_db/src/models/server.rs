@@ -140,6 +140,19 @@ impl Server {
     pub fn remove_integration(&mut self, integration: &IntegrationId) {
         self.integrations.retain(|i| i != integration);
     }
+
+    pub fn add_owner(&mut self, owner: ServerUser) {
+        self.owners.push(owner);
+    }
+
+    /// Remove an owner from the server
+    ///
+    /// This will silently fails if the owner is not found
+    /// or you're trying to remove the owner
+    pub fn remove_owner(&mut self, integration: &showtimes_shared::ulid::Ulid) {
+        self.owners
+            .retain(|i| i.id != *integration && i.privilege != UserPrivilege::Owner);
+    }
 }
 
 /// A model to hold each server that is synchronized
