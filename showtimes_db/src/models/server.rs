@@ -70,6 +70,11 @@ impl ServerUser {
             extras: Vec::new(),
         }
     }
+
+    pub fn has_id(&self, id: impl Into<String>) -> bool {
+        let into_id = id.into();
+        self.extras.contains(&into_id)
+    }
 }
 
 /// A model to hold server information

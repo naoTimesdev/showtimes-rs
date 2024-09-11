@@ -150,6 +150,30 @@ impl std::fmt::Display for IntegrationType {
     }
 }
 
+impl IntegrationType {
+    /// Check if the integration type is related to Discord
+    pub fn is_discord(&self) -> bool {
+        matches!(
+            self,
+            IntegrationType::DiscordRole
+                | IntegrationType::DiscordUser
+                | IntegrationType::DiscordChannel
+                | IntegrationType::DiscordGuild
+        )
+    }
+
+    /// Check if the integrations type is related to Providers
+    pub fn is_provider(&self) -> bool {
+        // AnilistMal is not a Provider but just a shortcut from Anilist
+        matches!(
+            self,
+            IntegrationType::ProviderAnilist
+                | IntegrationType::ProviderVndb
+                | IntegrationType::ProviderTmdb
+        )
+    }
+}
+
 /// Model to hold the ID of an integration.
 ///
 /// This can be used to denote Discord Integration IDs, etc.

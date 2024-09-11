@@ -324,6 +324,14 @@ impl Role {
     pub fn name(&self) -> &str {
         &self.name
     }
+
+    pub fn set_name(&mut self, name: impl Into<String>) {
+        self.name = name.into();
+    }
+
+    pub fn set_order(&mut self, order: i32) {
+        self.order = order;
+    }
 }
 
 /// A model to hold each project role status in the database.
@@ -524,6 +532,20 @@ impl EpisodeProgress {
         self.aired = Some(timestamp);
         Ok(())
     }
+
+    pub fn set_finished(&mut self, finished: bool) {
+        self.finished = finished;
+    }
+
+    /// Check if the episode/chapter is progressing.
+    pub fn is_progressing(&self) -> bool {
+        self.statuses.iter().any(|s| !s.finished)
+    }
+
+    /// Check if the episode/chapter is finished.
+    pub fn is_finished(&self) -> bool {
+        self.finished
+    }
 }
 
 /// The model holding project information.
@@ -687,6 +709,18 @@ impl Project {
             .push(EpisodeProgress::new_with_roles(number, false, roles));
     }
 
+    /// Create a new episode/chapter progress with specific episode/chapter number and airing date.
+    pub fn add_episode_with_number_and_airing(
+        &mut self,
+        number: u64,
+        aired_at: chrono::DateTime<chrono::Utc>,
+    ) {
+        let roles = self.roles.clone();
+        let mut episode = EpisodeProgress::new_with_roles(number, false, roles);
+        episode.set_aired(Some(aired_at));
+        self.progress.push(episode);
+    }
+
     /// Remove an episode/chapter progress.
     pub fn remove_episode(&mut self, number: u64) {
         self.progress.retain(|e| e.number != number);
@@ -695,5 +729,21 @@ impl Project {
     /// Find an episode/chapter progress by number.
     pub fn find_episode(&self, number: u64) -> Option<&EpisodeProgress> {
         self.progress.iter().find(|e| e.number == number)
+    }
+
+    /// Find an episode/chapter progress by number but mutable.
+    pub fn find_episode_mut(&mut self, number: u64) -> Option<&mut EpisodeProgress> {
+        self.progress.iter_mut().find(|e| e.number == number)
+    }
+
+    /// Update an episode/chapter progress.
+    pub fn update_episode(&mut self, episode: EpisodeProgress) {
+        if let Some(ep) = self
+            .progress
+            .iter_mut()
+            .find(|e| e.number == episode.number)
+        {
+            *ep = episode;
+        }
     }
 }
