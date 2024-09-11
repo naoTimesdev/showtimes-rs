@@ -449,6 +449,23 @@ impl MutationRoot {
         mutations::servers::mutate_servers_update(ctx, id, user, input).await
     }
 
+    /// Update project information
+    #[graphql(
+        name = "updateProject",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)"
+    )]
+    async fn update_project(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The project ID to update")] id: crate::models::prelude::UlidGQL,
+        #[graphql(desc = "The project information to update")]
+        input: mutations::projects::ProjectUpdateInputGQL,
+    ) -> async_graphql::Result<ProjectGQL> {
+        let user = find_authenticated_user(ctx).await?;
+
+        mutations::projects::mutate_projects_update(ctx, user, id, input).await
+    }
+
     /// Delete a project from Showtimes
     #[graphql(
         name = "deleteProject",
@@ -461,7 +478,7 @@ impl MutationRoot {
     ) -> async_graphql::Result<OkResponse> {
         let user = find_authenticated_user(ctx).await?;
 
-        mutations::projects::mutate_project_delete(ctx, user, id).await
+        mutations::projects::mutate_projects_delete(ctx, user, id).await
     }
 }
 

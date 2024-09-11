@@ -201,3 +201,45 @@ impl From<&IntegrationInputGQL> for showtimes_db::m::IntegrationId {
         showtimes_db::m::IntegrationId::new(value.id.clone(), value.kind.into())
     }
 }
+
+pub struct NonEmptyValidator;
+
+impl CustomValidator<Vec<String>> for NonEmptyValidator {
+    fn check(
+        &self,
+        value: &Vec<String>,
+    ) -> Result<(), async_graphql::InputValueError<Vec<String>>> {
+        for (idx, vs) in value.iter().enumerate() {
+            if vs.trim().is_empty() {
+                return Err(
+                    async_graphql::InputValueError::custom("Value cannot be empty")
+                        .with_extension("index", idx)
+                        .with_extension("value", vs.clone()),
+                );
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl CustomValidator<Option<Vec<String>>> for NonEmptyValidator {
+    fn check(
+        &self,
+        value: &Option<Vec<String>>,
+    ) -> Result<(), async_graphql::InputValueError<Option<Vec<String>>>> {
+        if let Some(vs_val) = value {
+            for (idx, vs) in vs_val.iter().enumerate() {
+                if vs.trim().is_empty() {
+                    return Err(
+                        async_graphql::InputValueError::custom("Value cannot be empty")
+                            .with_extension("index", idx)
+                            .with_extension("value", vs.clone()),
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+}

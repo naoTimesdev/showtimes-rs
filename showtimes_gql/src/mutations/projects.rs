@@ -1,6 +1,8 @@
 use std::{collections::VecDeque, sync::Arc};
 
-use async_graphql::{dataloader::DataLoader, Error, ErrorExtensions, InputObject, Upload};
+use async_graphql::{
+    dataloader::DataLoader, CustomValidator, Enum, Error, ErrorExtensions, InputObject, Upload,
+};
 use chrono::TimeZone;
 use showtimes_db::{mongodb::bson::doc, DatabaseShared, ProjectHandler};
 use showtimes_fs::FsPool;
@@ -33,13 +35,72 @@ pub struct ProjectCreateMetadataInputGQL {
     start_date: Option<DateTimeGQL>,
 }
 
+struct ValidateRole;
+
+impl CustomValidator<String> for ValidateRole {
+    fn check(&self, value: &String) -> Result<(), async_graphql::InputValueError<String>> {
+        if value.is_empty() {
+            return Err(async_graphql::InputValueError::custom(format!(
+                "Role `{}` key cannot be empty",
+                &value
+            )));
+        };
+
+        if !value.is_ascii() {
+            return Err(async_graphql::InputValueError::custom(format!(
+                "Role `{}` key must be ASCII",
+                &value
+            )));
+        }
+
+        if value.contains(' ') {
+            return Err(async_graphql::InputValueError::custom(format!(
+                "Role `{}` key cannot contain spaces",
+                &value
+            )));
+        }
+
+        if &value.to_ascii_uppercase() != value {
+            return Err(async_graphql::InputValueError::custom(format!(
+                "Role `{}` key must be uppercase",
+                &value
+            )));
+        }
+
+        Ok(())
+    }
+}
+
 /// The input for roles information
 #[derive(InputObject)]
 pub struct ProjectRoleInputGQL {
     /// The role key
+    #[graphql(validator(custom = "ValidateRole"))]
     key: String,
     /// The role long name
+    #[graphql(validator(min_length = 1))]
     name: String,
+}
+
+/// The action for updating a role
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[graphql(rename_items = "SCREAMING_SNAKE_CASE")]
+pub enum ProjectRoleUpdateAction {
+    /// Add new role
+    Add,
+    /// Remove a role
+    Remove,
+    /// Update a role
+    Update,
+}
+
+/// The update information for a role
+#[derive(InputObject)]
+pub struct ProjectRoleUpdateInputGQL {
+    /// The role itself
+    role: ProjectRoleInputGQL,
+    /// The action to perform for this role
+    action: ProjectRoleUpdateAction,
 }
 
 /// The input assignees for a project
@@ -48,7 +109,59 @@ pub struct ProjectAssigneeInputGQL {
     /// The user ID
     id: UlidGQL,
     /// The role key
+    #[graphql(validator(custom = "ValidateRole"))]
     role: String,
+}
+
+/// The update information for a assignee for a project
+#[derive(InputObject)]
+pub struct ProjectAssigneeUpdateInputGQL {
+    /// The person itself
+    ///
+    /// To remove a person from a role, just set this to `None` or `null`
+    id: Option<UlidGQL>,
+    /// The role key
+    #[graphql(validator(custom = "ValidateRole"))]
+    role: String,
+}
+
+/// The update information of a status on each role of a progress
+#[derive(InputObject)]
+pub struct ProjectProgressStatusUpdateInputGQL {
+    /// The role key
+    #[graphql(validator(custom = "ValidateRole"))]
+    role: String,
+    /// The status of the role
+    finished: bool,
+}
+
+/// The update information for a progress in the project
+///
+/// All fields optional except `number`, provide if you
+/// want to update it.
+///
+/// This is only used in `projectUpdate` mutation, if you want to
+/// remove or add episode manually use `projectProgressUpdate` mutation
+#[derive(InputObject)]
+pub struct ProjectProgressUpdateInputGQL {
+    /// The episode number
+    number: u64,
+    /// Is episode finished or not
+    finished: Option<bool>,
+    /// The airing/release date of the episode/chapter.
+    aired: Option<DateTimeGQL>,
+    /// Delay reason, set `unsetDelay` to `true` to remove
+    #[graphql(name = "delayReason", validator(min_length = 1))]
+    delay_reason: Option<String>,
+    /// Unset the delay reason, when set to `true` this will take
+    /// precedence over `delayReason`
+    #[graphql(name = "unsetDelay")]
+    unset_delay: Option<bool>,
+    /// The status of each role in the episode
+    ///
+    /// This will only update the status for the role that is provided
+    /// in the list, to not update the status, just do not include the list
+    statuses: Option<Vec<ProjectProgressStatusUpdateInputGQL>>,
 }
 
 /// The input object for creating a new project
@@ -68,6 +181,56 @@ pub struct ProjectCreateInputGQL {
     poster: Option<Upload>,
     /// The poster color (rgb color in integer format)
     poster_color: Option<u32>,
+    /// The aliases to be added to the project.
+    ///
+    /// If provided, the aliases from metadata will be ignored
+    #[graphql(validator(custom = "super::NonEmptyValidator"))]
+    aliases: Option<Vec<String>>,
+}
+
+/// The input object for update a project
+///
+/// All fields optional, only provide the fields that you want to update
+///
+/// The update will be done in this order:
+/// 0. Update title, aliases, etc.
+/// 1. Update the roles
+/// 2. Update the assignees
+/// 3. Sync metadata (if needed)
+/// 4. Update the progress
+/// 5. Update the poster + poster color
+#[derive(InputObject)]
+pub struct ProjectUpdateInputGQL {
+    /// The title of the project
+    #[graphql(validator(min_length = 1))]
+    title: Option<String>,
+    /// The aliases for the project
+    #[graphql(validator(custom = "super::NonEmptyValidator"))]
+    aliases: Option<Vec<String>>,
+    /// The modified roles list for the project
+    roles: Option<Vec<ProjectRoleUpdateInputGQL>>,
+    /// The modfied assignees for the project
+    assignees: Option<Vec<ProjectAssigneeUpdateInputGQL>>,
+    /// The poster image
+    poster: Option<Upload>,
+    /// The poster color (rgb color in integer format)
+    poster_color: Option<u32>,
+    /// Synchronize the project with external metadata
+    ///
+    /// This will update the progress count.
+    ///
+    /// The behaviour are like this:
+    /// - When a new episode is found, it will be added to the end of the list
+    /// - When an episode is removed, if no progress (or released), it will be removed
+    /// - All episode will have their aired date updated
+    ///
+    /// Default to `false`
+    #[graphql(default = false, name = "syncMetadata")]
+    sync_metadata: bool,
+    /// The progress update for the project
+    ///
+    /// This will only update the progress, to add or remove episode/chapter, use `projectProgressUpdate` mutation
+    progress: Option<Vec<ProjectProgressUpdateInputGQL>>,
 }
 
 #[derive(Clone, Debug)]
@@ -358,7 +521,6 @@ async fn fetch_metadata_via_vndb(
     }
 
     // Deduplicate the titles
-    all_titles.sort();
     all_titles.dedup();
 
     // Convert to VecDeque
@@ -573,7 +735,15 @@ pub async fn mutate_projects_create(
     project.roles = all_roles;
     project.assignees = assignees;
     project.progress = all_progress;
-    project.aliases = metadata.aliases;
+    if let Some(aliases) = input.aliases {
+        if aliases.is_empty() {
+            project.aliases = metadata.aliases;
+        } else {
+            project.aliases = aliases;
+        }
+    } else {
+        project.aliases = metadata.aliases;
+    }
     project.integrations = metadata.integrations;
 
     // Upload the poster
@@ -686,7 +856,7 @@ async fn download_cover(url: &str) -> anyhow::Result<Vec<u8>> {
     Ok(bytes_map)
 }
 
-pub async fn mutate_project_delete(
+pub async fn mutate_projects_delete(
     ctx: &async_graphql::Context<'_>,
     user: showtimes_db::m::User,
     id: UlidGQL,
@@ -740,7 +910,7 @@ pub async fn mutate_project_delete(
             );
         }
         _ => {
-            // Allow anyone to create a project
+            // Allow anyone to delete a project
         }
     }
 
@@ -828,4 +998,310 @@ pub async fn mutate_project_delete(
         .await?;
 
     Ok(OkResponse::ok("Project deleted"))
+}
+
+pub async fn mutate_projects_update(
+    ctx: &async_graphql::Context<'_>,
+    user: showtimes_db::m::User,
+    id: UlidGQL,
+    input: ProjectUpdateInputGQL,
+) -> async_graphql::Result<ProjectGQL> {
+    let srv_loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
+    let usr_loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
+    let db = ctx.data_unchecked::<DatabaseShared>();
+    let storages = ctx.data_unchecked::<Arc<FsPool>>();
+    let meili = ctx.data_unchecked::<SearchClientShared>();
+
+    let srv = srv_loader.load_one(*id).await?;
+
+    if srv.is_none() {
+        return Err(Error::new("Server not found").extend_with(|_, e| {
+            e.set("id", id.to_string());
+            e.set("reason", "invalid_server");
+        }));
+    }
+
+    let srv = srv.unwrap();
+    let find_user = srv.owners.iter().find(|o| o.id == user.id);
+    match (find_user, user.kind) {
+        (Some(user), showtimes_db::m::UserKind::User) => {
+            // Check if we are allowed to update a project
+            if user.privilege == showtimes_db::m::UserPrivilege::ProjectManager {
+                if !user.has_id(*id) {
+                    return Err(
+                        Error::new("User not allowed to update projects").extend_with(|_, e| {
+                            e.set("id", id.to_string());
+                            e.set("reason", "invalid_privilege");
+                        }),
+                    );
+                }
+            }
+        }
+        (None, showtimes_db::m::UserKind::User) => {
+            return Err(
+                Error::new("User not allowed to update projects").extend_with(|_, e| {
+                    e.set("id", id.to_string());
+                    e.set("reason", "invalid_user");
+                }),
+            );
+        }
+        _ => {
+            // Allow anyone to update a project
+        }
+    }
+
+    let prj_loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
+    let prj_info = prj_loader.load_one(ProjectDataLoaderKey::Id(*id)).await?;
+
+    if prj_info.is_none() {
+        return Err(Error::new("Project not found").extend_with(|_, e| {
+            e.set("id", id.to_string());
+            e.set("reason", "invalid_project");
+        }));
+    }
+
+    let mut prj_info = prj_info.unwrap();
+
+    // Update title and aliases
+    if let Some(title) = input.title {
+        prj_info.title = title;
+    }
+
+    if let Some(aliases) = input.aliases {
+        prj_info.aliases = aliases;
+    }
+
+    // Update roles
+    if let Some(roles_update) = input.roles {
+        for role in &roles_update {
+            match role.action {
+                ProjectRoleUpdateAction::Update => {
+                    let find_role = prj_info
+                        .roles
+                        .iter_mut()
+                        .find(|r| r.key() == &role.role.key);
+                    if let Some(role_info) = find_role {
+                        role_info.set_name(role.role.name.clone());
+                    }
+                }
+                ProjectRoleUpdateAction::Add => {
+                    let new_role =
+                        showtimes_db::m::Role::new(role.role.key.clone(), role.role.name.clone())?;
+                    let mut ordered_roles = prj_info.roles.clone();
+                    ordered_roles.sort_by(|a, b| a.order().cmp(&b.order()));
+                    let last_order = ordered_roles.last().map(|r| r.order()).unwrap_or(0);
+                    prj_info.roles.push(new_role.with_order(last_order + 1));
+                }
+                ProjectRoleUpdateAction::Remove => {
+                    prj_info.roles.retain(|r| r.key() != role.role.key);
+                }
+            }
+        }
+    }
+
+    // Update assignees
+    if let Some(assignees_update) = input.assignees {
+        for assignee in &assignees_update {
+            // Depending on the ID, remove or add
+            let find_role = prj_info
+                .assignees
+                .iter_mut()
+                .find(|a| a.key() == assignee.role);
+
+            if let Some(role_info) = find_role {
+                match &assignee.id {
+                    Some(id) => {
+                        let user_info = usr_loader.load_one(**id).await?;
+                        if user_info.is_none() {
+                            return Err(Error::new("User not found").extend_with(|_, e| {
+                                e.set("id", id.to_string());
+                                e.set("role", assignee.role.clone());
+                                e.set("action", "update");
+                            }));
+                        }
+
+                        let user_info = user_info.unwrap();
+                        role_info.set_actor(Some(user_info.id));
+                    }
+                    None => {
+                        role_info.set_actor(None);
+                    }
+                }
+            }
+        }
+    }
+
+    if input.sync_metadata {
+        let find_providers = prj_info
+            .integrations
+            .iter()
+            .find(|i| i.kind().is_provider());
+        let first_date = prj_info
+            .progress
+            .first()
+            .and_then(|p| p.aired)
+            .map(|a| DateTimeGQL::from(a));
+
+        if let Some(provider) = find_providers {
+            let metadata_res = match provider.kind() {
+                showtimes_db::m::IntegrationType::ProviderAnilist => {
+                    let in_metadata = ProjectCreateMetadataInputGQL {
+                        id: provider.id().to_string(),
+                        episode: Some(prj_info.progress.len() as i32),
+                        start_date: first_date,
+                        kind: ExternalSearchSource::Anilist,
+                    };
+
+                    fetch_metadata_via_anilist(ctx, &in_metadata).await?
+                }
+                showtimes_db::m::IntegrationType::ProviderVndb => {
+                    let in_metadata = ProjectCreateMetadataInputGQL {
+                        id: provider.id().to_string(),
+                        episode: Some(prj_info.progress.len() as i32),
+                        start_date: first_date,
+                        kind: ExternalSearchSource::Vndb,
+                    };
+
+                    fetch_metadata_via_vndb(ctx, &in_metadata).await?
+                }
+                showtimes_db::m::IntegrationType::ProviderTmdb => {
+                    let in_metadata = ProjectCreateMetadataInputGQL {
+                        id: provider.id().to_string(),
+                        episode: Some(prj_info.progress.len() as i32),
+                        start_date: first_date,
+                        kind: ExternalSearchSource::TMDb,
+                    };
+
+                    fetch_metadata_via_tmdb(ctx, &in_metadata).await?
+                }
+                _ => {
+                    return Err(Error::new(format!(
+                        "Provider `{}` not supported for metadata sync",
+                        provider.kind()
+                    ))
+                    .extend_with(|_, e| {
+                        e.set("provider", provider.kind().to_string());
+                        e.set("id", provider.id());
+                    }));
+                }
+            };
+
+            // Update the metadata
+            for episode in &metadata_res.progress {
+                let find_episode = prj_info.find_episode_mut(episode.number as u64);
+                match find_episode {
+                    Some(db_ep) => {
+                        db_ep.set_aired(episode.aired_at);
+                    }
+                    None => match episode.aired_at {
+                        Some(aired_at) => {
+                            prj_info.add_episode_with_number_and_airing(
+                                episode.number as u64,
+                                aired_at,
+                            );
+                        }
+                        None => {
+                            prj_info.add_episode_with_number(episode.number as u64);
+                        }
+                    },
+                }
+            }
+
+            // Reverse side, check if we need to remove episodes
+            let mut to_be_removed: Vec<u64> = vec![];
+            for episode in &prj_info.progress {
+                let find_episode = metadata_res
+                    .progress
+                    .iter()
+                    .find(|e| (e.number as u64) == episode.number);
+                if find_episode.is_none() {
+                    to_be_removed.push(episode.number);
+                }
+            }
+
+            for remove_ep in to_be_removed {
+                prj_info.remove_episode(remove_ep);
+            }
+        }
+    }
+
+    // Update progress
+    if let Some(progress) = input.progress {
+        for episode in &progress {
+            let find_episode = prj_info.find_episode_mut(episode.number as u64);
+            if let Some(db_ep) = find_episode {
+                let aired_at = episode.aired.clone().map(|a| *a);
+                db_ep.set_aired(aired_at);
+
+                if let Some(true) = episode.unset_delay {
+                    db_ep.clear_delay_reason();
+                } else if let Some(delay) = &episode.delay_reason {
+                    db_ep.set_delay_reason(delay);
+                }
+
+                if let Some(finished) = episode.finished {
+                    db_ep.set_finished(finished);
+                }
+
+                if let Some(statuses) = &episode.statuses {
+                    for status in statuses {
+                        let find_status =
+                            db_ep.statuses.iter_mut().find(|s| s.key() == status.role);
+                        if let Some(status_info) = find_status {
+                            status_info.set_finished(status.finished);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Update poster
+    if let Some(poster_upload) = input.poster {
+        let info_up = poster_upload.value(ctx)?;
+        let mut file_target = tokio::fs::File::from_std(info_up.content);
+
+        // Get format
+        let format = crate::image::detect_upload_data(&mut file_target).await?;
+        // Seek back to the start of the file
+        file_target.seek(std::io::SeekFrom::Start(0)).await?;
+
+        let filename = format!("cover.{}", format.as_extension());
+
+        storages
+            .file_stream_upload(
+                prj_info.id,
+                &filename,
+                &mut file_target,
+                Some(&srv.id.to_string()),
+                Some(showtimes_fs::FsFileKind::Images),
+            )
+            .await?;
+
+        let image_meta = showtimes_db::m::ImageMetadata::new(
+            showtimes_fs::FsFileKind::Images.as_path_name(),
+            prj_info.id,
+            &filename,
+            format.as_extension(),
+            Some(srv.id.to_string()),
+        );
+
+        prj_info.poster.image = image_meta;
+    }
+
+    if let Some(poster_color) = input.poster_color {
+        prj_info.poster.color = Some(poster_color);
+    }
+
+    // Save the project
+    let prj_handler = ProjectHandler::new(db);
+    prj_handler.save(&mut prj_info, None).await?;
+
+    // Update index
+    let prj_search = showtimes_search::models::Project::from(prj_info.clone());
+    prj_search.update_document(meili).await?;
+
+    let prj_gql: ProjectGQL = prj_info.into();
+
+    Ok(prj_gql)
 }
