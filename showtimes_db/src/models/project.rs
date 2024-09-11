@@ -546,6 +546,13 @@ impl EpisodeProgress {
     pub fn is_finished(&self) -> bool {
         self.finished
     }
+
+    /// Propagate roles changes from the project to the episode/chapter.
+    pub fn propagate_roles(&mut self, roles: &[Role]) {
+        let roles_keys: Vec<String> = roles.iter().map(|r| r.key.clone()).collect();
+        // Update the statuses
+        self.statuses.retain(|s| roles_keys.contains(&s.key));
+    }
 }
 
 /// The model holding project information.
@@ -745,5 +752,18 @@ impl Project {
         {
             *ep = episode;
         }
+    }
+
+    /// Propagate the roles to the assignees and statuses.
+    pub fn propagate_roles(&mut self) {
+        // Check for roles to be removed
+        let roles_keys: Vec<String> = self.roles.iter().map(|r| r.key.clone()).collect();
+        // Update the assignees
+        self.assignees.retain(|a| roles_keys.contains(&a.key));
+
+        // Update the statuses
+        self.progress.iter_mut().for_each(|e| {
+            e.propagate_roles(&self.roles);
+        });
     }
 }

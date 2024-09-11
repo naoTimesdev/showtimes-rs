@@ -1119,6 +1119,9 @@ pub async fn mutate_projects_update(
                 }
             }
         }
+
+        // Propagate the changes to assignees and roles
+        prj_info.propagate_roles();
     }
 
     if input.sync_metadata {
