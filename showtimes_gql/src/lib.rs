@@ -84,6 +84,7 @@ impl QueryRoot {
 
     /// Get authenticated user associated projects
     #[graphql(guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)")]
+    #[allow(clippy::too_many_arguments)]
     async fn projects(
         &self,
         ctx: &Context<'_>,

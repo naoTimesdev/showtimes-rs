@@ -464,14 +464,14 @@ impl Loader<ServerSyncServerId> for ServerSyncLoader {
             .await?;
         let mapped_res: HashMap<ServerSyncServerId, Vec<showtimes_db::m::ServerCollaborationSync>> =
             keys.iter()
-                .filter_map(|k| {
+                .map(|k| {
                     let res: Vec<showtimes_db::m::ServerCollaborationSync> = all_results
                         .iter()
                         .filter(|u| u.projects.iter().any(|p| p.server == **k))
                         .cloned()
                         .collect();
 
-                    Some((k.clone(), res))
+                    (k.clone(), res)
                 })
                 .collect();
 

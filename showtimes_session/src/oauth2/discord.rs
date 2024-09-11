@@ -82,7 +82,7 @@ impl DiscordClient {
     ) -> Result<DiscordToken, DiscordClientError> {
         let client = reqwest::Client::new();
         let res = client
-            .post(&format!("{}/oauth2/token", BASE_URL))
+            .post(format!("{}/oauth2/token", BASE_URL))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .form(&[
                 ("client_id", &self.client_id),
@@ -111,7 +111,7 @@ impl DiscordClient {
     ) -> Result<DiscordToken, reqwest::Error> {
         let client = reqwest::Client::new();
         let res = client
-            .post(&format!("{}/oauth2/token", BASE_URL))
+            .post(format!("{}/oauth2/token", BASE_URL))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .form(&[
                 ("client_id", &self.client_id),
@@ -128,7 +128,7 @@ impl DiscordClient {
     pub async fn get_user(&self, token: impl Into<String>) -> Result<DiscordUser, reqwest::Error> {
         let client = reqwest::Client::new();
         let res = client
-            .get(&format!("{}/users/@me", BASE_URL))
+            .get(format!("{}/users/@me", BASE_URL))
             .header("Authorization", format!("Bearer {}", token.into()))
             .send()
             .await?;
@@ -142,7 +142,7 @@ impl DiscordClient {
     ) -> Result<Vec<DiscordPartialGuild>, reqwest::Error> {
         let client = reqwest::Client::new();
         let res = client
-            .get(&format!("{}/users/@me/guilds", BASE_URL))
+            .get(format!("{}/users/@me/guilds", BASE_URL))
             .header("Authorization", format!("Bearer {}", token.into()))
             .send()
             .await?;

@@ -382,7 +382,7 @@ pub enum SortOrderGQL {
 
 impl SortOrderGQL {
     pub(crate) fn into_sort_doc(
-        &self,
+        self,
         title: impl Into<Option<String>>,
     ) -> showtimes_db::mongodb::bson::Document {
         let title: Option<String> = title.into();

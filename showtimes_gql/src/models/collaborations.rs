@@ -82,9 +82,7 @@ impl CollaborationSyncGQL {
 
         let results_mapped: Vec<ServerGQL> = loader
             .load_many(unmapped_servers_ids)
-            .await?
-            .into_iter()
-            .map(|(_, srv)| {
+            .await?.into_values().map(|srv| {
                 let srv_gql: ServerGQL = srv.into();
                 srv_gql.with_projects_disabled()
             })
@@ -119,9 +117,7 @@ impl CollaborationSyncGQL {
 
         let results_mapped: Vec<ProjectGQL> = loader
             .load_many(unmapped_project_ids)
-            .await?
-            .into_iter()
-            .map(|(_, proj)| {
+            .await?.into_values().map(|proj| {
                 let prj_gql: ProjectGQL = proj.into();
                 prj_gql
                     .with_disable_server_fetch()

@@ -243,8 +243,8 @@ mod tests {
 
     use super::*;
 
-    const SECRET: &'static str = "super-duper-secret-for-testing";
-    const REDIRECT_URL: &'static str = "/oauth2/test/discord";
+    const SECRET: &str = "super-duper-secret-for-testing";
+    const REDIRECT_URL: &str = "/oauth2/test/discord";
 
     #[test]
     fn test_valid_session() {

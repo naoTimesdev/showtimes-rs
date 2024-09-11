@@ -48,7 +48,7 @@ impl TMDbProvider {
     where
         T: serde::de::DeserializeOwned,
     {
-        let mut req = self.client.get(&format!("{}/{}", TMDB_API_URL, path));
+        let mut req = self.client.get(format!("{}/{}", TMDB_API_URL, path));
 
         for (key, value) in query_params {
             req = req.query(&[(*key, *value)]);

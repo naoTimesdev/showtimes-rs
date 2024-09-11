@@ -294,8 +294,7 @@ impl ProjectGQL {
 
         sorted_progress
             .first()
-            .map(|p| p.aired.map(|d| d.into()))
-            .flatten()
+            .and_then(|p| p.aired.map(|d| d.into()))
     }
 
     /// The project episode/progress total count.

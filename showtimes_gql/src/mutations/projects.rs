@@ -352,13 +352,9 @@ async fn fetch_metadata_via_anilist(
 
             episode_count
         }
-        showtimes_metadata::m::AnilistMediaType::Manga => {
-            let chapter_count = anilist_info
-                .chapters
-                .unwrap_or_else(|| input.episode.unwrap_or(0));
-
-            chapter_count
-        }
+        showtimes_metadata::m::AnilistMediaType::Manga => anilist_info
+            .chapters
+            .unwrap_or_else(|| input.episode.unwrap_or(0)),
     };
 
     let start_time = match (anilist_info.start_date, input.start_date.clone()) {
@@ -389,7 +385,7 @@ async fn fetch_metadata_via_anilist(
                 aired_at: Some(current_time),
             });
 
-            current_time = current_time + chrono::Duration::weeks(1);
+            current_time += chrono::Duration::weeks(1);
         }
     }
 
@@ -419,7 +415,7 @@ async fn fetch_metadata_via_anilist(
                 for i in 1..first_ep.number {
                     merged_episodes.push(ExternalMediaFetchProgressResult {
                         number: i,
-                        aired_at: first_ep.aired_at.clone(),
+                        aired_at: first_ep.aired_at,
                     });
                 }
             }
@@ -427,7 +423,7 @@ async fn fetch_metadata_via_anilist(
             let est_ep_u32: u32 = est_episode.try_into().unwrap();
             if last_ep.number < est_ep_u32 {
                 // Extrapolate forward, use the last episode start as the basis
-                let mut last_ep_start = last_ep.aired_at.clone();
+                let mut last_ep_start = last_ep.aired_at;
                 for i in (last_ep.number + 1)..=est_ep_u32 {
                     let aired_at = match last_ep_start {
                         Some(last) => {
@@ -438,7 +434,7 @@ async fn fetch_metadata_via_anilist(
                         None => None,
                     };
                     merged_episodes.push(ExternalMediaFetchProgressResult {
-                        number: i as u32,
+                        number: i,
                         aired_at,
                     });
                 }
@@ -696,7 +692,7 @@ pub async fn mutate_projects_create(
     // Create the assignees
     let mut assignees: Vec<showtimes_db::m::RoleAssignee> = vec![];
     for role in all_roles.iter() {
-        let assignee = input.assignees.iter().find(|&a| &a.role == role.key());
+        let assignee = input.assignees.iter().find(|&a| a.role == role.key());
 
         match assignee {
             Some(assignee) => {
@@ -931,7 +927,7 @@ pub async fn mutate_projects_delete(
             .delete_document(&collab_info.id.to_string())
             .await?;
 
-        task_del.wait_for_completion(&*meili, None, None).await?;
+        task_del.wait_for_completion(meili, None, None).await?;
     }
 
     let collab_invite_handler = showtimes_db::CollaborationInviteHandler::new(db);
@@ -968,7 +964,7 @@ pub async fn mutate_projects_delete(
         let index_invite = meili.index(showtimes_search::models::ServerCollabInvite::index_name());
 
         let task_del = index_invite.delete_documents(&all_ids).await?;
-        task_del.wait_for_completion(&*meili, None, None).await?;
+        task_del.wait_for_completion(meili, None, None).await?;
     }
 
     // Delete poster
@@ -993,9 +989,7 @@ pub async fn mutate_projects_delete(
     let task_prj_del = index_project
         .delete_document(&prj_info.id.to_string())
         .await?;
-    task_prj_del
-        .wait_for_completion(&*meili, None, None)
-        .await?;
+    task_prj_del.wait_for_completion(meili, None, None).await?;
 
     Ok(OkResponse::ok("Project deleted"))
 }
@@ -1026,15 +1020,14 @@ pub async fn mutate_projects_update(
     match (find_user, user.kind) {
         (Some(user), showtimes_db::m::UserKind::User) => {
             // Check if we are allowed to update a project
-            if user.privilege == showtimes_db::m::UserPrivilege::ProjectManager {
-                if !user.has_id(*id) {
-                    return Err(
-                        Error::new("User not allowed to update projects").extend_with(|_, e| {
-                            e.set("id", id.to_string());
-                            e.set("reason", "invalid_privilege");
-                        }),
-                    );
-                }
+            if user.privilege == showtimes_db::m::UserPrivilege::ProjectManager && !user.has_id(*id)
+            {
+                return Err(
+                    Error::new("User not allowed to update projects").extend_with(|_, e| {
+                        e.set("id", id.to_string());
+                        e.set("reason", "invalid_privilege");
+                    }),
+                );
             }
         }
         (None, showtimes_db::m::UserKind::User) => {
@@ -1076,10 +1069,7 @@ pub async fn mutate_projects_update(
         for role in &roles_update {
             match role.action {
                 ProjectRoleUpdateAction::Update => {
-                    let find_role = prj_info
-                        .roles
-                        .iter_mut()
-                        .find(|r| r.key() == &role.role.key);
+                    let find_role = prj_info.roles.iter_mut().find(|r| r.key() == role.role.key);
                     if let Some(role_info) = find_role {
                         role_info.set_name(role.role.name.clone());
                     }
@@ -1088,7 +1078,7 @@ pub async fn mutate_projects_update(
                     let new_role =
                         showtimes_db::m::Role::new(role.role.key.clone(), role.role.name.clone())?;
                     let mut ordered_roles = prj_info.roles.clone();
-                    ordered_roles.sort_by(|a, b| a.order().cmp(&b.order()));
+                    ordered_roles.sort_by_key(|a| a.order());
                     let last_order = ordered_roles.last().map(|r| r.order()).unwrap_or(0);
                     prj_info.roles.push(new_role.with_order(last_order + 1));
                 }
@@ -1140,7 +1130,7 @@ pub async fn mutate_projects_update(
             .progress
             .first()
             .and_then(|p| p.aired)
-            .map(|a| DateTimeGQL::from(a));
+            .map(DateTimeGQL::from);
 
         if let Some(provider) = find_providers {
             let metadata_res = match provider.kind() {
@@ -1228,7 +1218,7 @@ pub async fn mutate_projects_update(
     // Update progress
     if let Some(progress) = input.progress {
         for episode in &progress {
-            let find_episode = prj_info.find_episode_mut(episode.number as u64);
+            let find_episode = prj_info.find_episode_mut(episode.number);
             if let Some(db_ep) = find_episode {
                 let aired_at = episode.aired.clone().map(|a| *a);
                 db_ep.set_aired(aired_at);

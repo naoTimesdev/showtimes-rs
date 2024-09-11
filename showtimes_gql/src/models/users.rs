@@ -150,7 +150,7 @@ impl From<&showtimes_db::m::User> for UserGQL {
             id: user.id,
             username: user.username.clone(),
             kind: user.kind,
-            api_key: user.api_key.clone(),
+            api_key: user.api_key,
             registered: user.registered,
             avatar: user.avatar.clone(),
             created: user.created,
