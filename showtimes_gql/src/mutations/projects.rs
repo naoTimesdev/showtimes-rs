@@ -963,15 +963,32 @@ pub async fn mutate_projects_delete(
         .await?;
 
     if let Some(collab_info) = collab_info {
-        collab_handler.delete(&collab_info).await?;
+        let mut collab_info = collab_info;
+        // Remove ourselves from the collab
+        collab_info.projects.retain(|p| p.project != prj_info.id);
 
-        // Delete from search engine
-        let index_collab = meili.index(showtimes_search::models::ServerCollabSync::index_name());
-        let task_del = index_collab
-            .delete_document(&collab_info.id.to_string())
-            .await?;
+        // If only 1 or zero, delete this link
+        if collab_info.projects.len() < 2 {
+            // Delete from DB
+            collab_handler.delete(&collab_info).await?;
 
-        task_del.wait_for_completion(meili, None, None).await?;
+            // Delete from search engine
+            let index_collab =
+                meili.index(showtimes_search::models::ServerCollabSync::index_name());
+            let task_del = index_collab
+                .delete_document(&collab_info.id.to_string())
+                .await?;
+
+            task_del.wait_for_completion(meili, None, None).await?;
+        } else {
+            // Save the collab
+            collab_handler.save(&mut collab_info, None).await?;
+
+            // Update search engine
+            let collab_search =
+                showtimes_search::models::ServerCollabSync::from(collab_info.clone());
+            collab_search.update_document(meili).await?;
+        }
     }
 
     let collab_invite_handler = showtimes_db::CollaborationInviteHandler::new(db);
