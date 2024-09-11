@@ -602,20 +602,33 @@ async fn fetch_metadata_via_tmdb(
     })
 }
 
-pub async fn mutate_projects_create(
-    ctx: &async_graphql::Context<'_>,
-    user: showtimes_db::m::User,
-    id: UlidGQL,
-    input: ProjectCreateInputGQL,
+async fn make_and_update_project(
+    db: &showtimes_db::DatabaseShared,
+    meili: &showtimes_search::SearchClientShared,
+    project: &mut showtimes_db::m::Project,
 ) -> async_graphql::Result<ProjectGQL> {
+    // Save the project
+    let prj_handler = ProjectHandler::new(db);
+    prj_handler.save(project, None).await?;
+
+    // Update index
+    let prj_search = showtimes_search::models::Project::from(project.clone());
+    prj_search.update_document(meili).await?;
+
+    let prj_gql: ProjectGQL = project.clone().into();
+
+    Ok(prj_gql)
+}
+
+async fn check_permissions(
+    ctx: &async_graphql::Context<'_>,
+    id: showtimes_shared::ulid::Ulid,
+    user: &showtimes_db::m::User,
+    project_id: Option<showtimes_shared::ulid::Ulid>,
+) -> async_graphql::Result<showtimes_db::m::Server> {
     let srv_loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
-    let usr_loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
-    let db = ctx.data_unchecked::<DatabaseShared>();
-    let storages = ctx.data_unchecked::<Arc<FsPool>>();
-    let meili = ctx.data_unchecked::<SearchClientShared>();
 
-    let srv = srv_loader.load_one(*id).await?;
-
+    let srv = srv_loader.load_one(id).await?;
     if srv.is_none() {
         return Err(Error::new("Server not found").extend_with(|_, e| {
             e.set("id", id.to_string());
@@ -625,30 +638,70 @@ pub async fn mutate_projects_create(
 
     let srv = srv.unwrap();
     let find_user = srv.owners.iter().find(|o| o.id == user.id);
+
     match (find_user, user.kind) {
         (Some(user), showtimes_db::m::UserKind::User) => {
             // Check if we are allowed to create a project
-            if user.privilege < showtimes_db::m::UserPrivilege::Manager {
-                return Err(
-                    Error::new("User not allowed to create projects").extend_with(|_, e| {
-                        e.set("id", id.to_string());
-                        e.set("reason", "invalid_privilege");
-                    }),
-                );
+            match project_id {
+                Some(project_id) => {
+                    if user.privilege == showtimes_db::m::UserPrivilege::ProjectManager
+                        && !user.has_id(project_id)
+                    {
+                        Err(
+                            Error::new("User not allowed to update projects").extend_with(
+                                |_, e| {
+                                    e.set("id", id.to_string());
+                                    e.set("reason", "invalid_privilege");
+                                },
+                            ),
+                        )
+                    } else {
+                        Ok(srv)
+                    }
+                }
+                None => {
+                    if user.privilege < showtimes_db::m::UserPrivilege::Manager {
+                        Err(
+                            Error::new("User not allowed to create/delete projects").extend_with(
+                                |_, e| {
+                                    e.set("id", id.to_string());
+                                    e.set("reason", "invalid_privilege");
+                                },
+                            ),
+                        )
+                    } else {
+                        Ok(srv)
+                    }
+                }
             }
         }
-        (None, showtimes_db::m::UserKind::User) => {
-            return Err(
-                Error::new("User not allowed to create projects").extend_with(|_, e| {
-                    e.set("id", id.to_string());
-                    e.set("reason", "invalid_user");
-                }),
-            );
-        }
+        (None, showtimes_db::m::UserKind::User) => Err(Error::new(
+            "User not allowed to create projects",
+        )
+        .extend_with(|_, e| {
+            e.set("id", id.to_string());
+            e.set("reason", "invalid_user");
+        })),
         _ => {
             // Allow anyone to create a project
+            Ok(srv)
         }
     }
+}
+
+pub async fn mutate_projects_create(
+    ctx: &async_graphql::Context<'_>,
+    user: showtimes_db::m::User,
+    id: UlidGQL,
+    input: ProjectCreateInputGQL,
+) -> async_graphql::Result<ProjectGQL> {
+    let usr_loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
+    let db = ctx.data_unchecked::<DatabaseShared>();
+    let storages = ctx.data_unchecked::<Arc<FsPool>>();
+    let meili = ctx.data_unchecked::<SearchClientShared>();
+
+    // Check perms
+    let srv = check_permissions(ctx, *id, &user, None).await?;
 
     // Fetch all assignees
     let assignee_keys = input
@@ -721,7 +774,7 @@ pub async fn mutate_projects_create(
         let mut progress = showtimes_db::m::EpisodeProgress::new_with_roles(
             episode.number as u64,
             false,
-            all_roles.clone(),
+            &all_roles,
         );
         progress.set_aired(episode.aired_at);
         all_progress.push(progress);
@@ -813,16 +866,7 @@ pub async fn mutate_projects_create(
         showtimes_db::m::Poster::new_with_color(poster_url, input.poster_color.unwrap_or(16614485));
 
     // Save the project
-    let prj_handler = ProjectHandler::new(db);
-    prj_handler.save(&mut project, None).await?;
-
-    // Update index
-    let prj_search = showtimes_search::models::Project::from(project.clone());
-    prj_search.update_document(meili).await?;
-
-    let prj_gql: ProjectGQL = project.into();
-
-    Ok(prj_gql)
+    make_and_update_project(db, meili, &mut project).await
 }
 
 async fn download_cover(url: &str) -> anyhow::Result<Vec<u8>> {
@@ -1000,50 +1044,13 @@ pub async fn mutate_projects_update(
     id: UlidGQL,
     input: ProjectUpdateInputGQL,
 ) -> async_graphql::Result<ProjectGQL> {
-    let srv_loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
+    let prj_loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
     let usr_loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
     let db = ctx.data_unchecked::<DatabaseShared>();
     let storages = ctx.data_unchecked::<Arc<FsPool>>();
     let meili = ctx.data_unchecked::<SearchClientShared>();
 
-    let srv = srv_loader.load_one(*id).await?;
-
-    if srv.is_none() {
-        return Err(Error::new("Server not found").extend_with(|_, e| {
-            e.set("id", id.to_string());
-            e.set("reason", "invalid_server");
-        }));
-    }
-
-    let srv = srv.unwrap();
-    let find_user = srv.owners.iter().find(|o| o.id == user.id);
-    match (find_user, user.kind) {
-        (Some(user), showtimes_db::m::UserKind::User) => {
-            // Check if we are allowed to update a project
-            if user.privilege == showtimes_db::m::UserPrivilege::ProjectManager && !user.has_id(*id)
-            {
-                return Err(
-                    Error::new("User not allowed to update projects").extend_with(|_, e| {
-                        e.set("id", id.to_string());
-                        e.set("reason", "invalid_privilege");
-                    }),
-                );
-            }
-        }
-        (None, showtimes_db::m::UserKind::User) => {
-            return Err(
-                Error::new("User not allowed to update projects").extend_with(|_, e| {
-                    e.set("id", id.to_string());
-                    e.set("reason", "invalid_user");
-                }),
-            );
-        }
-        _ => {
-            // Allow anyone to update a project
-        }
-    }
-
-    let prj_loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
+    // Fetch project
     let prj_info = prj_loader.load_one(ProjectDataLoaderKey::Id(*id)).await?;
 
     if prj_info.is_none() {
@@ -1054,6 +1061,9 @@ pub async fn mutate_projects_update(
     }
 
     let mut prj_info = prj_info.unwrap();
+
+    // Check perms
+    check_permissions(ctx, prj_info.creator, &user, Some(prj_info.id)).await?;
 
     // Update title and aliases
     if let Some(title) = input.title {
@@ -1266,7 +1276,7 @@ pub async fn mutate_projects_update(
                 prj_info.id,
                 &filename,
                 &mut file_target,
-                Some(&srv.id.to_string()),
+                Some(&prj_info.creator.to_string()),
                 Some(showtimes_fs::FsFileKind::Images),
             )
             .await?;
@@ -1276,7 +1286,7 @@ pub async fn mutate_projects_update(
             prj_info.id,
             &filename,
             format.as_extension(),
-            Some(srv.id.to_string()),
+            Some(prj_info.creator.to_string()),
         );
 
         prj_info.poster.image = image_meta;
@@ -1287,14 +1297,56 @@ pub async fn mutate_projects_update(
     }
 
     // Save the project
-    let prj_handler = ProjectHandler::new(db);
-    prj_handler.save(&mut prj_info, None).await?;
+    make_and_update_project(db, meili, &mut prj_info).await
+}
 
-    // Update index
-    let prj_search = showtimes_search::models::Project::from(prj_info.clone());
-    prj_search.update_document(meili).await?;
+pub async fn mutate_projects_episode_add_auto(
+    ctx: &async_graphql::Context<'_>,
+    user: showtimes_db::m::User,
+    id: UlidGQL,
+    count: u64,
+) -> async_graphql::Result<ProjectGQL> {
+    let prj_loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
+    let db = ctx.data_unchecked::<DatabaseShared>();
+    let meili = ctx.data_unchecked::<SearchClientShared>();
 
-    let prj_gql: ProjectGQL = prj_info.into();
+    // Fetch project
+    let prj_info = prj_loader.load_one(ProjectDataLoaderKey::Id(*id)).await?;
 
-    Ok(prj_gql)
+    if prj_info.is_none() {
+        return Err(Error::new("Project not found").extend_with(|_, e| {
+            e.set("id", id.to_string());
+            e.set("reason", "invalid_project");
+        }));
+    }
+
+    let mut prj_info = prj_info.unwrap();
+
+    // Check perms
+    check_permissions(ctx, prj_info.creator, &user, Some(prj_info.id)).await?;
+
+    // Add episodes from the last episode
+    let mut sorted_episodes = prj_info.progress.clone();
+    sorted_episodes.sort();
+    let last_episode = sorted_episodes.last().unwrap();
+    let last_air_date = last_episode.aired;
+    let new_episodes = ((last_episode.number + 1)..=(last_episode.number + count))
+        .enumerate()
+        .map(|(idx, n)| {
+            let next_air_date =
+                last_air_date.map(|d| d + chrono::Duration::weeks((idx + 1) as i64));
+
+            let mut ep =
+                showtimes_db::m::EpisodeProgress::new_with_roles(n, false, &prj_info.roles);
+            ep.set_aired(next_air_date);
+            ep
+        })
+        .collect::<Vec<showtimes_db::m::EpisodeProgress>>();
+
+    // Extend, sort, then replace
+    sorted_episodes.extend(new_episodes);
+    sorted_episodes.sort();
+    prj_info.progress = sorted_episodes;
+
+    make_and_update_project(db, meili, &mut prj_info).await
 }

@@ -467,6 +467,28 @@ impl MutationRoot {
         mutations::projects::mutate_projects_update(ctx, user, id, input).await
     }
 
+    /// Add new episode automatically to a project
+    ///
+    /// This will use the last episode as the base for the new episode
+    #[graphql(
+        name = "projectProgressAddAuto",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)"
+    )]
+    async fn update_project_progress_auto_add(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The project ID to update")] id: crate::models::prelude::UlidGQL,
+        #[graphql(
+            desc = "The total number of episodes to add, minimum of 1 and maximum of 100",
+            validator(minimum = 1, maximum = 100)
+        )]
+        total: u32,
+    ) -> async_graphql::Result<ProjectGQL> {
+        let user = find_authenticated_user(ctx).await?;
+
+        mutations::projects::mutate_projects_episode_add_auto(ctx, user, id, total.into()).await
+    }
+
     /// Delete a project from Showtimes
     #[graphql(
         name = "deleteProject",

@@ -375,9 +375,17 @@ impl RoleStatus {
 
 impl From<Role> for RoleStatus {
     fn from(role: Role) -> Self {
-        let r = role.clone();
         RoleStatus {
-            key: r.key,
+            key: role.key().to_string(),
+            finished: false,
+        }
+    }
+}
+
+impl From<&Role> for RoleStatus {
+    fn from(role: &Role) -> Self {
+        RoleStatus {
+            key: role.key().to_string(),
             finished: false,
         }
     }
@@ -491,12 +499,12 @@ impl EpisodeProgress {
         }
     }
 
-    pub fn new_with_roles(number: u64, finished: bool, roles: Vec<Role>) -> Self {
+    pub fn new_with_roles(number: u64, finished: bool, roles: &[Role]) -> Self {
         EpisodeProgress {
             number,
             finished,
             aired: None,
-            statuses: roles.into_iter().map(RoleStatus::from).collect(),
+            statuses: roles.iter().map(RoleStatus::from).collect(),
             delay_reason: None,
         }
     }
@@ -552,6 +560,26 @@ impl EpisodeProgress {
         let roles_keys: Vec<String> = roles.iter().map(|r| r.key.clone()).collect();
         // Update the statuses
         self.statuses.retain(|s| roles_keys.contains(&s.key));
+    }
+}
+
+impl PartialEq for EpisodeProgress {
+    fn eq(&self, other: &Self) -> bool {
+        self.number == other.number
+    }
+}
+
+impl Eq for EpisodeProgress {}
+
+impl PartialOrd for EpisodeProgress {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.number.cmp(&other.number))
+    }
+}
+
+impl Ord for EpisodeProgress {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.number.cmp(&other.number)
     }
 }
 
@@ -704,16 +732,14 @@ impl Project {
     /// Create a new episode/chapter progress.
     pub fn add_episode(&mut self) {
         let number = self.progress.len() as u64 + 1;
-        let roles = self.roles.clone();
         self.progress
-            .push(EpisodeProgress::new_with_roles(number, false, roles));
+            .push(EpisodeProgress::new_with_roles(number, false, &self.roles));
     }
 
     /// Create a new episode/chapter progress with specific episode/chapter number.
     pub fn add_episode_with_number(&mut self, number: u64) {
-        let roles = self.roles.clone();
         self.progress
-            .push(EpisodeProgress::new_with_roles(number, false, roles));
+            .push(EpisodeProgress::new_with_roles(number, false, &self.roles));
     }
 
     /// Create a new episode/chapter progress with specific episode/chapter number and airing date.
@@ -722,8 +748,7 @@ impl Project {
         number: u64,
         aired_at: chrono::DateTime<chrono::Utc>,
     ) {
-        let roles = self.roles.clone();
-        let mut episode = EpisodeProgress::new_with_roles(number, false, roles);
+        let mut episode = EpisodeProgress::new_with_roles(number, false, &self.roles);
         episode.set_aired(Some(aired_at));
         self.progress.push(episode);
     }
