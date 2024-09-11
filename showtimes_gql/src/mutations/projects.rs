@@ -1350,3 +1350,36 @@ pub async fn mutate_projects_episode_add_auto(
 
     make_and_update_project(db, meili, &mut prj_info).await
 }
+
+pub async fn mutate_projects_episode_remove(
+    ctx: &async_graphql::Context<'_>,
+    user: showtimes_db::m::User,
+    id: UlidGQL,
+    episodes: &[u64],
+) -> async_graphql::Result<ProjectGQL> {
+    let prj_loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
+    let db = ctx.data_unchecked::<DatabaseShared>();
+    let meili = ctx.data_unchecked::<SearchClientShared>();
+
+    // Fetch project
+    let prj_info = prj_loader.load_one(ProjectDataLoaderKey::Id(*id)).await?;
+
+    if prj_info.is_none() {
+        return Err(Error::new("Project not found").extend_with(|_, e| {
+            e.set("id", id.to_string());
+            e.set("reason", "invalid_project");
+        }));
+    }
+
+    let mut prj_info = prj_info.unwrap();
+
+    // Check perms
+    check_permissions(ctx, prj_info.creator, &user, Some(prj_info.id)).await?;
+
+    // Remove episodes marked
+    prj_info
+        .progress
+        .retain(|ep| !episodes.contains(&ep.number));
+
+    make_and_update_project(db, meili, &mut prj_info).await
+}
