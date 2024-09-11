@@ -217,6 +217,19 @@ impl FsPool {
         }
     }
 
+    /// Delete a folder from the filesystem.
+    pub async fn directory_delete(
+        &self,
+        base_key: impl Into<String> + std::marker::Send,
+        parent_id: Option<&str>,
+        kind: Option<FsFileKind>,
+    ) -> anyhow::Result<()> {
+        match self {
+            Self::LocalFs(fs) => fs.directory_delete(base_key, parent_id, kind).await,
+            Self::S3Fs(fs) => fs.directory_delete(base_key, parent_id, kind).await,
+        }
+    }
+
     /// Get the current filesystem name.
     pub fn get_name(&self) -> &'static str {
         match self {
