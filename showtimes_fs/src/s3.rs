@@ -403,16 +403,22 @@ impl FsImpl for S3Fs {
         }
 
         tracing::debug!("Deleting {} objects", delete_objects.len());
-        let delete_in = Delete::builder()
-            .set_objects(Some(delete_objects))
-            .build()?;
+        // Split into 100 objects per request
+        let chunks = delete_objects.chunks(100);
+        let chunks_count = chunks.len();
+        for (idx, chunk) in chunks.enumerate() {
+            tracing::debug!("Deleting chunk #{} out of #{}", idx, chunks_count);
+            let delete_in = Delete::builder()
+                .set_objects(Some(chunk.to_vec()))
+                .build()?;
 
-        client
-            .delete_objects()
-            .bucket(&self.bucket_name)
-            .delete(delete_in)
-            .send()
-            .await?;
+            client
+                .delete_objects()
+                .bucket(&self.bucket_name)
+                .delete(delete_in)
+                .send()
+                .await?;
+        }
 
         tracing::debug!("Deletion complete");
         Ok(())
