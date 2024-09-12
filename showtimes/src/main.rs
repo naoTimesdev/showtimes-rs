@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use std::sync::Arc;
 
 use axum::{response::IntoResponse, routing::get, Router};

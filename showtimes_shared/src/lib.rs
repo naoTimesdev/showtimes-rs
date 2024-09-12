@@ -1,4 +1,4 @@
-//! Shared utilities for Showtimes
+#![doc = include_str!("../README.md")]
 
 use serde::{ser::SerializeSeq, Deserialize};
 use uuid::{Timestamp, Uuid};

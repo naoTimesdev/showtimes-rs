@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use clap::Parser;
 use cli::MigrationCommands;
 use migrations::get_migrations;

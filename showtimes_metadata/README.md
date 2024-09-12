@@ -1,10 +1,11 @@
 # metadata
 
-A wrapper for external network fetching for a shows or books metadata information.
+An opinionated metadata fetching library for a shows, books, and other metadata information from external services.
 
 ## Supported Sources
-- Anilist (Anime, Manga, Novels)
-- TMDB (Shows, Movies, and more.)
+- [Anilist](https://anilist.co/) (Anime, Manga, Novels)
+- [TMDB](https://themoviedb.org/) (Shows, Movies, and more.)
+- [VNDB](https://vndb.org/) (Visual Novels)
 
 ## License
 

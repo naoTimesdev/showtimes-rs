@@ -6,11 +6,10 @@ The session handling library for Showtimes API. Powered by [JWT](https://jwt.io/
 
 This library contains four main functions:
 - `create_*`: Create a new session.
-  - `create_session`: Create a new session for user authentication.
+  - `create_session`: Create a new session for JWT authentication.
+  - `create_api_key_session`: Create a new session for API key authentication.
   - `create_discord_session_state`: Create a anti-CSRF state for Discord OAuth2.
-- `verify_*`: Verify a session.
-  - `verify_session`: Verify a session for user authentication.
-  - `verify_discord_session_state`: Verify a anti-CSRF state for Discord OAuth2.
+- `verify_session`: Verify a session token with the expected audience.
 
 We use `HS512` for the algorithm that contains the following payload:
 ```jsonc
@@ -21,9 +20,9 @@ We use `HS512` for the algorithm that contains the following payload:
     "exp": 1620000000,
     // The token issuer
     "iss": "showtimes-rs-session/0.1.0",
-    // The token "audience", `user` or `discord-auth` to determine the token usage
+    // The token "audience": `user`, "api-key", "master-key", or "discord-auth".
     "aud": "user",
-    // The user ULID or the final redirect URL for Discord
+    // The user ULID, API key, or the final redirect URL for Discord
     "metadata": "1234567890"
 }
 ```

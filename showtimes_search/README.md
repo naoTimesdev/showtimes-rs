@@ -1,6 +1,13 @@
 # search
 
-The search library for Showtimes API. Powered by Meilisearch.
+The search library for Showtimes API.
+
+Powered by
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/meilisearch/meilisearch/main/assets/meilisearch-logo-dark.svg" height="24">
+  <img alt="Meilisearch" src="https://raw.githubusercontent.com/meilisearch/meilisearch/main/assets/meilisearch-logo-light.svg" height="24">
+</picture>
 
 ## License
 

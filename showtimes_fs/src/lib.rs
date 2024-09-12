@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub mod local;

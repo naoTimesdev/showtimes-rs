@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use async_graphql::dataloader::DataLoader;
 use async_graphql::extensions::Tracing;
 use async_graphql::{Context, EmptySubscription, ErrorExtensions, Object};

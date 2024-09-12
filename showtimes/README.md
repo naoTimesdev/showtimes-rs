@@ -1,6 +1,6 @@
 # showtimes-rs
 
-A big rewrite in progress...
+The main brain of naoTimes/Showtimes backend API.
 
 ## License
 
