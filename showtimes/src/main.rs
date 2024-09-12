@@ -56,15 +56,27 @@ async fn entrypoint() -> anyhow::Result<()> {
     let (non_blocking, _guard) = tracing_appender::non_blocking(log_file);
 
     // Initialize tracing logger
-    tracing_subscriber::registry()
+    let tracing_init = tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
                 "showtimes=debug,tower_http=debug,axum::rejection=trace,async_graphql::graphql=debug".into()
             }),
         )
         .with(tracing_subscriber::fmt::layer())
-        .with(tracing_subscriber::fmt::layer().with_writer(non_blocking))
-        .init();
+        .with(tracing_subscriber::fmt::layer().with_writer(non_blocking));
+
+    if let Some(axiom) = &config.axiom {
+        // Start with axiom telemetry
+        let axiom_layer = tracing_axiom::builder("showtimes")
+            .with_token(axiom.token.clone())?
+            .with_dataset(axiom.dataset.clone())?
+            .build()?;
+
+        tracing_init.with(axiom_layer).try_init()?;
+    } else {
+        // Start with no telemetry
+        tracing_init.init();
+    }
 
     let version = env!("CARGO_PKG_VERSION");
     tracing::info!("💭 Starting showtimes v{}", version);
@@ -229,9 +241,11 @@ async fn shutdown_signal() {
     tokio::select! {
         _ = ctrl_c => {
             tracing::info!("Received Ctrl-C, shutting down...");
+            opentelemetry::global::shutdown_tracer_provider();
         }
         _ = terminate => {
             tracing::info!("Received SIGTERM, shutting down...");
+            opentelemetry::global::shutdown_tracer_provider();
         }
     }
 }
