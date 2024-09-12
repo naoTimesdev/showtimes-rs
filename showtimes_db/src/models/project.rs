@@ -779,13 +779,35 @@ impl Project {
         }
     }
 
-    /// Propagate the roles to the assignees and statuses.
-    pub fn propagate_roles(&mut self) {
+    /// Propagate the roles for assignees.
+    pub fn propagate_roles_assignees(&mut self) {
         // Check for roles to be removed
         let roles_keys: Vec<String> = self.roles.iter().map(|r| r.key.clone()).collect();
         // Update the assignees
         self.assignees.retain(|a| roles_keys.contains(&a.key));
+        let existing_keys = self
+            .assignees
+            .iter()
+            .map(|a| a.key.clone())
+            .collect::<Vec<String>>();
 
+        // Get missing roles
+        let missing_roles: Vec<RoleAssignee> = self
+            .roles
+            .iter()
+            .filter(|r| !existing_keys.contains(&r.key))
+            .map(RoleAssignee::from)
+            .collect();
+
+        if !missing_roles.is_empty() {
+            // Add the missing roles
+            self.assignees.extend(missing_roles);
+        }
+    }
+
+    /// Propagate the roles to the assignees and statuses.
+    pub fn propagate_roles(&mut self) {
+        self.propagate_roles_assignees();
         // Update the statuses
         self.progress.iter_mut().for_each(|e| {
             e.propagate_roles(&self.roles);
