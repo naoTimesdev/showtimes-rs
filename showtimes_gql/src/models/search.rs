@@ -139,8 +139,8 @@ impl ExternalSearch {
             title,
             titles: ExternalSearchTitle {
                 english: media.title.clone(),
-                native: None,
-                romanized: media.original_title.clone(),
+                native: media.original_title.clone(),
+                romanized: None,
             },
             format: ProjectTypeGQL::Movies,
             description: media.overview.clone(),
