@@ -3,7 +3,7 @@ use tokio::sync::Mutex;
 
 use async_graphql::{Enum, Object, SimpleObject};
 use showtimes_metadata::{
-    m::{AnilistFuzzyDate, AnilistMedia, AnilistMediaFormat, TMDbMultiResult, VndbNovel},
+    m::{AnilistFuzzyDate, AnilistMedia, AnilistMediaFormat, TMDbMovieResult, VndbNovel},
     AnilistProvider, TMDbProvider, VndbProvider,
 };
 
@@ -118,34 +118,31 @@ impl ExternalSearch {
         }
     }
 
-    /// Convert from a [`TMDbMultiResult`] to an [`ExternalSearch`]
-    pub fn from_tmdb(media: &TMDbMultiResult, prefer_title: ExternalSearchTitlePrefer) -> Self {
+    /// Convert from a [`TMDbMovieResult`] to an [`ExternalSearch`]
+    pub fn from_tmdb(media: &TMDbMovieResult, prefer_title: ExternalSearchTitlePrefer) -> Self {
         let title = get_title(
-            Some(media.title()),
-            media.original_title(),
+            media.title.clone(),
+            media.original_title.clone(),
             None,
             prefer_title,
         )
         .unwrap_or_default();
 
         // release_date is YYYY-MM-DD, but can be YYYY-MM or YYYY
-        let release_date = media.release_date().and_then(|d| yyyy_mm_dd_to_fuzzy(&d));
-
-        let format = match media.media_type {
-            showtimes_metadata::m::TMDbMediaType::Tv => ProjectTypeGQL::Series,
-            showtimes_metadata::m::TMDbMediaType::Movie => ProjectTypeGQL::Movies,
-            _ => ProjectTypeGQL::Unknown,
-        };
+        let release_date = media
+            .release_date
+            .clone()
+            .and_then(|d| yyyy_mm_dd_to_fuzzy(&d));
 
         Self {
             id: media.id.to_string(),
             title,
             titles: ExternalSearchTitle {
-                english: Some(media.title()),
+                english: media.title.clone(),
                 native: None,
-                romanized: media.original_title(),
+                romanized: media.original_title.clone(),
             },
-            format,
+            format: ProjectTypeGQL::Movies,
             description: media.overview.clone(),
             release_date,
             image: media.poster_url(),
@@ -313,18 +310,11 @@ impl QuerySearchRoot {
         // TMDb provider is optional
         match provider {
             Some(provider) => {
-                let results = provider.search(&query).await?;
+                let results = provider.search_movie(&query).await?;
 
                 Ok(results
                     .iter()
-                    // Only allow movies and tv shows
-                    .filter_map(|m| match m.media_type {
-                        showtimes_metadata::m::TMDbMediaType::Movie
-                        | showtimes_metadata::m::TMDbMediaType::Tv => {
-                            Some(ExternalSearch::from_tmdb(m, prefer_title))
-                        }
-                        _ => None,
-                    })
+                    .map(|m| ExternalSearch::from_tmdb(m, prefer_title))
                     .collect())
             }
             None => Ok(vec![]),

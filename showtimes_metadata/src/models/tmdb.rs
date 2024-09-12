@@ -38,8 +38,6 @@ pub struct TMDbMovieResult {
     pub id: i32,
     /// Is this an adult/NSFW item
     pub adult: bool,
-    /// The media type of the result
-    pub media_type: TMDbMediaType,
     /// The title of the result.
     pub title: Option<String>,
     /// The original title of the result.
@@ -201,7 +199,7 @@ impl TMDbMultiResult {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
-pub struct TMDbMultiResponse {
+pub struct TMDbMultiResponse<T> {
     /// The page of the response
     pub page: u32,
     /// The total number of pages
@@ -209,7 +207,8 @@ pub struct TMDbMultiResponse {
     /// The total number of results
     pub total_results: u32,
     /// The results of the response
-    pub results: Vec<TMDbMultiResult>,
+    #[serde(bound(deserialize = "T: Deserialize<'de>", serialize = "T: Serialize"))]
+    pub results: Vec<T>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]

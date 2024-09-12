@@ -84,14 +84,32 @@ impl TMDbProvider {
         }
     }
 
-    /// Search for a movie
+    /// Search for a tv, movie, anything
     ///
     /// This will also search for people and companies, so make sure to filter the results.
     ///
     /// # Arguments
     /// * `query` - The query to search for
     pub async fn search(&self, query: &str) -> Result<Vec<TMDbMultiResult>, TMDbErrorResponse> {
-        let response: TMDbMultiResponse = self
+        let response: TMDbMultiResponse<TMDbMultiResult> = self
+            .request(
+                "search/multi",
+                &[("query", query), ("include_adult", "true")],
+            )
+            .await?;
+
+        Ok(response.results)
+    }
+
+    /// Search for a movie
+    ///
+    /// # Arguments
+    /// * `query` - The query to search for
+    pub async fn search_movie(
+        &self,
+        query: &str,
+    ) -> Result<Vec<TMDbMovieResult>, TMDbErrorResponse> {
+        let response: TMDbMultiResponse<TMDbMovieResult> = self
             .request(
                 "search/movie",
                 &[("query", query), ("include_adult", "true")],
