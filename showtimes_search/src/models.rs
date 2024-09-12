@@ -198,8 +198,8 @@ impl From<&showtimes_db::m::ServerCollaborationSyncTarget> for ServerCollabTarge
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-collab-sync",
-    filterable = ["id", "created", "projects"],
-    searchable = ["id", "projects"],
+    filterable = ["id", "created", "projects.project", "projects.server"],
+    searchable = ["id", "projects.project", "projects.server"],
     sortable = ["id", "created", "updated"],
     distinct = "id",
 )]
