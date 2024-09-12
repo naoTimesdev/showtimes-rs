@@ -233,6 +233,20 @@ pub struct ProjectUpdateInputGQL {
     progress: Option<Vec<ProjectProgressUpdateInputGQL>>,
 }
 
+/// The input object for update a project progress count manually.
+///
+/// When a pre-existing episode is updated, the system will update the episode
+/// instead of adding a new one.
+///
+/// Note: This can make the system out of sync with the external metadata.
+#[derive(InputObject)]
+pub struct ProgressCreateInputGQL {
+    /// The episode title
+    number: u64,
+    /// Airing date of the progress
+    aired: Option<DateTimeGQL>,
+}
+
 #[derive(Clone, Debug)]
 struct ExternalMediaFetchProgressResult {
     number: u32,
@@ -1364,6 +1378,56 @@ pub async fn mutate_projects_episode_add_auto(
     sorted_episodes.extend(new_episodes);
     sorted_episodes.sort();
     prj_info.progress = sorted_episodes;
+
+    make_and_update_project(db, meili, &mut prj_info).await
+}
+
+pub async fn mutate_projects_episode_add_manual(
+    ctx: &async_graphql::Context<'_>,
+    user: showtimes_db::m::User,
+    id: UlidGQL,
+    episodes: &[ProgressCreateInputGQL],
+) -> async_graphql::Result<ProjectGQL> {
+    let prj_loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
+    let db = ctx.data_unchecked::<DatabaseShared>();
+    let meili = ctx.data_unchecked::<SearchClientShared>();
+
+    // Fetch project
+    let prj_info = prj_loader.load_one(ProjectDataLoaderKey::Id(*id)).await?;
+
+    if prj_info.is_none() {
+        return Err(Error::new("Project not found").extend_with(|_, e| {
+            e.set("id", id.to_string());
+            e.set("reason", "invalid_project");
+        }));
+    }
+
+    let mut prj_info = prj_info.unwrap();
+
+    // Check perms
+    check_permissions(ctx, prj_info.creator, &user, Some(prj_info.id)).await?;
+
+    // Add episodes
+    for episode in episodes {
+        let exist_mut = prj_info.find_episode_mut(episode.number);
+        if let Some(repl_mut) = exist_mut {
+            if let Some(aired) = &episode.aired {
+                repl_mut.set_aired(Some(**aired));
+            }
+        } else {
+            match &episode.aired {
+                Some(aired) => {
+                    prj_info.add_episode_with_number_and_airing(episode.number, **aired);
+                }
+                None => {
+                    prj_info.add_episode_with_number(episode.number);
+                }
+            }
+        }
+    }
+
+    // Sort the episodes
+    prj_info.sort_progress();
 
     make_and_update_project(db, meili, &mut prj_info).await
 }

@@ -489,6 +489,28 @@ impl MutationRoot {
         mutations::projects::mutate_projects_episode_add_auto(ctx, user, id, total.into()).await
     }
 
+    /// Add new episode manually to a project
+    ///
+    /// You will need to provide each episode information
+    #[graphql(
+        name = "projectProgressAdd",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)"
+    )]
+    async fn update_project_progress_add(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The project ID to update")] id: crate::models::prelude::UlidGQL,
+        #[graphql(
+            desc = "The new episodes to be added, minimum of 1 and maximum of 100",
+            validator(min_items = 1, max_items = 100)
+        )]
+        episodes: Vec<mutations::projects::ProgressCreateInputGQL>,
+    ) -> async_graphql::Result<ProjectGQL> {
+        let user = find_authenticated_user(ctx).await?;
+
+        mutations::projects::mutate_projects_episode_add_manual(ctx, user, id, &episodes).await
+    }
+
     /// Add new episode automatically to a project
     ///
     /// This will use the last episode as the base for the new episode

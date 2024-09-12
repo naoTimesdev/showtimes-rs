@@ -791,4 +791,9 @@ impl Project {
             e.propagate_roles(&self.roles);
         });
     }
+
+    /// Sort ascendingly the progress episodes/chapters by number.
+    pub fn sort_progress(&mut self) {
+        self.progress.sort();
+    }
 }
