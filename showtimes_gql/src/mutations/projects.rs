@@ -11,7 +11,10 @@ use showtimes_search::SearchClientShared;
 use tokio::{io::AsyncSeekExt, sync::Mutex};
 
 use crate::{
-    data_loader::{ProjectDataLoader, ProjectDataLoaderKey, ServerDataLoader, UserDataLoader},
+    data_loader::{
+        ProjectDataLoader, ProjectDataLoaderKey, ServerDataLoader, ServerSyncIds, ServerSyncLoader,
+        UserDataLoader,
+    },
     models::{
         prelude::{DateTimeGQL, OkResponse, UlidGQL},
         projects::ProjectGQL,
@@ -1069,6 +1072,66 @@ pub async fn mutate_projects_delete(
     Ok(OkResponse::ok("Project deleted"))
 }
 
+async fn sync_projects_collaborations(
+    ctx: &async_graphql::Context<'_>,
+    project: &showtimes_db::m::Project,
+) -> async_graphql::Result<()> {
+    let db = ctx.data_unchecked::<DatabaseShared>();
+    let meili = ctx.data_unchecked::<SearchClientShared>();
+
+    // Find all collabs
+    let collab_loader = ctx.data_unchecked::<DataLoader<ServerSyncLoader>>();
+    let collab_res = collab_loader
+        .load_one(ServerSyncIds::new(project.creator, project.id))
+        .await?;
+
+    if let Some(collab_info) = collab_res {
+        // Get non-current projects
+        let other_projects = collab_info
+            .projects
+            .iter()
+            .filter(|p| p.project != project.id && p.server != project.creator)
+            .map(|p| p.project)
+            .collect::<Vec<showtimes_shared::ulid::Ulid>>();
+
+        if other_projects.is_empty() {
+            return Ok(());
+        }
+
+        let projects_loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
+        let mut all_projects = projects_loader.load_many(other_projects).await?;
+        let prj_handler = ProjectHandler::new(db);
+
+        // Update the roles, status, and assignees
+        let mut o_project_search = vec![];
+        for o_project in all_projects.values_mut() {
+            o_project.roles = project.roles.clone();
+            o_project.progress = project.progress.clone();
+            o_project.propagate_roles_assignees();
+
+            // Save
+            prj_handler.save(o_project, None).await?;
+            o_project_search.push(showtimes_search::models::Project::from(o_project.clone()));
+        }
+
+        // Save the projects
+        if !o_project_search.is_empty() {
+            let o_project_index = meili.index(showtimes_search::models::Project::index_name());
+            let o_project_task = o_project_index
+                .add_or_update(
+                    &o_project_search,
+                    Some(showtimes_search::models::Project::primary_key()),
+                )
+                .await?;
+            o_project_task
+                .wait_for_completion(meili, None, None)
+                .await?;
+        }
+    }
+
+    Ok(())
+}
+
 pub async fn mutate_projects_update(
     ctx: &async_graphql::Context<'_>,
     user: showtimes_db::m::User,
@@ -1328,7 +1391,11 @@ pub async fn mutate_projects_update(
     }
 
     // Save the project
-    make_and_update_project(db, meili, &mut prj_info).await
+    let prj_gql = make_and_update_project(db, meili, &mut prj_info).await?;
+    // Sync the collaborations
+    sync_projects_collaborations(ctx, &prj_info).await?;
+
+    Ok(prj_gql)
 }
 
 pub async fn mutate_projects_episode_add_auto(
@@ -1379,7 +1446,12 @@ pub async fn mutate_projects_episode_add_auto(
     sorted_episodes.sort();
     prj_info.progress = sorted_episodes;
 
-    make_and_update_project(db, meili, &mut prj_info).await
+    // Save the project
+    let prj_gql = make_and_update_project(db, meili, &mut prj_info).await?;
+    // Sync the collaborations
+    sync_projects_collaborations(ctx, &prj_info).await?;
+
+    Ok(prj_gql)
 }
 
 pub async fn mutate_projects_episode_add_manual(
@@ -1429,7 +1501,12 @@ pub async fn mutate_projects_episode_add_manual(
     // Sort the episodes
     prj_info.sort_progress();
 
-    make_and_update_project(db, meili, &mut prj_info).await
+    // Save the project
+    let prj_gql = make_and_update_project(db, meili, &mut prj_info).await?;
+    // Sync the collaborations
+    sync_projects_collaborations(ctx, &prj_info).await?;
+
+    Ok(prj_gql)
 }
 
 pub async fn mutate_projects_episode_remove(
@@ -1462,5 +1539,10 @@ pub async fn mutate_projects_episode_remove(
         .progress
         .retain(|ep| !episodes.contains(&ep.number));
 
-    make_and_update_project(db, meili, &mut prj_info).await
+    // Save the project
+    let prj_gql = make_and_update_project(db, meili, &mut prj_info).await?;
+    // Sync the collaborations
+    sync_projects_collaborations(ctx, &prj_info).await?;
+
+    Ok(prj_gql)
 }

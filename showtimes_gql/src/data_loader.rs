@@ -247,6 +247,32 @@ impl Loader<ServerOwnerId> for ProjectDataLoader {
     }
 }
 
+impl Loader<Ulid> for ProjectDataLoader {
+    type Error = FieldError;
+    type Value = showtimes_db::m::Project;
+
+    async fn load(&self, keys: &[Ulid]) -> Result<HashMap<Ulid, Self::Value>, Self::Error> {
+        let keys_to_string = keys.iter().map(|k| k.to_string()).collect::<Vec<_>>();
+        let result = self
+            .col
+            .get_collection()
+            .find(doc! {
+                "id": { "$in": keys_to_string }
+            })
+            .await?;
+
+        let all_results = result
+            .try_collect::<Vec<showtimes_db::m::Project>>()
+            .await?;
+        let mapped_res: HashMap<Ulid, showtimes_db::m::Project> = all_results
+            .iter()
+            .map(|proj| (proj.id, proj.clone()))
+            .collect();
+
+        Ok(mapped_res)
+    }
+}
+
 /// A simple owner data loader
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerOwnerId(Ulid);
