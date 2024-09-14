@@ -2,6 +2,7 @@ use async_graphql::{CustomValidator, Enum, InputObject};
 
 use crate::models::prelude::IntegrationTypeGQL;
 
+pub mod collaborations;
 pub mod projects;
 pub mod servers;
 pub mod users;

@@ -19,6 +19,7 @@ pub enum UserPrivilege {
     /// In addition to project manager, this user can:
     /// - Add and remove project
     /// - Manage all project
+    /// - Manage the collaboration
     Manager,
     /// A user with all the special privileges
     ///

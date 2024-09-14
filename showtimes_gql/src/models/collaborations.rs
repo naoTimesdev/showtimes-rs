@@ -1,4 +1,4 @@
-use async_graphql::{dataloader::DataLoader, Object};
+use async_graphql::{dataloader::DataLoader, Error, ErrorExtensions, Object};
 use showtimes_shared::ulid::Ulid;
 
 use crate::data_loader::{ProjectDataLoader, ProjectDataLoaderKey, ServerDataLoader};
@@ -82,7 +82,9 @@ impl CollaborationSyncGQL {
 
         let results_mapped: Vec<ServerGQL> = loader
             .load_many(unmapped_servers_ids)
-            .await?.into_values().map(|srv| {
+            .await?
+            .into_values()
+            .map(|srv| {
                 let srv_gql: ServerGQL = srv.into();
                 srv_gql.with_projects_disabled()
             })
@@ -117,7 +119,9 @@ impl CollaborationSyncGQL {
 
         let results_mapped: Vec<ProjectGQL> = loader
             .load_many(unmapped_project_ids)
-            .await?.into_values().map(|proj| {
+            .await?
+            .into_values()
+            .map(|proj| {
                 let prj_gql: ProjectGQL = proj.into();
                 prj_gql
                     .with_disable_server_fetch()
@@ -136,5 +140,186 @@ impl CollaborationSyncGQL {
     /// The collaboration link updated
     async fn updated(&self) -> DateTimeGQL {
         self.updated.into()
+    }
+}
+
+pub struct CollaborationInviteSourceGQL {
+    /// The server ID
+    server_id: showtimes_shared::ulid::Ulid,
+    /// The project ID
+    project_id: showtimes_shared::ulid::Ulid,
+}
+
+#[Object]
+impl CollaborationInviteSourceGQL {
+    /// The server information
+    async fn server(&self, ctx: &async_graphql::Context<'_>) -> async_graphql::Result<ServerGQL> {
+        let loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
+
+        match loader.load_one(self.server_id).await? {
+            Some(srv) => {
+                let srv_gql: ServerGQL = srv.into();
+                Ok(srv_gql.with_projects_disabled())
+            }
+            None => Err(Error::new("Server not found").extend_with(|_, e| {
+                e.set("id", self.server_id.to_string());
+                e.set("reason", "invalid_server");
+            })),
+        }
+    }
+
+    /// The project information
+    async fn project(&self, ctx: &async_graphql::Context<'_>) -> async_graphql::Result<ProjectGQL> {
+        let loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
+
+        match loader
+            .load_one(ProjectDataLoaderKey::Id(self.project_id))
+            .await?
+        {
+            Some(prj) => {
+                let prj_gql: ProjectGQL = prj.into();
+                Ok(prj_gql
+                    .with_disable_server_fetch()
+                    .with_disable_collaboration_fetch())
+            }
+            None => Err(Error::new("Project not found").extend_with(|_, e| {
+                e.set("id", self.project_id.to_string());
+                e.set("reason", "invalid_project");
+            })),
+        }
+    }
+}
+
+pub struct CollaborationInviteTargetGQL {
+    /// The server ID
+    server_id: showtimes_shared::ulid::Ulid,
+    /// The project ID
+    project_id: Option<showtimes_shared::ulid::Ulid>,
+}
+
+#[Object]
+impl CollaborationInviteTargetGQL {
+    /// The server information
+    async fn server(&self, ctx: &async_graphql::Context<'_>) -> async_graphql::Result<ServerGQL> {
+        let loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
+
+        match loader.load_one(self.server_id).await? {
+            Some(srv) => {
+                let srv_gql: ServerGQL = srv.into();
+                Ok(srv_gql.with_projects_disabled())
+            }
+            None => Err(Error::new("Server not found").extend_with(|_, e| {
+                e.set("id", self.server_id.to_string());
+                e.set("reason", "invalid_server");
+            })),
+        }
+    }
+
+    /// The project information
+    ///
+    /// When not provided, this will be duplicated from the source
+    /// server when the invite is accepted.
+    async fn project(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+    ) -> async_graphql::Result<Option<ProjectGQL>> {
+        match self.project_id {
+            None => Ok(None),
+            Some(id) => {
+                let loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
+
+                match loader.load_one(id).await? {
+                    Some(prj) => {
+                        let prj_gql: ProjectGQL = prj.into();
+                        let prj_gql = prj_gql
+                            .with_disable_server_fetch()
+                            .with_disable_collaboration_fetch();
+                        Ok(Some(prj_gql))
+                    }
+                    None => Err(Error::new("Project not found").extend_with(|_, e| {
+                        e.set("id", id.to_string());
+                        e.set("reason", "invalid_project");
+                    })),
+                }
+            }
+        }
+    }
+}
+
+/// Collaboration sync information
+pub struct CollaborationInviteGQL {
+    /// The invite ID
+    id: showtimes_shared::ulid::Ulid,
+    /// The source
+    source: CollaborationInviteSourceGQL,
+    /// The target
+    target: CollaborationInviteTargetGQL,
+    /// Creation time
+    created: chrono::DateTime<chrono::Utc>,
+    /// Updated time
+    updated: chrono::DateTime<chrono::Utc>,
+}
+
+#[Object]
+impl CollaborationInviteGQL {
+    /// The invite ID
+    async fn id(&self) -> UlidGQL {
+        self.id.into()
+    }
+
+    /// The source server and project
+    async fn source(&self) -> &CollaborationInviteSourceGQL {
+        &self.source
+    }
+
+    /// The target server and project
+    async fn target(&self) -> &CollaborationInviteTargetGQL {
+        &self.target
+    }
+
+    /// Creation time of the invite
+    async fn created(&self) -> DateTimeGQL {
+        self.created.into()
+    }
+
+    /// Last updated time of the invite
+    async fn updated(&self) -> DateTimeGQL {
+        self.updated.into()
+    }
+}
+
+impl From<showtimes_db::m::ServerCollaborationInvite> for CollaborationInviteGQL {
+    fn from(db: showtimes_db::m::ServerCollaborationInvite) -> Self {
+        CollaborationInviteGQL {
+            id: db.id,
+            source: CollaborationInviteSourceGQL {
+                server_id: db.source.server,
+                project_id: db.source.project,
+            },
+            target: CollaborationInviteTargetGQL {
+                server_id: db.target.server,
+                project_id: db.target.project,
+            },
+            created: db.created,
+            updated: db.updated,
+        }
+    }
+}
+
+impl From<&showtimes_db::m::ServerCollaborationInvite> for CollaborationInviteGQL {
+    fn from(db: &showtimes_db::m::ServerCollaborationInvite) -> Self {
+        CollaborationInviteGQL {
+            id: db.id,
+            source: CollaborationInviteSourceGQL {
+                server_id: db.source.server,
+                project_id: db.source.project,
+            },
+            target: CollaborationInviteTargetGQL {
+                server_id: db.target.server,
+                project_id: db.target.project,
+            },
+            created: db.created,
+            updated: db.updated,
+        }
     }
 }

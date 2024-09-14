@@ -208,6 +208,8 @@ pub struct ProjectUpdateInputGQL {
     #[graphql(validator(min_length = 1))]
     title: Option<String>,
     /// The aliases for the project
+    ///
+    /// Providing empty list will remove all aliases
     #[graphql(validator(custom = "super::NonEmptyValidator"))]
     aliases: Option<Vec<String>>,
     /// The modified roles list for the project
@@ -234,6 +236,20 @@ pub struct ProjectUpdateInputGQL {
     ///
     /// This will only update the progress, to add or remove episode/chapter, use `projectProgressUpdate` mutation
     progress: Option<Vec<ProjectProgressUpdateInputGQL>>,
+}
+
+impl ProjectUpdateInputGQL {
+    /// Check if any field is set
+    fn is_any_set(&self) -> bool {
+        self.title.is_some()
+            || self.aliases.is_some()
+            || self.roles.is_some()
+            || self.assignees.is_some()
+            || self.poster.is_some()
+            || self.poster_color.is_some()
+            || self.sync_metadata
+            || self.progress.is_some()
+    }
 }
 
 /// The input object for update a project progress count manually.
@@ -1138,6 +1154,12 @@ pub async fn mutate_projects_update(
     id: UlidGQL,
     input: ProjectUpdateInputGQL,
 ) -> async_graphql::Result<ProjectGQL> {
+    if !input.is_any_set() {
+        return Err(Error::new("No fields to update").extend_with(|_, e| {
+            e.set("reason", "no_fields");
+        }));
+    }
+
     let prj_loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
     let usr_loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
     let db = ctx.data_unchecked::<DatabaseShared>();
