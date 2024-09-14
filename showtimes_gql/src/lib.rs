@@ -549,7 +549,7 @@ impl MutationRoot {
     ) -> async_graphql::Result<CollaborationInviteGQL> {
         let user = find_authenticated_user(ctx).await?;
 
-        mutations::collaborations::mutate_colaborations_initiate(ctx, user, input).await
+        mutations::collaborations::mutate_collaborations_initiate(ctx, user, input).await
     }
 
     /// Delete a project from Showtimes

@@ -33,7 +33,7 @@ pub struct CollaborationSyncGQL {
     /// Collaboration link updated
     updated: chrono::DateTime<chrono::Utc>,
     /// What server requested the sync
-    requester: CollaborationSyncRequester,
+    requester: Option<CollaborationSyncRequester>,
 }
 
 impl CollaborationSyncGQL {
@@ -50,7 +50,7 @@ impl CollaborationSyncGQL {
             project_ids,
             created: db.created,
             updated: db.updated,
-            requester,
+            requester: Some(requester),
         }
     }
 }
@@ -69,12 +69,15 @@ impl CollaborationSyncGQL {
     ) -> async_graphql::Result<Vec<ServerGQL>> {
         let loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
 
-        let unmapped_servers_ids: Vec<Ulid> = self
-            .server_ids
-            .clone()
-            .into_iter()
-            .filter(|id| *id != self.requester.server_id)
-            .collect();
+        let unmapped_servers_ids: Vec<Ulid> = match self.requester {
+            Some(requester) => self
+                .server_ids
+                .clone()
+                .into_iter()
+                .filter(|id| *id != requester.server_id)
+                .collect(),
+            None => self.server_ids.clone(),
+        };
 
         if unmapped_servers_ids.is_empty() {
             return Ok(vec![]);
@@ -104,12 +107,15 @@ impl CollaborationSyncGQL {
             .project_ids
             .clone()
             .into_iter()
-            .filter_map(|id| {
-                if id != self.requester.project_id {
-                    Some(ProjectDataLoaderKey::Id(id))
-                } else {
-                    None
+            .filter_map(|id| match &self.requester {
+                Some(requester) => {
+                    if id != requester.project_id {
+                        Some(ProjectDataLoaderKey::Id(id))
+                    } else {
+                        None
+                    }
                 }
+                None => Some(ProjectDataLoaderKey::Id(id)),
             })
             .collect();
 
@@ -285,6 +291,32 @@ impl CollaborationInviteGQL {
     /// Last updated time of the invite
     async fn updated(&self) -> DateTimeGQL {
         self.updated.into()
+    }
+}
+
+impl From<showtimes_db::m::ServerCollaborationSync> for CollaborationSyncGQL {
+    fn from(db: showtimes_db::m::ServerCollaborationSync) -> Self {
+        CollaborationSyncGQL {
+            id: db.id,
+            server_ids: db.projects.iter().map(|p| p.server).collect(),
+            project_ids: db.projects.iter().map(|p| p.project).collect(),
+            created: db.created,
+            updated: db.updated,
+            requester: None,
+        }
+    }
+}
+
+impl From<&showtimes_db::m::ServerCollaborationSync> for CollaborationSyncGQL {
+    fn from(db: &showtimes_db::m::ServerCollaborationSync) -> Self {
+        CollaborationSyncGQL {
+            id: db.id,
+            server_ids: db.projects.iter().map(|p| p.server).collect(),
+            project_ids: db.projects.iter().map(|p| p.project).collect(),
+            created: db.created,
+            updated: db.updated,
+            requester: None,
+        }
     }
 }
 
