@@ -76,7 +76,7 @@ pub async fn detect_upload_data(
         ));
     }
 
-    let mut buffer = [0u8; 8];
+    let mut buffer = [0u8; 20];
     image_data.read_exact(&mut buffer).await?;
 
     // Seek back to the start of the file
