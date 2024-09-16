@@ -11,6 +11,9 @@ pub use models as m;
 /// The shared [`SHClickHouse`] client
 pub type SharedSHClickHouse = Arc<SHClickHouse>;
 
+const DATABASE_NAME: &str = "nt_showtimes";
+const TABLE_NAME: &str = "events";
+
 /// The main ClickHouse client handler for Showtimes
 pub struct SHClickHouse {
     client: Client,
@@ -41,15 +44,21 @@ impl SHClickHouse {
 
         // Create the database if not exists
         client
-            .query("CREATE DATABASE IF NOT EXISTS showtimes")
+            .query(&format!("CREATE DATABASE IF NOT EXISTS {}", DATABASE_NAME))
             .execute()
             .await?;
 
-        let client = client.clone().with_database("showtimes");
-        client
-            .query(
+        let client = client.clone().with_database(DATABASE_NAME);
+
+        Ok(Self { client })
+    }
+
+    /// Create the necessary tables in the database
+    pub async fn create_tables(&self) -> Result<(), clickhouse::error::Error> {
+        self.client
+            .query(&format!(
                 r#"
-                CREATE TABLE IF NOT EXISTS events (
+                CREATE TABLE IF NOT EXISTS {} (
                     id UUID,
                     kind Enum8(
                         'user_created' = 1,
@@ -74,11 +83,18 @@ impl SHClickHouse {
                 ) ENGINE = MergeTree()
                 ORDER BY (timestamp)
             "#,
-            )
+                TABLE_NAME
+            ))
             .execute()
-            .await?;
+            .await
+    }
 
-        Ok(Self { client })
+    /// Drop all tables in the database
+    pub async fn drop_tables(&self) -> Result<(), clickhouse::error::Error> {
+        self.client
+            .query(&format!("DROP TABLE IF EXISTS {}", TABLE_NAME))
+            .execute()
+            .await
     }
 
     /// Create new event, this will also forward the event to the broker
@@ -103,7 +119,7 @@ impl SHClickHouse {
             data_event
         };
 
-        let mut insert = self.client.insert("events")?;
+        let mut insert = self.client.insert(TABLE_NAME)?;
         insert.write(&data_event).await?;
         insert.end().await?;
 
@@ -131,7 +147,7 @@ impl SHClickHouse {
             } else {
                 data_event
             };
-            let mut insert = client.insert("events")?;
+            let mut insert = client.insert(TABLE_NAME)?;
             insert.write(&data_event).await?;
             insert.end().await?;
 

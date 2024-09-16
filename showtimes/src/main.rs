@@ -106,6 +106,7 @@ async fn entrypoint() -> anyhow::Result<()> {
         config.clickhouse.password.as_deref(),
     )
     .await?;
+    clickhouse_conn.create_tables().await?;
 
     // Initialize the filesystem
     tracing::info!("🔌📁 Loading filesystem...");
