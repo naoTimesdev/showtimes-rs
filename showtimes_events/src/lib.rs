@@ -77,7 +77,7 @@ impl SHClickHouse {
                         'collaboration_deleted' = 43,
                         'collaboration_retracted' = 44,
                     ),
-                    data STRING,
+                    data String,
                     actor Nullable(String),
                     timestamp DateTime
                 ) ENGINE = MergeTree()
