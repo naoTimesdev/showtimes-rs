@@ -2,11 +2,8 @@
 
 use async_graphql::dataloader::DataLoader;
 use async_graphql::extensions::Tracing;
-use async_graphql::{Context, EmptySubscription, ErrorExtensions, Object};
-use data_loader::{
-    find_authenticated_user, DiscordIdLoad, ServerAndOwnerId, ServerDataLoader, ServerOwnerId,
-    UserDataLoader,
-};
+use async_graphql::{Context, EmptySubscription, Object};
+use data_loader::{find_authenticated_user, ServerAndOwnerId, ServerDataLoader, ServerOwnerId};
 use models::collaborations::{CollaborationInviteGQL, CollaborationSyncGQL};
 use models::prelude::{OkResponse, PaginatedGQL};
 use models::projects::ProjectGQL;
@@ -16,8 +13,7 @@ use models::stats::StatsGQL;
 use models::users::{UserGQL, UserSessionGQL};
 use showtimes_db::{mongodb::bson::doc, DatabaseShared};
 use showtimes_session::manager::SharedSessionManager;
-use showtimes_session::{oauth2::discord::DiscordClient, ShowtimesUserSession};
-use std::sync::Arc;
+use showtimes_session::ShowtimesUserSession;
 
 mod data_loader;
 mod guard;
@@ -238,113 +234,7 @@ impl MutationRoot {
         #[graphql(desc = "The OAuth2 token/code returned from Discord")] token: String,
         #[graphql(desc = "The OAuth2 state")] state: String,
     ) -> async_graphql::Result<UserSessionGQL> {
-        let config = ctx.data_unchecked::<Arc<showtimes_shared::Config>>();
-        let sess_manager = ctx.data_unchecked::<SharedSessionManager>();
-
-        tracing::info!("Authenticating user with token: {}", &token);
-        showtimes_session::verify_session(
-            &state,
-            &config.jwt.secret,
-            showtimes_session::ShowtimesAudience::DiscordAuth,
-        )
-        .map_err(|err| {
-            err.extend_with(|_, e| {
-                e.set("reason", "invalid_state");
-                e.set("state", state);
-                e.set("token", token.clone());
-            })
-        })?;
-
-        // Valid!
-        let discord = ctx.data_unchecked::<Arc<DiscordClient>>();
-
-        tracing::info!("Exchanging code {} for OAuth2 token...", &token);
-        let exchanged = discord
-            .exchange_code(&token, &config.discord.redirect_url)
-            .await?;
-
-        tracing::info!("Success, getting user for code {}", &token);
-        let user_info = discord.get_user(&exchanged.access_token).await?;
-
-        // Load handler and data loader
-        let handler = showtimes_db::UserHandler::new(ctx.data_unchecked::<DatabaseShared>());
-        let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
-
-        tracing::info!("Checking if user exists for ID: {}", &user_info.id);
-        let user = loader.load_one(DiscordIdLoad(user_info.id.clone())).await?;
-
-        match user {
-            Some(mut user) => {
-                tracing::info!("User found, updating token for ID: {}", &user_info.id);
-                // Update the user token
-                user.discord_meta.access_token = exchanged.access_token;
-                user.discord_meta.refresh_token = exchanged.refresh_token.unwrap();
-                user.discord_meta.expires_at =
-                    chrono::Utc::now().timestamp() + exchanged.expires_in as i64;
-
-                if !user.registered {
-                    user.discord_meta.username = user_info.username.clone();
-                    user.registered = true;
-                }
-
-                handler.save(&mut user, None).await?;
-
-                let (oauth_user, oauth_token) = showtimes_session::create_session(
-                    user.id,
-                    config
-                        .jwt
-                        .expiration
-                        .unwrap_or(7 * 24 * 60 * 60)
-                        .try_into()?,
-                    &config.jwt.secret,
-                )?;
-
-                sess_manager
-                    .lock()
-                    .await
-                    .set_session(&oauth_token, oauth_user)
-                    .await?;
-
-                Ok(UserSessionGQL::new(user, oauth_token))
-            }
-            None => {
-                tracing::info!(
-                    "User not found, creating new user for ID: {}",
-                    &user_info.id
-                );
-                // Create new user
-                let current_time = chrono::Utc::now();
-                let expires_at = current_time.timestamp() + exchanged.expires_in as i64;
-                let discord_user = showtimes_db::m::DiscordUser {
-                    id: user_info.id,
-                    username: user_info.username.clone(),
-                    avatar: user_info.avatar,
-                    access_token: exchanged.access_token,
-                    refresh_token: exchanged.refresh_token.unwrap(),
-                    expires_at,
-                };
-
-                let mut user = showtimes_db::m::User::new(user_info.username, discord_user);
-                handler.save(&mut user, None).await?;
-
-                let (oauth_user, oauth_token) = showtimes_session::create_session(
-                    user.id,
-                    config
-                        .jwt
-                        .expiration
-                        .unwrap_or(7 * 24 * 60 * 60)
-                        .try_into()?,
-                    &config.jwt.secret,
-                )?;
-
-                sess_manager
-                    .lock()
-                    .await
-                    .set_session(&oauth_token, oauth_user)
-                    .await?;
-                Ok(UserSessionGQL::new(user, oauth_token))
-            }
-        }
+        crate::mutations::users::mutate_users_authenticate(ctx, token, state).await
     }
 
     /// Disconnect/logout from Showtimes, this can also be used to revoke OAuth2 token
