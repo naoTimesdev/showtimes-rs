@@ -25,6 +25,7 @@ image = { version = "0.25.2", default-features = false, features = ["jpeg", "png
 # Showtimes related
 showtimes-shared = { path = "../showtimes_shared" }
 showtimes-db = { path = "../showtimes_db" }
+showtimes-events = { path = "../showtimes_events" }
 showtimes-fs = { path = "../showtimes_fs" }
 showtimes-metadata = { path = "../showtimes_metadata" }
 showtimes-search = { path = "../showtimes_search" }

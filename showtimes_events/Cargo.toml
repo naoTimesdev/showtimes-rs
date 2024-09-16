@@ -23,3 +23,4 @@ slab = "0.4"
 uuid.workspace = true
 
 showtimes-shared = { path = "../showtimes_shared" }
+showtimes-db = { path = "../showtimes_db" }

@@ -136,14 +136,22 @@ pub async fn mutate_users_update(
     }
 
     let mut user_info = user_info.clone();
+    let mut user_before = showtimes_events::m::UserUpdatedDataEvent::default();
+    let mut user_after = showtimes_events::m::UserUpdatedDataEvent::default();
     if let Some(username) = input.username {
+        user_before.set_name(&user_info.username);
         user_info.username = username;
+        user_after.set_name(&user_info.username);
     }
     if let Some(kind) = input.kind {
+        user_before.set_kind(user_info.kind.into());
         user_info.kind = kind.into();
+        user_after.set_kind(user_info.kind.into());
     }
     if let Some(true) = input.reset_api_key {
+        user_before.set_api_key(user_info.api_key.clone());
         user_info.api_key = showtimes_shared::APIKey::new();
+        user_after.set_api_key(user_info.api_key.clone());
     }
     if let Some(avatar_upload) = input.avatar {
         let info_up = avatar_upload.value(ctx)?;
@@ -174,6 +182,10 @@ pub async fn mutate_users_update(
             None::<String>,
         );
 
+        if let Some(avatar) = &user_info.avatar {
+            user_before.set_avatar(avatar);
+        }
+        user_after.set_avatar(&image_meta);
         user_info.avatar = Some(image_meta);
     }
 
@@ -181,9 +193,22 @@ pub async fn mutate_users_update(
     let user_handler = UserHandler::new(db);
     user_handler.save(&mut user_info, None).await?;
 
-    // Update index
-    let user_search = showtimes_search::models::User::from(user_info.clone());
-    user_search.update_document(meili).await?;
+    let search_arc = meili.clone();
+    let user_clone = user_info.clone();
+    let task_search = tokio::task::spawn(async move {
+        let user_search = showtimes_search::models::User::from(user_clone);
+        user_search.update_document(&search_arc).await
+    });
+    let task_event = ctx
+        .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+        .create_event_async(
+            showtimes_events::m::EventKind::UserUpdated,
+            showtimes_events::m::UserUpdatedEvent::new(user_info.id, user_before, user_after),
+        );
+
+    let (r_a, r_b) = tokio::try_join!(task_search, task_event)?;
+    r_a?;
+    r_b?;
 
     let user_gql: UserGQL = user_info.into();
 
