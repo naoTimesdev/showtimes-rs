@@ -818,4 +818,16 @@ impl Project {
     pub fn sort_progress(&mut self) {
         self.progress.sort();
     }
+
+    /// Create a new Clone or Duplicate of this project with different ID and creator.
+    pub fn duplicate(&self, creator: showtimes_shared::ulid::Ulid) -> Self {
+        let mut new_project = self.clone();
+        let cur_time = chrono::Utc::now();
+        new_project.id = ulid_serializer::default();
+        new_project.creator = creator;
+        new_project.created = cur_time;
+        new_project.updated = cur_time;
+        new_project.unset_id();
+        new_project
+    }
 }

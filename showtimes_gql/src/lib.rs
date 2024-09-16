@@ -7,7 +7,7 @@ use data_loader::{
     find_authenticated_user, DiscordIdLoad, ServerAndOwnerId, ServerDataLoader, ServerOwnerId,
     UserDataLoader,
 };
-use models::collaborations::CollaborationInviteGQL;
+use models::collaborations::{CollaborationInviteGQL, CollaborationSyncGQL};
 use models::prelude::{OkResponse, PaginatedGQL};
 use models::projects::ProjectGQL;
 use models::search::QuerySearchRoot;
@@ -550,6 +550,21 @@ impl MutationRoot {
         let user = find_authenticated_user(ctx).await?;
 
         mutations::collaborations::mutate_collaborations_initiate(ctx, user, input).await
+    }
+
+    /// Accept a collaboration between projects
+    #[graphql(
+        name = "collaborateAccept",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)"
+    )]
+    async fn collaborate_accept(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The collaboration ID to accept")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<CollaborationSyncGQL> {
+        let user = find_authenticated_user(ctx).await?;
+
+        mutations::collaborations::mutate_collaborations_accept(ctx, user, id).await
     }
 
     /// Delete a project from Showtimes

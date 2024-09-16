@@ -1,10 +1,16 @@
 use async_graphql::{dataloader::DataLoader, Error, ErrorExtensions, InputObject};
-use showtimes_db::{CollaborationInviteHandler, DatabaseShared};
+use showtimes_db::{
+    m::ServerCollaborationSyncTarget, mongodb::bson::doc, CollaborationInviteHandler,
+    DatabaseShared,
+};
 use showtimes_search::SearchClientShared;
 
 use crate::{
     data_loader::{ProjectDataLoader, ServerDataLoader},
-    models::{collaborations::CollaborationInviteGQL, prelude::UlidGQL},
+    models::{
+        collaborations::{CollaborationInviteGQL, CollaborationSyncGQL},
+        prelude::UlidGQL,
+    },
 };
 
 /// The user input object on what to update
@@ -71,7 +77,7 @@ async fn check_permissions(
     }
 }
 
-pub async fn mutate_colaborations_initiate(
+pub async fn mutate_collaborations_initiate(
     ctx: &async_graphql::Context<'_>,
     user: showtimes_db::m::User,
     input: CollaborationRequestInputGQL,
@@ -139,4 +145,98 @@ pub async fn mutate_colaborations_initiate(
     invite_search.update_document(meili).await?;
 
     Ok(collab_invite.into())
+}
+
+pub async fn mutate_collaborations_accept(
+    ctx: &async_graphql::Context<'_>,
+    user: showtimes_db::m::User,
+    invite: UlidGQL,
+) -> async_graphql::Result<CollaborationSyncGQL> {
+    let db = ctx.data_unchecked::<DatabaseShared>();
+    let meili = ctx.data_unchecked::<SearchClientShared>();
+    let prj_loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
+
+    let invite_db = showtimes_db::CollaborationInviteHandler::new(db);
+    let invite_data = invite_db
+        .find_by_id(&(*invite.to_string()))
+        .await?
+        .ok_or_else(|| {
+            Error::new("Collaboration invite not found").extend_with(|_, e| {
+                e.set("id", invite.to_string());
+                e.set("reason", "invalid_invite");
+            })
+        })?;
+
+    let target_srv = check_permissions(ctx, &user, invite_data.target.server).await?;
+
+    let orig_proj = prj_loader
+        .load_one(invite_data.source.project)
+        .await?
+        .ok_or_else(|| {
+            Error::new("Original/source project not found").extend_with(|_, e| {
+                e.set("id", invite_data.source.project.to_string());
+                e.set("reason", "invalid_project");
+            })
+        })?;
+
+    // Check done, see if we can just use the existing project or should we duplicate
+    let mut target_proj = if let Some(project_id) = invite_data.target.project {
+        let project = prj_loader.load_one(project_id).await?;
+
+        match project {
+            None => orig_proj.duplicate(target_srv.id),
+            Some(target_proj) => target_proj,
+        }
+    } else {
+        orig_proj.duplicate(target_srv.id)
+    };
+
+    // Save the project to DB first for target
+    let prj_handler = showtimes_db::ProjectHandler::new(db);
+    prj_handler.save(&mut target_proj, None).await?;
+
+    // Save to search index
+    let prj_search = showtimes_search::models::Project::from(target_proj.clone());
+    prj_search.update_document(meili).await?;
+
+    // Find any pre-existing sync
+    let sync_handler = showtimes_db::CollaborationSyncHandler::new(db);
+    let mut sync_ss = sync_handler
+        .find_by(doc! {
+            "projects.project": orig_proj.id.to_string(),
+        })
+        .await?;
+
+    let sync_mut = sync_ss.as_mut();
+
+    // Match, update the list then save
+    let sync_gql: CollaborationSyncGQL = if let Some(sync) = sync_mut {
+        sync.projects
+            .push(ServerCollaborationSyncTarget::from(target_proj));
+
+        // Update DB
+        sync_handler.save(sync, None).await?;
+        // Update search
+        let sync_search = showtimes_search::models::ServerCollabSync::from(sync.clone());
+        sync_search.update_document(meili).await?;
+
+        sync.clone().into()
+    } else {
+        // Create a new sync
+        let src_sync = showtimes_db::m::ServerCollaborationSyncTarget::from(orig_proj);
+        let target_sync = showtimes_db::m::ServerCollaborationSyncTarget::from(target_proj);
+
+        let mut sync = showtimes_db::m::ServerCollaborationSync::new(vec![src_sync, target_sync]);
+
+        // Save to DB
+        sync_handler.save(&mut sync, None).await?;
+
+        // Save to search index
+        let sync_search = showtimes_search::models::ServerCollabSync::from(sync.clone());
+        sync_search.update_document(meili).await?;
+
+        sync.clone().into()
+    };
+
+    Ok(sync_gql)
 }
