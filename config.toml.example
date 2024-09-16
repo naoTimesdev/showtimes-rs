@@ -27,6 +27,15 @@ url = "https://your.meilisearch.instance"
 # Meilisearch key, allow write access to the index
 api_key = "meilisearch-api-key-or-master-key"
 
+# ClickHouse config
+[events]
+# ClickHouse connection string
+url = "http://localhost:8123"
+# Clickhouse user
+user = "default"
+# Clickhouse password
+# password = "your-clickhouse-password"
+
 # Discord OAuth2
 [discord]
 client_id = "00000000000000000000"

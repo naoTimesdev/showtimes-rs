@@ -97,6 +97,17 @@ pub struct AxiomTelemetry {
     pub token: String,
 }
 
+/// ClickHouse configuration
+#[derive(Debug, Clone, Deserialize)]
+pub struct ClickHouseEvent {
+    /// The url of the ClickHouse server
+    pub url: String,
+    /// The username of the ClickHouse server
+    pub username: String,
+    /// The password of the ClickHouse server
+    pub password: Option<String>,
+}
+
 /// The full configuration for Showtimes
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
@@ -118,6 +129,9 @@ pub struct Config {
     /// The Meilisearch configuration
     #[serde(rename = "search")]
     pub meilisearch: Meilisearch,
+    /// The ClickHouse configuration
+    #[serde(rename = "events")]
+    pub clickhouse: ClickHouseEvent,
     /// The Discord OAuth2 configuration
     pub discord: DiscordOAuth2,
     /// The external or metadata services API key
