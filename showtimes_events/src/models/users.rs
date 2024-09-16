@@ -39,6 +39,8 @@ pub struct UserUpdatedDataEvent {
     kind: Option<showtimes_db::m::UserKind>,
     #[serde(skip_serializing_if = "Option::is_none")]
     avatar: Option<showtimes_db::m::ImageMetadata>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    discord_meta: Option<showtimes_db::m::DiscordUser>,
 }
 
 impl UserUpdatedDataEvent {
@@ -56,6 +58,10 @@ impl UserUpdatedDataEvent {
 
     pub fn set_avatar(&mut self, avatar: &showtimes_db::m::ImageMetadata) {
         self.avatar = Some(avatar.clone());
+    }
+
+    pub fn set_discord_meta(&mut self, discord_meta: &showtimes_db::m::DiscordUser) {
+        self.discord_meta = Some(discord_meta.clone());
     }
 }
 

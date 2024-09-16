@@ -222,6 +222,7 @@ pub async fn mutate_users_authenticate(
     state: String,
 ) -> async_graphql::Result<UserSessionGQL> {
     let config = ctx.data_unchecked::<Arc<showtimes_shared::Config>>();
+    let event_manager = ctx.data_unchecked::<showtimes_events::SharedSHClickHouse>();
     let sess_manager = ctx.data_unchecked::<SharedSessionManager>();
 
     tracing::info!("Authenticating user with token: {}", &token);
@@ -259,6 +260,9 @@ pub async fn mutate_users_authenticate(
     match user {
         Some(mut user) => {
             tracing::info!("User found, updating token for ID: {}", &user_info.id);
+            let mut before_user = showtimes_events::m::UserUpdatedDataEvent::default();
+            let mut after_user = showtimes_events::m::UserUpdatedDataEvent::default();
+            before_user.set_discord_meta(&user.discord_meta);
             // Update the user token
             user.discord_meta.access_token = exchanged.access_token;
             user.discord_meta.refresh_token = exchanged.refresh_token.unwrap();
@@ -267,8 +271,13 @@ pub async fn mutate_users_authenticate(
 
             if !user.registered {
                 user.discord_meta.username = user_info.username.clone();
+                before_user.set_name(&user.username);
+                user.username = user_info.username.clone();
+                after_user.set_name(&user.username);
                 user.registered = true;
             }
+
+            after_user.set_discord_meta(&user.discord_meta);
 
             handler.save(&mut user, None).await?;
 
@@ -281,6 +290,14 @@ pub async fn mutate_users_authenticate(
                     .try_into()?,
                 &config.jwt.secret,
             )?;
+
+            // Emit event
+            event_manager
+                .create_event(
+                    showtimes_events::m::EventKind::UserUpdated,
+                    showtimes_events::m::UserUpdatedEvent::new(user.id, before_user, after_user),
+                )
+                .await?;
 
             sess_manager
                 .lock()
@@ -309,6 +326,14 @@ pub async fn mutate_users_authenticate(
 
             let mut user = showtimes_db::m::User::new(user_info.username, discord_user);
             handler.save(&mut user, None).await?;
+
+            // Emit event
+            event_manager
+                .create_event(
+                    showtimes_events::m::EventKind::UserCreated,
+                    showtimes_events::m::UserCreatedEvent::from(&user),
+                )
+                .await?;
 
             let (oauth_user, oauth_token) = showtimes_session::create_session(
                 user.id,
