@@ -15,7 +15,7 @@ expiration = 86400
 # Database connection string
 [database]
 # MongoDB connection string
-mongodb = "mongodb://localhost:27017"
+mongodb = "mongodb://root:secure-ntdb-password@localhost:27017"
 # Redis-adjacent (Valkey, etc) connecting string
 # Note: We will not support Redis 7.4+
 redis = "redis://localhost:6379/0"

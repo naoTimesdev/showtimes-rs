@@ -99,7 +99,7 @@ async fn entrypoint() -> anyhow::Result<()> {
     tracing::info!("🔌📅 Loading database...");
     let mongo_conn = showtimes_db::create_connection(&config.database.mongodb).await?;
 
-    tracing::info!("🔌🪵 Loading clickhose events...");
+    tracing::info!("🔌🪵 Loading ClickHouse events...");
     let clickhouse_conn = showtimes_events::SHClickHouse::new(
         &config.clickhouse.url,
         &config.clickhouse.username,

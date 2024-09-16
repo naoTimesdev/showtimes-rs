@@ -1,0 +1,42 @@
+services:
+  sh_database:
+    image: "mongo:7.0.14"
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: secure-ntdb-password
+  
+  sh_redis:
+    image: "valkey/valkey:7.2.6-alpine"
+    restart: always
+
+  sh_meilisearch:
+    image: "chainguard/meilisearch:latest"
+    restart: always
+
+  sh_clickhouse:
+    image: clickhouse/clickhouse-server:24.8.4.13-alpine
+    restart: always
+    volumes:
+      - event-data:/var/lib/clickhouse
+      - event-logs:/var/log/clickhouse-server
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  showtimes:
+    build: .
+    ports: "5560:5560"
+    restart: always
+    depends_on:
+      - sh_database
+      - sh_redis
+      - sh_meilisearch
+      - sh_clickhouse
+
+volumes:
+  event-data:
+    driver: local
+  event-logs:
+    driver: local
