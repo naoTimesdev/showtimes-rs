@@ -28,6 +28,7 @@ mongodb.workspace = true
 bson.workspace = true
 
 showtimes-db = { path = "../showtimes_db" }
+showtimes-events = { path = "../showtimes_events" }
 showtimes-fs = { path = "../showtimes_fs" }
 showtimes-search = { path = "../showtimes_search" }
 showtimes-shared = { path = "../showtimes_shared" }

@@ -3,6 +3,7 @@ use showtimes_db::{ClientShared, DatabaseShared};
 pub(crate) mod m20240725045840_init;
 pub(crate) mod m20240726055250_update_covers;
 pub(crate) mod m20240821113204_fallback_images_invalids;
+pub(crate) mod m20240916075925_clickhouse_init;
 
 #[async_trait::async_trait]
 pub trait Migration {
@@ -25,5 +26,6 @@ pub fn get_migrations(client: &ClientShared, db: &DatabaseShared) -> Vec<Box<dyn
                 client, db,
             ),
         ),
+        Box::new(m20240916075925_clickhouse_init::M20240916075925ClickhouseInit::init(client, db)),
     ]
 }
