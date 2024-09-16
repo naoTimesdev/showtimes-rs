@@ -104,4 +104,27 @@ impl SHClickHouse {
 
         Ok(())
     }
+
+    /// A similar function to [`SHClickHouse::create_event`] but will run
+    /// on non-blocking manner or in another thread
+    pub fn create_event_async<T>(
+        &self,
+        kind: m::EventKind,
+        data: T,
+    ) -> tokio::task::JoinHandle<Result<(), clickhouse::error::Error>>
+    where
+        T: serde::Serialize + Send + Sync + Clone + 'static,
+    {
+        let client = self.client.clone();
+        tokio::task::spawn(async move {
+            let data_event = m::SHEvent::new(kind, data.clone());
+            let mut insert = client.insert("events")?;
+            insert.write(&data_event).await?;
+            insert.end().await?;
+
+            MemoryBroker::publish(data);
+
+            Ok(())
+        })
+    }
 }
