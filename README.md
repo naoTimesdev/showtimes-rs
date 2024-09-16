@@ -9,6 +9,7 @@ The following project was built with the following requirements in mind:
 - MongoDB 6.x or newer
 - Redis/Valkey 7.x or newer (Redis 7.4+ CE is NOT supported/recommended)
 - Meilisearch 1.8.x or newer
+- ClickHouse 24.x
 - S3-compatible storage (e.g. MinIO, AWS S3, Wasabi, etc.) [`Optional`]
 
 ### MSRV

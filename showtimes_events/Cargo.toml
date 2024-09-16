@@ -1,0 +1,22 @@
+[package]
+name = "showtimes-events"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Event storage and handling for Showtimes API"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+futures.workspace = true
+
+clickhouse.workspace = true
+slab = "0.4"
+
+showtimes-shared = { path = "../showtimes_shared" }
