@@ -42,9 +42,12 @@ pub enum EventKind {
 
 #[derive(Debug, Row, Serialize, Deserialize)]
 pub(crate) struct SHEvent<T: Send + Sync + Clone> {
+    /// The ID of the event, this is randomly generated
     #[serde(with = "clickhouse::serde::uuid")]
     id: uuid::Uuid,
+    /// The event kind
     kind: EventKind,
+    /// The event data itself, on Clickhouse this will be stored as a
     #[serde(
         bound(
             deserialize = "T: DeserializeOwned + Send + Sync + Clone",
@@ -54,6 +57,11 @@ pub(crate) struct SHEvent<T: Send + Sync + Clone> {
         serialize_with = "serialize_event_data"
     )]
     data: T,
+    /// The actor or the person who initiated the event
+    ///
+    /// If the event is initiated by the system/Owner, this will be `None`/null
+    actor: Option<String>,
+    /// The timestamp of the event
     #[serde(with = "showtimes_shared::unix_timestamp_serializer")]
     timestamp: chrono::DateTime<chrono::Utc>,
 }
@@ -67,8 +75,14 @@ where
             id: uuid::Uuid::new_v4(),
             kind,
             data,
+            actor: None,
             timestamp: chrono::Utc::now(),
         }
+    }
+
+    pub fn with_actor(mut self, actor: String) -> Self {
+        self.actor = Some(actor);
+        self
     }
 }
 

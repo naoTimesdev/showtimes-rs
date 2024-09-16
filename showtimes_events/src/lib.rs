@@ -67,11 +67,12 @@ impl SHClickHouse {
                         'collaboration_rejected' = 42,
                         'collaboration_deleted' = 43,
                         'collaboration_retracted' = 44,
-                    )
+                    ),
                     data STRING,
+                    actor Nullable(String),
                     timestamp DateTime
                 ) ENGINE = MergeTree()
-                ORDER BY (id)
+                ORDER BY (timestamp)
             "#,
             )
             .execute()
@@ -90,11 +91,17 @@ impl SHClickHouse {
         &self,
         kind: m::EventKind,
         data: T,
+        actor: Option<String>,
     ) -> Result<(), clickhouse::error::Error>
     where
         T: serde::Serialize + Send + Sync + Clone + 'static,
     {
         let data_event = m::SHEvent::new(kind, data.clone());
+        let data_event = if let Some(actor) = actor {
+            data_event.with_actor(actor)
+        } else {
+            data_event
+        };
 
         let mut insert = self.client.insert("events")?;
         insert.write(&data_event).await?;
@@ -111,6 +118,7 @@ impl SHClickHouse {
         &self,
         kind: m::EventKind,
         data: T,
+        actor: Option<String>,
     ) -> tokio::task::JoinHandle<Result<(), clickhouse::error::Error>>
     where
         T: serde::Serialize + Send + Sync + Clone + 'static,
@@ -118,6 +126,11 @@ impl SHClickHouse {
         let client = self.client.clone();
         tokio::task::spawn(async move {
             let data_event = m::SHEvent::new(kind, data.clone());
+            let data_event = if let Some(actor) = actor {
+                data_event.with_actor(actor)
+            } else {
+                data_event
+            };
             let mut insert = client.insert("events")?;
             insert.write(&data_event).await?;
             insert.end().await?;

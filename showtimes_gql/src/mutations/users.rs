@@ -205,6 +205,11 @@ pub async fn mutate_users_update(
         .create_event_async(
             showtimes_events::m::EventKind::UserUpdated,
             showtimes_events::m::UserUpdatedEvent::new(user_info.id, user_before, user_after),
+            if user.requester.kind == UserKind::Owner {
+                None
+            } else {
+                Some(user.requester.id.to_string())
+            },
         );
 
     let (r_a, r_b) = tokio::try_join!(task_search, task_event)?;
@@ -296,6 +301,7 @@ pub async fn mutate_users_authenticate(
                 .create_event(
                     showtimes_events::m::EventKind::UserUpdated,
                     showtimes_events::m::UserUpdatedEvent::new(user.id, before_user, after_user),
+                    Some(user.id.to_string()),
                 )
                 .await?;
 
@@ -332,6 +338,7 @@ pub async fn mutate_users_authenticate(
                 .create_event(
                     showtimes_events::m::EventKind::UserCreated,
                     showtimes_events::m::UserCreatedEvent::from(&user),
+                    Some(user.id.to_string()),
                 )
                 .await?;
 
