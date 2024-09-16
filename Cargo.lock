@@ -1173,6 +1173,7 @@ dependencies = [
  "serde",
  "static_assertions",
  "thiserror",
+ "time",
  "tokio",
  "url",
  "uuid",
@@ -4137,7 +4138,6 @@ dependencies = [
 name = "showtimes-events"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "clickhouse",
  "futures",
  "serde",
@@ -4146,6 +4146,7 @@ dependencies = [
  "showtimes-db",
  "showtimes-shared",
  "slab",
+ "time",
  "tokio",
  "tracing",
  "uuid",

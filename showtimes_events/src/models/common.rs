@@ -62,8 +62,8 @@ pub(crate) struct SHEvent<T: Send + Sync + Clone> {
     /// If the event is initiated by the system/Owner, this will be `None`/null
     actor: Option<String>,
     /// The timestamp of the event
-    #[serde(with = "showtimes_shared::unix_timestamp_serializer")]
-    timestamp: chrono::DateTime<chrono::Utc>,
+    #[serde(with = "clickhouse::serde::time::datetime")]
+    timestamp: ::time::OffsetDateTime,
 }
 
 impl<T> SHEvent<T>
@@ -76,7 +76,7 @@ where
             kind,
             data,
             actor: None,
-            timestamp: chrono::Utc::now(),
+            timestamp: ::time::OffsetDateTime::now_utc(),
         }
     }
 
