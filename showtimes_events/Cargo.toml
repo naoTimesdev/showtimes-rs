@@ -12,11 +12,14 @@ description = "Event storage and handling for Showtimes API"
 [dependencies]
 tokio.workspace = true
 serde.workspace = true
+serde_repr = "0.1"
+serde_json.workspace = true
 tracing.workspace = true
 chrono.workspace = true
 futures.workspace = true
 
 clickhouse.workspace = true
 slab = "0.4"
+uuid.workspace = true
 
 showtimes-shared = { path = "../showtimes_shared" }

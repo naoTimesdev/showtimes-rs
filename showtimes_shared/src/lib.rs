@@ -395,7 +395,8 @@ pub mod unix_timestamp_serializer {
         D: serde::Deserializer<'de>,
     {
         let ts = i64::deserialize(deserializer)?;
-        let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(ts, 0).unwrap();
+        let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(ts, 0)
+            .ok_or_else(|| serde::de::Error::custom(format!("invalid timestamp: {}", ts)))?;
         Ok(dt)
     }
 }

@@ -60,7 +60,7 @@ tower-http = { version = "0.5.2", features = ["cors", "trace"] }
 mongodb = { version = "3.1.0", features = ["rustls-tls", "tracing-unstable"] }
 bson = { version = "2.12.0", features = ["chrono-0_4"] }
 redis = { version = "0.27.2", features = ["tokio-comp"] }
-clickhouse = { version = "0.12.2", features = ["inserter"] }
+clickhouse = { version = "0.12.2", features = ["uuid"] }
 meilisearch-sdk = "0.27.1"
 jsonwebtoken = "9.3.0"
 
