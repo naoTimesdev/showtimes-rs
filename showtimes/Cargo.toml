@@ -35,6 +35,7 @@ tower-layer = "0.3.3"
 # Showtimes related
 showtimes-shared = { path = "../showtimes_shared" }
 showtimes-db = { path = "../showtimes_db" }
+showtimes-events = { path = "../showtimes_events" }
 showtimes-fs = { path = "../showtimes_fs" }
 showtimes-gql = { path = "../showtimes_gql" }
 showtimes-metadata = { path = "../showtimes_metadata" }

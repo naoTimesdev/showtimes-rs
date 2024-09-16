@@ -24,4 +24,6 @@ pub struct ShowtimesState {
     pub tmdb_provider: Option<Arc<showtimes_metadata::TMDbProvider>>,
     /// External metadata providers (VNDB)
     pub vndb_provider: Option<Arc<showtimes_metadata::VndbProvider>>,
+    /// ClickHouse events broker
+    pub clickhouse: showtimes_events::SharedSHClickHouse,
 }

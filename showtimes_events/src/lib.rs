@@ -1,11 +1,17 @@
 #![doc = include_str!("../README.md")]
 
+use std::sync::Arc;
+
 pub mod brokers;
 pub mod models;
 pub use brokers::MemoryBroker;
 use clickhouse::Client;
 pub use models as m;
 
+/// The shared [`SHClickHouse`] client
+pub type SharedSHClickHouse = Arc<SHClickHouse>;
+
+/// The main ClickHouse client handler for Showtimes
 pub struct SHClickHouse {
     client: Client,
 }

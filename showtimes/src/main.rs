@@ -55,12 +55,20 @@ async fn entrypoint() -> anyhow::Result<()> {
     let log_file = tracing_appender::rolling::daily(log_dir, "showtimes.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(log_file);
 
+    let merged_env_trace = "showtimes=debug,tower_http=debug,axum::rejection=trace,async_graphql::graphql=debug,mongodb::connection=debug";
+
     // Initialize tracing logger
     let tracing_init = tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                "showtimes=debug,tower_http=debug,axum::rejection=trace,async_graphql::graphql=debug".into()
-            }),
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .map(|filter| {
+                    let split_filter = merged_env_trace.split(',').collect::<Vec<&str>>();
+                    let directives = split_filter
+                        .iter()
+                        .fold(filter, |acc, &x| acc.add_directive(x.parse().unwrap()));
+                    directives
+                })
+                .unwrap_or_else(|_| merged_env_trace.parse().unwrap()),
         )
         .with(tracing_subscriber::fmt::layer())
         .with(tracing_subscriber::fmt::layer().with_writer(non_blocking));
@@ -90,6 +98,14 @@ async fn entrypoint() -> anyhow::Result<()> {
 
     tracing::info!("🔌📅 Loading database...");
     let mongo_conn = showtimes_db::create_connection(&config.database.mongodb).await?;
+
+    tracing::info!("🔌🪵 Loading clickhose events...");
+    let clickhouse_conn = showtimes_events::SHClickHouse::new(
+        &config.clickhouse.url,
+        &config.clickhouse.username,
+        config.clickhouse.password.as_deref(),
+    )
+    .await?;
 
     // Initialize the filesystem
     tracing::info!("🔌📁 Loading filesystem...");
@@ -155,6 +171,7 @@ async fn entrypoint() -> anyhow::Result<()> {
         anilist_provider: Arc::new(Mutex::new(anilist_provider)),
         tmdb_provider,
         vndb_provider,
+        clickhouse: Arc::new(clickhouse_conn),
     };
 
     tracing::info!("🚀 Starting server...");

@@ -4089,6 +4089,7 @@ dependencies = [
  "serde",
  "serde_json",
  "showtimes-db",
+ "showtimes-events",
  "showtimes-fs",
  "showtimes-gql",
  "showtimes-metadata",
