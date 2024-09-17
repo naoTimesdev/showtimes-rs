@@ -26,8 +26,6 @@ async-graphql-axum.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 tracing-appender.workspace = true
-tracing-axiom = "0.7.0"
-opentelemetry = { version = "0.25.0", features = ["trace"], default-features = false }
 tower-http.workspace = true
 tower-service = "0.3.3"
 tower-layer = "0.3.3"

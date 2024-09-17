@@ -88,15 +88,6 @@ pub struct StorageS3 {
     pub endpoint_url: String,
 }
 
-/// Axiom configuration
-#[derive(Debug, Clone, Deserialize)]
-pub struct AxiomTelemetry {
-    /// The dataset ID of the Axiom project
-    pub dataset: String,
-    /// The token of the Axiom dataset
-    pub token: String,
-}
-
 /// ClickHouse configuration
 #[derive(Debug, Clone, Deserialize)]
 pub struct ClickHouseEvent {
@@ -140,8 +131,6 @@ pub struct Config {
     pub storages: Storages,
     /// The JWT session configuration
     pub jwt: JwtSession,
-    /// The Axiom telemetry configuration
-    pub axiom: Option<AxiomTelemetry>,
 }
 
 impl Config {
