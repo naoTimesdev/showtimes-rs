@@ -446,8 +446,8 @@ pub async fn mutate_servers_delete(
     srv_handler.delete(&server).await?;
 
     // Delete from search engine
-    let srv_index = meili.index(showtimes_search::models::Server::index_name());
-    srv_index.delete_document(server.id.to_string()).await?;
+    let srv_search = showtimes_search::models::Server::from(server.clone());
+    srv_search.delete_document(meili).await?;
 
     Ok(OkResponse::ok("Server deleted"))
 }

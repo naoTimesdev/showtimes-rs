@@ -1006,13 +1006,9 @@ pub async fn mutate_projects_delete(
             collab_handler.delete(&collab_info).await?;
 
             // Delete from search engine
-            let index_collab =
-                meili.index(showtimes_search::models::ServerCollabSync::index_name());
-            let task_del = index_collab
-                .delete_document(&collab_info.id.to_string())
-                .await?;
-
-            task_del.wait_for_completion(meili, None, None).await?;
+            let collab_search =
+                showtimes_search::models::ServerCollabSync::from(collab_info.clone());
+            collab_search.delete_document(meili).await?;
         } else {
             // Save the collab
             collab_handler.save(&mut collab_info, None).await?;
@@ -1079,11 +1075,8 @@ pub async fn mutate_projects_delete(
     prj_handler.delete(&prj_info).await?;
 
     // Delete from search engine
-    let index_project = meili.index(showtimes_search::models::Project::index_name());
-    let task_prj_del = index_project
-        .delete_document(&prj_info.id.to_string())
-        .await?;
-    task_prj_del.wait_for_completion(meili, None, None).await?;
+    let project_search = showtimes_search::models::Project::from(prj_info.clone());
+    project_search.delete_document(meili).await?;
 
     Ok(OkResponse::ok("Project deleted"))
 }

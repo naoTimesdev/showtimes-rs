@@ -273,13 +273,8 @@ pub async fn mutate_collaborations_cancel(
     invite_db.delete(&invite_data).await?;
 
     // Remove from search index
-    let index_invite = meili.index(showtimes_search::models::ServerCollabInvite::index_name());
-    let task_invite_del = index_invite
-        .delete_document(&invite_data.id.to_string())
-        .await?;
-    task_invite_del
-        .wait_for_completion(meili, None, None)
-        .await?;
+    let invite_search = showtimes_search::models::ServerCollabInvite::from(invite_data.clone());
+    invite_search.delete_document(meili).await?;
 
     if is_deny {
         Ok(OkResponse::ok("Invite denied"))

@@ -119,7 +119,7 @@ fn get_searchmodel_attr(attrs: Vec<Attribute>) -> Result<SearchModelAttr, syn::E
 pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
 
-    let (model_attr, pk_name) = match &ast.data {
+    let (model_attr, pk_field) = match &ast.data {
         syn::Data::Struct(data) => {
             // Get the fields of the struct
             let fields = match &data.fields {
@@ -150,14 +150,11 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
                 .into();
             }
 
-            // Get the field name of the primary key
-            let pk_field_name = pk_field.unwrap().ident.as_ref().unwrap().to_string();
-
             // Get the search model attributes
             let search_attrs = get_searchmodel_attr(ast.attrs.clone());
 
             match search_attrs {
-                Ok(data) => (data, pk_field_name),
+                Ok(data) => (data, pk_field.unwrap()),
                 Err(err) => return err.to_compile_error().into(),
             }
         }
@@ -182,6 +179,20 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
     let model_attr_sort = model_attr.sortable.clone();
     let model_attr_display = model_attr.displayed.clone();
     let model_attr_distinct = model_attr.distinct.clone().unwrap_or_default();
+
+    // Convert pk_name to be able to select one the actual field in the struct
+    let pk_select = pk_field
+        .ident
+        .as_ref()
+        .ok_or_else(|| {
+            syn::Error::new(pk_field.span(), "Primary key field must have an identifier")
+                .to_compile_error()
+        })
+        .unwrap();
+    let pk_field_name = pk_select.to_string();
+
+    // Get the field type of the primary key
+    let pk_field_type = pk_field.ty.clone();
 
     let expanded = quote::quote! {
         impl #name {
@@ -221,7 +232,12 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
 
             /// Get the primary key of the model
             pub fn primary_key() -> &'static str {
-                #pk_name
+                #pk_field_name
+            }
+
+            /// Get the primary key value of the model
+            pub fn primary_key_value(&self) -> &#pk_field_type {
+                &self.#pk_select
             }
 
             async fn set_filterable_attributes(index: &meilisearch_sdk::indexes::Index, client: &meilisearch_sdk::client::Client) -> Result<(), meilisearch_sdk::errors::Error> {
@@ -271,8 +287,8 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
 
             async fn set_primary_key(client: &meilisearch_sdk::client::Client) -> Result<(), meilisearch_sdk::errors::Error> {
                 let mut index = client.index(#model_attr_name);
-                tracing::debug!("Setting primary key for `{}`: {:?}", #model_attr_name, #pk_name);
-                let task = index.set_primary_key(#pk_name).await?;
+                tracing::debug!("Setting primary key for `{}`: {:?}", #model_attr_name, #pk_field_name);
+                let task = index.set_primary_key(#pk_field_name).await?;
                 task.wait_for_completion(client, None, None).await?;
                 Ok(())
             }
@@ -304,9 +320,9 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
                     Err(meilisearch_sdk::errors::Error::Meilisearch(error)) => {
                         if error.error_code == meilisearch_sdk::errors::ErrorCode::IndexNotFound {
                             tracing::debug!("Index \"{}\" not found, creating...", #model_attr_name);
-                            let task = client.create_index(#model_attr_name, Some(#pk_name)).await?;
+                            let task = client.create_index(#model_attr_name, Some(#pk_field_name)).await?;
                             tracing::debug!("Waiting for \"{}\" index creation to complete...", #model_attr_name);
-                            task.wait_for_completion(client.deref(), None, None).await?;
+                            task.wait_for_completion(client, None, None).await?;
                             tracing::debug!("Index \"{}\" created, getting the index...", #model_attr_name);
                             let index = client.get_index(#model_attr_name).await?;
                             Ok(index)
@@ -326,9 +342,24 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
             pub async fn update_document(&self, client: &std::sync::Arc<meilisearch_sdk::client::Client>) -> Result<(), meilisearch_sdk::errors::Error> {
                 let index = #name::get_index(client).await?;
                 tracing::debug!("Updating document in index: {}", #model_attr_name);
+                let pvalue = self.primary_key_value().to_string();
                 let task = index.add_or_update(&[self.clone()], Some(#name::primary_key())).await?;
-                tracing::debug!("Waiting for document update of {:?} in \"{}\" to complete...", &self, #model_attr_name);
-                task.wait_for_completion(client.deref(), None, None).await?;
+                tracing::debug!("Waiting for document update of {:?} in \"{}\" to complete...", &pvalue, #model_attr_name);
+                task.wait_for_completion(client, None, None).await?;
+                Ok(())
+            }
+
+            /// Delete this single document in the index
+            ///
+            /// Arguments:
+            /// - `client`: The MeiliSearch client
+            pub async fn delete_document(&self, client: &std::sync::Arc<meilisearch_sdk::client::Client>) -> Result<(), meilisearch_sdk::errors::Error> {
+                let index = #name::get_index(client).await?;
+                tracing::debug!("Deleting document in index: {}", #model_attr_name);
+                let pvalue = self.primary_key_value().to_string();
+                let task = index.delete_document(&pvalue).await?;
+                tracing::debug!("Waiting for document deletion of {:?} in \"{}\" to complete...", &pvalue, #model_attr_name);
+                task.wait_for_completion(client, None, None).await?;
                 Ok(())
             }
         }
