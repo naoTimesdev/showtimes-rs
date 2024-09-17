@@ -158,7 +158,7 @@ pub async fn mutate_collaborations_accept(
 
     let invite_db = showtimes_db::CollaborationInviteHandler::new(db);
     let invite_data = invite_db
-        .find_by_id(&(*invite.to_string()))
+        .find_by_id(&invite.to_string())
         .await?
         .ok_or_else(|| {
             Error::new("Collaboration invite not found").extend_with(|_, e| {
@@ -252,7 +252,7 @@ pub async fn mutate_collaborations_cancel(
 
     let invite_db = showtimes_db::CollaborationInviteHandler::new(db);
     let invite_data = invite_db
-        .find_by_id(&(*invite.to_string()))
+        .find_by_id(&invite.to_string())
         .await?
         .ok_or_else(|| {
             Error::new("Collaboration invite not found").extend_with(|_, e| {

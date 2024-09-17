@@ -145,14 +145,14 @@ pub async fn mutate_users_update(
         user_after.set_name(&user_info.username);
     }
     if let Some(kind) = input.kind {
-        user_before.set_kind(user_info.kind.into());
+        user_before.set_kind(user_info.kind);
         user_info.kind = kind.into();
-        user_after.set_kind(user_info.kind.into());
+        user_after.set_kind(user_info.kind);
     }
     if let Some(true) = input.reset_api_key {
-        user_before.set_api_key(user_info.api_key.clone());
+        user_before.set_api_key(user_info.api_key);
         user_info.api_key = showtimes_shared::APIKey::new();
-        user_after.set_api_key(user_info.api_key.clone());
+        user_after.set_api_key(user_info.api_key);
     }
     if let Some(avatar_upload) = input.avatar {
         let info_up = avatar_upload.value(ctx)?;

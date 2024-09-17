@@ -138,10 +138,7 @@ impl S3Fs {
                 // Parse with chrono
                 chrono::DateTime::parse_from_rfc2822(v).ok()
             })
-            .and_then(|v| {
-                // TO UTC
-                Some(v.with_timezone(&chrono::Utc))
-            });
+            .map(|v| v.with_timezone(&chrono::Utc));
 
         // Content type
         let content_type = response
