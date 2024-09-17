@@ -3220,7 +3220,6 @@ dependencies = [
  "showtimes-session",
  "showtimes-shared",
  "tokio",
- "toml",
  "tower-http",
  "tower-layer",
  "tower-service",
@@ -3242,7 +3241,6 @@ dependencies = [
  "serde",
  "showtimes-derive",
  "showtimes-shared",
- "tokio",
  "tosho-macros",
 ]
 
@@ -3302,8 +3300,6 @@ dependencies = [
  "futures",
  "image",
  "reqwest",
- "serde",
- "serde_json",
  "showtimes-db",
  "showtimes-events",
  "showtimes-fs",
@@ -3357,14 +3353,12 @@ dependencies = [
 name = "showtimes-search"
 version = "0.1.0"
 dependencies = [
- "bson",
  "chrono",
  "meilisearch-sdk",
  "serde",
  "showtimes-db",
  "showtimes-derive",
  "showtimes-shared",
- "tokio",
  "tracing",
 ]
 

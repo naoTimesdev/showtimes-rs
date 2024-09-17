@@ -10,14 +10,15 @@ rust-version.workspace = true
 description = "A simple wrapper for Showtimes API Meilisearch instance"
 
 [dependencies]
-tokio.workspace = true
 serde.workspace = true
 chrono.workspace = true
 tracing.workspace = true
 
-bson.workspace = true
 meilisearch-sdk.workspace = true
 
 showtimes-shared = { path = "../showtimes_shared" }
 showtimes-derive = { path = "../showtimes_derive" }
 showtimes-db = { path = "../showtimes_db" }
+
+[package.metadata.cargo-machete]
+ignored = ["tracing"]
