@@ -16,8 +16,6 @@ pub enum ImageFormatMini {
     Gif,
     /// WEBP
     WebP,
-    /// AVIF
-    Avif,
 }
 
 impl ImageFormatMini {
@@ -27,7 +25,6 @@ impl ImageFormatMini {
             Self::Jpeg => "image/jpeg",
             Self::Gif => "image/gif",
             Self::WebP => "image/webp",
-            Self::Avif => "image/avif",
         }
     }
 
@@ -37,7 +34,6 @@ impl ImageFormatMini {
             Self::Jpeg => "jpeg",
             Self::Gif => "gif",
             Self::WebP => "webp",
-            Self::Avif => "avif",
         }
     }
 }
@@ -49,19 +45,16 @@ impl From<ImageFormatMini> for image::ImageFormat {
             ImageFormatMini::Jpeg => image::ImageFormat::Jpeg,
             ImageFormatMini::Gif => image::ImageFormat::Gif,
             ImageFormatMini::WebP => image::ImageFormat::WebP,
-            ImageFormatMini::Avif => image::ImageFormat::Avif,
         }
     }
 }
 
-static MAGIC_BYTES: [(&[u8], ImageFormatMini); 7] = [
+static MAGIC_BYTES: [(&[u8], ImageFormatMini); 5] = [
     (b"\x89PNG\r\n\x1a\n", ImageFormatMini::Png),
     (&[0xff, 0xd8, 0xff], ImageFormatMini::Jpeg),
     (b"GIF89a", ImageFormatMini::Gif),
     (b"GIF87a", ImageFormatMini::Gif),
     (b"RIFF", ImageFormatMini::WebP), // TODO: better magic byte detection, see https://github.com/image-rs/image/issues/660
-    (b"\0\0\0 ftypavif", ImageFormatMini::Avif),
-    (b"\0\0\0\x1cftypavif", ImageFormatMini::Avif),
 ];
 
 pub async fn detect_upload_data(
