@@ -43,8 +43,11 @@ pub enum EventKind {
 #[derive(Debug, Row, Serialize, Deserialize)]
 pub(crate) struct SHEvent<T: Send + Sync + Clone> {
     /// The ID of the event, this is randomly generated
-    #[serde(with = "clickhouse::serde::uuid")]
-    id: uuid::Uuid,
+    #[serde(
+        deserialize_with = "deserialize_ulid",
+        serialize_with = "serialize_ulid"
+    )]
+    id: showtimes_shared::ulid::Ulid,
     /// The event kind
     kind: EventKind,
     /// The event data itself, on Clickhouse this will be stored as a
@@ -72,7 +75,7 @@ where
 {
     pub fn new(kind: EventKind, data: T) -> Self {
         Self {
-            id: uuid::Uuid::new_v4(),
+            id: showtimes_shared::ulid_serializer::default(),
             kind,
             data,
             actor: None,
@@ -103,4 +106,26 @@ where
 {
     let s = serde_json::to_string(data).map_err(serde::ser::Error::custom)?;
     serializer.serialize_str(&s)
+}
+
+fn serialize_ulid<S>(ulid: &showtimes_shared::ulid::Ulid, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let to_uuid = showtimes_shared::ulid_to_uuid(*ulid);
+    clickhouse::serde::uuid::serialize(&to_uuid, serializer)
+}
+
+fn deserialize_ulid<'de, D>(deserializer: D) -> Result<showtimes_shared::ulid::Ulid, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let uuid = clickhouse::serde::uuid::deserialize(deserializer)?;
+    if uuid.get_version_num() != 7 {
+        return Err(serde::de::Error::custom(format!(
+            "Invalid UUID version, expected UUIDv7 got {}",
+            uuid.get_version_num()
+        )));
+    }
+    Ok(showtimes_shared::uuid_to_ulid(uuid))
 }
