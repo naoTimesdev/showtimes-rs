@@ -1,6 +1,7 @@
 use clickhouse::Row;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use std::fmt::Debug;
 
 /// [`EventKind`] represents the kind of event that can be published
 #[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy)]
@@ -40,8 +41,8 @@ pub enum EventKind {
     CollaborationRetracted = 44,
 }
 
-#[derive(Debug, Row, Serialize, Deserialize)]
-pub(crate) struct SHEvent<T: Send + Sync + Clone> {
+#[derive(Clone, Debug, Row, Serialize, Deserialize)]
+pub struct SHEvent<T: Send + Sync + Clone> {
     /// The ID of the event, this is randomly generated
     #[serde(
         deserialize_with = "deserialize_ulid",
@@ -53,8 +54,8 @@ pub(crate) struct SHEvent<T: Send + Sync + Clone> {
     /// The event data itself, on Clickhouse this will be stored as a
     #[serde(
         bound(
-            deserialize = "T: DeserializeOwned + Send + Sync + Clone",
-            serialize = "T: Serialize + Send + Sync + Clone"
+            deserialize = "T: DeserializeOwned + Send + Sync + Clone + Debug",
+            serialize = "T: Serialize + Send + Sync + Clone + Debug"
         ),
         deserialize_with = "deserialize_event_data",
         serialize_with = "serialize_event_data"
@@ -73,7 +74,7 @@ impl<T> SHEvent<T>
 where
     T: serde::Serialize + Send + Sync + Clone + 'static,
 {
-    pub fn new(kind: EventKind, data: T) -> Self {
+    pub(crate) fn new(kind: EventKind, data: T) -> Self {
         Self {
             id: showtimes_shared::ulid_serializer::default(),
             kind,
@@ -83,7 +84,7 @@ where
         }
     }
 
-    pub fn with_actor(mut self, actor: String) -> Self {
+    pub(crate) fn with_actor(mut self, actor: String) -> Self {
         self.actor = Some(actor);
         self
     }

@@ -1,9 +1,11 @@
 #![doc = include_str!("../README.md")]
 
+use std::fmt::Debug;
 use std::sync::Arc;
 
 pub mod brokers;
 pub mod models;
+mod streams;
 pub use brokers::MemoryBroker;
 use clickhouse::Client;
 pub use models as m;
@@ -12,7 +14,7 @@ pub use models as m;
 pub type SharedSHClickHouse = Arc<SHClickHouse>;
 
 const DATABASE_NAME: &str = "nt_showtimes";
-const TABLE_NAME: &str = "events";
+pub(crate) const TABLE_NAME: &str = "events";
 
 /// The main ClickHouse client handler for Showtimes
 pub struct SHClickHouse {
@@ -110,7 +112,7 @@ impl SHClickHouse {
         actor: Option<String>,
     ) -> Result<(), clickhouse::error::Error>
     where
-        T: serde::Serialize + Send + Sync + Clone + 'static,
+        T: serde::Serialize + Send + Sync + Clone + Debug + 'static,
     {
         self.create_event_many(kind, vec![data], actor).await
     }
@@ -124,7 +126,7 @@ impl SHClickHouse {
         actor: Option<String>,
     ) -> tokio::task::JoinHandle<Result<(), clickhouse::error::Error>>
     where
-        T: serde::Serialize + Send + Sync + Clone + 'static,
+        T: serde::Serialize + Send + Sync + Clone + Debug + 'static,
     {
         self.create_event_many_async(kind, vec![data], actor)
     }
@@ -142,7 +144,7 @@ impl SHClickHouse {
         actor: Option<String>,
     ) -> Result<(), clickhouse::error::Error>
     where
-        T: serde::Serialize + Send + Sync + Clone + 'static,
+        T: serde::Serialize + Send + Sync + Clone + Debug + 'static,
     {
         push_event(&self.client, kind, &data, actor).await?;
 
@@ -163,7 +165,7 @@ impl SHClickHouse {
         actor: Option<String>,
     ) -> tokio::task::JoinHandle<Result<(), clickhouse::error::Error>>
     where
-        T: serde::Serialize + Send + Sync + Clone + 'static,
+        T: serde::Serialize + Send + Sync + Clone + Debug + 'static,
     {
         let client = self.client.clone();
         tokio::task::spawn(async move {
@@ -176,6 +178,17 @@ impl SHClickHouse {
 
             Ok(())
         })
+    }
+
+    /// Query the events from the database with proper pagination
+    pub async fn query<T>(
+        &self,
+        kind: m::EventKind,
+    ) -> Result<streams::SHClickStream<T>, clickhouse::error::Error>
+    where
+        T: serde::de::DeserializeOwned + Send + Sync + Clone + Unpin + std::fmt::Debug + 'static,
+    {
+        streams::SHClickStream::init(self.client.clone(), kind).await
     }
 }
 
@@ -210,7 +223,7 @@ async fn push_event<T>(
     actor: Option<String>,
 ) -> Result<(), clickhouse::error::Error>
 where
-    T: serde::Serialize + Send + Sync + Clone + 'static,
+    T: serde::Serialize + Send + Sync + Clone + Debug + 'static,
 {
     tracing::debug!(
         "Preparing to push event \"{:?}\" to ClickHouse (table = {}, db = {})",
