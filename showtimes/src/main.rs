@@ -55,7 +55,7 @@ async fn entrypoint() -> anyhow::Result<()> {
     let log_file = tracing_appender::rolling::daily(log_dir, "showtimes.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(log_file);
 
-    let merged_env_trace = "showtimes=debug,tower_http=debug,axum::rejection=trace,async_graphql::graphql=debug,mongodb::connection=debug";
+    let merged_env_trace = "showtimes=debug,showtimes_events=debug,tower_http=debug,axum::rejection=trace,async_graphql::graphql=debug,mongodb::connection=debug";
 
     // Initialize tracing logger
     tracing_subscriber::registry()

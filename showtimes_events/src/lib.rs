@@ -112,20 +112,7 @@ impl SHClickHouse {
     where
         T: serde::Serialize + Send + Sync + Clone + 'static,
     {
-        let data_event = m::SHEvent::new(kind, data.clone());
-        let data_event = if let Some(actor) = actor {
-            data_event.with_actor(actor)
-        } else {
-            data_event
-        };
-
-        let mut insert = self.client.insert(TABLE_NAME)?;
-        insert.write(&data_event).await?;
-        insert.end().await?;
-
-        MemoryBroker::publish(data);
-
-        Ok(())
+        self.create_event_many(kind, vec![data], actor).await
     }
 
     /// A similar function to [`SHClickHouse::create_event`] but will run
@@ -139,21 +126,110 @@ impl SHClickHouse {
     where
         T: serde::Serialize + Send + Sync + Clone + 'static,
     {
+        self.create_event_many_async(kind, vec![data], actor)
+    }
+
+    /// Create a new event with multiple data, this will also forward the event to the broker
+    /// for other services to consume, similar to [`SHClickHouse::create_event`] but with multiple data
+    ///
+    /// # Arguments
+    /// * `kind` - The kind of event
+    /// * `data` - The data of the event
+    pub async fn create_event_many<T>(
+        &self,
+        kind: m::EventKind,
+        data: Vec<T>,
+        actor: Option<String>,
+    ) -> Result<(), clickhouse::error::Error>
+    where
+        T: serde::Serialize + Send + Sync + Clone + 'static,
+    {
+        push_event(&self.client, kind, &data, actor).await?;
+
+        for d in data {
+            // Publish one by one
+            MemoryBroker::publish(d);
+        }
+
+        Ok(())
+    }
+
+    /// A similar function to [`SHClickHouse::create_event_many`] but will run
+    /// on non-blocking manner or in another thread
+    pub fn create_event_many_async<T>(
+        &self,
+        kind: m::EventKind,
+        data: Vec<T>,
+        actor: Option<String>,
+    ) -> tokio::task::JoinHandle<Result<(), clickhouse::error::Error>>
+    where
+        T: serde::Serialize + Send + Sync + Clone + 'static,
+    {
         let client = self.client.clone();
         tokio::task::spawn(async move {
-            let data_event = m::SHEvent::new(kind, data.clone());
-            let data_event = if let Some(actor) = actor {
-                data_event.with_actor(actor)
-            } else {
-                data_event
-            };
-            let mut insert = client.insert(TABLE_NAME)?;
-            insert.write(&data_event).await?;
-            insert.end().await?;
+            push_event(&client, kind, &data, actor).await?;
 
-            MemoryBroker::publish(data);
+            for d in data {
+                // Publish one by one
+                MemoryBroker::publish(d);
+            }
 
             Ok(())
         })
     }
+}
+
+/// Wrap the event data into [`m::SHEvent`] and return it
+fn make_event<T>(kind: m::EventKind, data: &T, actor: Option<String>) -> m::SHEvent<T>
+where
+    T: serde::Serialize + Send + Sync + Clone + 'static,
+{
+    let data_event = m::SHEvent::new(kind, data.clone());
+    let data_event = if let Some(actor) = actor {
+        data_event.with_actor(actor)
+    } else {
+        data_event
+    };
+
+    data_event
+}
+
+/// The actual event pusher to ClickHouse
+///
+/// Support for multiple data
+///
+/// # Arguments
+/// * `client` - The ClickHouse client
+/// * `kind` - The kind of event
+/// * `data` - The data of the event
+/// * `actor` - The actor of the event
+async fn push_event<T>(
+    client: &Client,
+    kind: m::EventKind,
+    data: &[T],
+    actor: Option<String>,
+) -> Result<(), clickhouse::error::Error>
+where
+    T: serde::Serialize + Send + Sync + Clone + 'static,
+{
+    tracing::debug!(
+        "Preparing to push event \"{:?}\" to ClickHouse (table = {}, db = {})",
+        kind,
+        TABLE_NAME,
+        DATABASE_NAME
+    );
+    let mut insert = client.insert(TABLE_NAME)?;
+    for d in data {
+        insert.write(&make_event(kind, d, actor.clone())).await?;
+    }
+    tracing::debug!(
+        "Inserting event \"{:?}\" to ClickHouse with {} event(s) (table = {}, db = {})",
+        kind,
+        TABLE_NAME,
+        DATABASE_NAME,
+        data.len()
+    );
+    insert.end().await?;
+
+    Ok(())
 }

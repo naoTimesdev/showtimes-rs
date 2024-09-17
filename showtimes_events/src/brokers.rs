@@ -61,7 +61,17 @@ impl<T: Sync + Send + Clone + 'static> MemoryBroker<T> {
     /// Publish a message to the broker
     pub fn publish(msg: T) {
         with_senders::<T, _, _>(|senders| {
+            tracing::debug!(
+                "Publishing message of type {:?} to {} subscribers",
+                std::any::type_name::<T>(),
+                senders.0.len()
+            );
             for (_, sender) in senders.0.iter_mut() {
+                tracing::trace!(
+                    "Publishing message of type {:?} to {:?}",
+                    std::any::type_name::<T>(),
+                    sender
+                );
                 sender.start_send(msg.clone()).ok();
             }
         })
@@ -72,6 +82,11 @@ impl<T: Sync + Send + Clone + 'static> MemoryBroker<T> {
         with_senders::<T, _, _>(|senders| {
             let (tx, rx) = futures::channel::mpsc::unbounded();
             let id = senders.0.insert(tx);
+            tracing::trace!(
+                "Subscribing for message type {:?} with ID {}",
+                std::any::type_name::<T>(),
+                id
+            );
             BrokerStream(id, rx)
         })
     }
