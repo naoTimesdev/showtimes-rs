@@ -12,6 +12,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub use rusty_s3::{Bucket, Credentials as S3FsCredentials, UrlStyle as S3PathStyle};
 
+const MAX_KEYS: usize = 500;
 const ONE_HOUR: Duration = Duration::from_secs(3600);
 
 #[derive(Debug, Clone)]
@@ -110,6 +111,7 @@ impl S3Fs {
         let filename: String = filename.into();
         let key = make_file_path(&base_key.into(), &filename, parent_id, kind.clone());
 
+        tracing::debug!("Checking file stat for: {}", &key);
         let head_action = HeadBucket::new(&self.bucket, Some(&self.credentials));
         let signed_url = head_action.sign(ONE_HOUR);
 
@@ -154,12 +156,16 @@ impl S3Fs {
                     .to_string()
             });
 
-        Ok(FsFileObject {
-            filename: key,
+        let fs_meta = FsFileObject {
+            filename: key.clone(),
             content_type,
             size: content_length,
             last_modified,
-        })
+        };
+
+        tracing::debug!("File stat for {}: {:?}", &key, fs_meta);
+
+        Ok(fs_meta)
     }
 
     pub(crate) async fn file_exists(
@@ -169,6 +175,10 @@ impl S3Fs {
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<bool> {
+        let base_key: String = base_key.into();
+        let filename: String = filename.into();
+        let key = make_file_path(&base_key, &filename, parent_id, kind.clone());
+        tracing::debug!("Checking file existence for: {}", &key);
         let result = self.file_stat(base_key, filename, parent_id, kind).await?;
 
         Ok(result.size > 0)
@@ -192,6 +202,7 @@ impl S3Fs {
         let guessed = mime_guess::from_path(&filename);
         let content_type = guessed.first_or_octet_stream().to_string();
 
+        tracing::debug!("Preparing to upload file: {}", &key);
         let mut action = PutObject::new(&self.bucket, Some(&self.credentials), &key);
         action.headers_mut().insert("content-type", &content_type);
         let signed_url = action.sign(ONE_HOUR);
@@ -201,6 +212,7 @@ impl S3Fs {
             tokio_util::codec::FramedRead::new(stream, tokio_util::codec::BytesCodec::new());
         let body = reqwest::Body::wrap_stream(reader);
 
+        tracing::debug!("Sending file stream into: {}", &key);
         self.client
             .put(signed_url)
             .header("content-type", &content_type)
@@ -209,6 +221,7 @@ impl S3Fs {
             .await?
             .error_for_status()?;
 
+        tracing::debug!("File uploaded: {}", &key);
         let file_stat = self
             .file_stat(&base_key, &filename, parent_id, kind)
             .await?;
@@ -230,6 +243,7 @@ impl S3Fs {
         let action = rusty_s3::actions::GetObject::new(&self.bucket, Some(&self.credentials), &key);
         let signed_url = action.sign(ONE_HOUR);
 
+        tracing::debug!("Downloading file stream for: {}", &key);
         let response = self.client.get(signed_url).send().await?;
 
         let mut stream = response.bytes_stream();
@@ -255,6 +269,7 @@ impl S3Fs {
             rusty_s3::actions::DeleteObject::new(&self.bucket, Some(&self.credentials), &key);
         let signed_url = action.sign(ONE_HOUR);
 
+        tracing::debug!("Deleting file: {}", &key);
         self.client
             .delete(signed_url)
             .send()
@@ -273,11 +288,12 @@ impl S3Fs {
         let mut last_key: Option<String> = None;
         let mut stop = false;
         let prefix = make_file_path(&base_key.into(), "", parent_id, kind);
+        tracing::debug!("Preparing to delete directory: {}", &prefix);
 
         while !stop {
             let mut action =
                 rusty_s3::actions::ListObjectsV2::new(&self.bucket, Some(&self.credentials));
-            action.with_max_keys(500);
+            action.with_max_keys(MAX_KEYS);
             action.with_prefix(&prefix);
             if let Some(last_key) = &last_key {
                 action.with_start_after(last_key);
@@ -285,6 +301,11 @@ impl S3Fs {
 
             let signed_url = action.sign(ONE_HOUR);
 
+            tracing::debug!(
+                "Listing objects for deletion: {} (last key? = {:?})",
+                &prefix,
+                &last_key
+            );
             let response = self
                 .client
                 .get(signed_url)
@@ -302,6 +323,11 @@ impl S3Fs {
                 .collect();
 
             if delete_keys.is_empty() {
+                tracing::debug!(
+                    "No more objects to delete for: {} (last key? = {:?})",
+                    &prefix,
+                    &last_key
+                );
                 break;
             }
 
@@ -310,6 +336,7 @@ impl S3Fs {
             let signed_del = del_action.sign(Duration::from_secs(60));
             let (body, content_md5) = del_action.body_with_md5();
 
+            tracing::debug!("Deleting a total of: {} keys", delete_keys.len());
             self.client
                 .post(signed_del)
                 .header("Content-MD5", content_md5)
@@ -320,6 +347,13 @@ impl S3Fs {
 
             stop = parsed.start_after.is_none();
             last_key = parsed.start_after;
+
+            tracing::debug!(
+                "Deleted a total of: {} keys (last key? = {:?}, continue? = {})",
+                delete_keys.len(),
+                &last_key,
+                !stop
+            );
         }
 
         Ok(())
