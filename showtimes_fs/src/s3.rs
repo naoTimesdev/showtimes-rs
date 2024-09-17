@@ -10,7 +10,7 @@ use rusty_s3::{
 };
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-pub use rusty_s3::{Bucket, Credentials as S3FsCredentials};
+pub use rusty_s3::{Bucket, Credentials as S3FsCredentials, UrlStyle as S3PathStyle};
 
 const ONE_HOUR: Duration = Duration::from_secs(3600);
 
@@ -46,13 +46,15 @@ impl S3Fs {
         name: impl Into<String>,
         endpoint: impl Into<String>,
         region: impl Into<String>,
+        path_style: Option<S3PathStyle>,
     ) -> Bucket {
+        let path_style = path_style.unwrap_or(S3PathStyle::VirtualHost);
         let endpoint: String = endpoint.into();
         let name: String = name.into();
         let region: String = region.into();
         Bucket::new(
             reqwest::Url::parse(&endpoint).unwrap(),
-            rusty_s3::UrlStyle::VirtualHost,
+            path_style,
             name,
             region,
         )

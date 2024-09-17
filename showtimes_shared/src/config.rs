@@ -73,6 +73,16 @@ pub struct StorageLocal {
     pub path: String,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum StorageS3PathStyle {
+    /// Virtual host path style ({bucket}.s3.{region}.amazonaws.com)
+    #[default]
+    Virtual,
+    /// Path style (s3.{region}.amazonaws.com/{bucket})
+    Path,
+}
+
 /// S3 storage configuration
 #[derive(Debug, Clone, Deserialize)]
 pub struct StorageS3 {
@@ -86,6 +96,9 @@ pub struct StorageS3 {
     pub secret_key: String,
     /// The endpoint URL for the S3 storage
     pub endpoint_url: String,
+    /// Path style for the bucket in S3 storage
+    #[serde(default)]
+    pub path_style: StorageS3PathStyle,
 }
 
 /// ClickHouse configuration

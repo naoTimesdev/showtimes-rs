@@ -103,8 +103,21 @@ async fn entrypoint() -> anyhow::Result<()> {
             tracing::info!("🔌📁🚀 Using S3 filesystem");
 
             let s3_credentials = S3FsCredentials::new(&s3.access_key, &s3.secret_key);
-            let s3_bucket =
-                showtimes_fs::s3::S3Fs::make_bucket(&s3.bucket, &s3.endpoint_url, &s3.region);
+            let s3_path_style = match s3.path_style {
+                showtimes_shared::config::StorageS3PathStyle::Path => {
+                    showtimes_fs::s3::S3PathStyle::Path
+                }
+                showtimes_shared::config::StorageS3PathStyle::Virtual => {
+                    showtimes_fs::s3::S3PathStyle::VirtualHost
+                }
+            };
+
+            let s3_bucket = showtimes_fs::s3::S3Fs::make_bucket(
+                &s3.bucket,
+                &s3.endpoint_url,
+                &s3.region,
+                Some(s3_path_style),
+            );
 
             let s3_fs = showtimes_fs::s3::S3Fs::new(s3_bucket, s3_credentials);
 

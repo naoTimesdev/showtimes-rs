@@ -14,7 +14,7 @@ use showtimes_db::{
 };
 use showtimes_fs::{
     local::LocalFs,
-    s3::{S3Fs, S3FsCredentials},
+    s3::{S3Fs, S3FsCredentials, S3PathStyle},
 };
 use showtimes_shared::ulid::Ulid;
 
@@ -96,6 +96,14 @@ impl Migration for M20240725045840Init {
         let s3_endpoint_url = std::env::var("S3_ENDPOINT_URL").ok();
         let s3_access_key = std::env::var("S3_ACCESS_KEY").ok();
         let s3_secret_key = std::env::var("S3_SECRET_KEY").ok();
+        let s3_path_style =
+            std::env::var("S3_PATH_STYLE")
+                .ok()
+                .and_then(|style| match style.as_str() {
+                    "virtual" => Some(S3PathStyle::VirtualHost),
+                    "path" => Some(S3PathStyle::Path),
+                    _ => None,
+                });
         let local_storage = std::env::var("LOCAL_STORAGE").ok();
 
         let storages: showtimes_fs::FsPool = match (
@@ -122,7 +130,7 @@ impl Migration for M20240725045840Init {
                 );
 
                 let credentials = S3FsCredentials::new(&access_key, &secret_key);
-                let bucket_info = S3Fs::make_bucket(&bucket, &endpoint_url, &region);
+                let bucket_info = S3Fs::make_bucket(&bucket, &endpoint_url, &region, s3_path_style);
                 showtimes_fs::FsPool::S3Fs(S3Fs::new(bucket_info, credentials))
             }
             (_, _, _, _, _, Some(directory)) => {

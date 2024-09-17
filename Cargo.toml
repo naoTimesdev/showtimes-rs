@@ -77,8 +77,9 @@ debug-assertions = true
 
 [profile.release]
 lto = "fat"
-opt-level = "s"
+opt-level = 3
 codegen-units = 1
+incremental = true
 
 [patch.crates-io]
 # Use git version for rusty-s3

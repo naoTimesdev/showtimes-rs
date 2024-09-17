@@ -62,3 +62,7 @@ secret_key = ""
 # Full URL to the endpoint, without the protocol
 region = "ap-southeast-1"
 endpoint = "s3.ap-southeast-1.amazonaws.com"  # can be empty
+# Path style can be "path" or "virtual"
+# Virtual: {bucket}.s3.{region}.amazonaws.com
+# Path: s3.{region}.amazonaws.com/{bucket}
+path_style = "virtual"
