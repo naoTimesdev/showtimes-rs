@@ -5,7 +5,7 @@ use chrono::TimeZone;
 use showtimes_db::{ClientShared, DatabaseShared};
 use showtimes_fs::{
     local::LocalFs,
-    s3::{S3Fs, S3FsCredentialsProvider, S3FsRegionProvider},
+    s3::{S3Fs, S3FsCredentials},
     FsFileKind,
 };
 
@@ -64,34 +64,34 @@ impl Migration for M20240821113204FallbackImagesInvalids {
         let s3_secret_key = std::env::var("S3_SECRET_KEY").ok();
         let local_storage = std::env::var("LOCAL_STORAGE").ok();
 
-        let region_info = match (s3_region, s3_endpoint_url) {
-            (Some(region), Some(endpoint)) => {
-                Some(S3FsRegionProvider::new(&region, Some(&endpoint)))
-            }
-            (Some(region), None) => Some(S3FsRegionProvider::new(&region, None)),
-            _ => None,
-        };
-
         let storages: showtimes_fs::FsPool = match (
             s3_bucket,
-            region_info,
+            s3_region,
+            s3_endpoint_url,
             s3_access_key,
             s3_secret_key,
             local_storage,
         ) {
-            (Some(bucket), Some(region), Some(access_key), Some(secret_key), _) => {
+            (
+                Some(bucket),
+                Some(region),
+                Some(endpoint_url),
+                Some(access_key),
+                Some(secret_key),
+                _,
+            ) => {
                 tracing::info!(
-                    " Creating S3Fs with region:     Ok(())
-{}, bucket: {}, endpoint: {:?}",
-                    region.region(),
+                    " Creating S3Fs with region: {}, bucket: {}, endpoint: {:?}",
+                    region,
                     bucket,
-                    region.endpoint_url(),
+                    region,
                 );
 
-                let credentials = S3FsCredentialsProvider::new(&access_key, &secret_key);
-                showtimes_fs::FsPool::S3Fs(S3Fs::new(&bucket, credentials, region).await)
+                let credentials = S3FsCredentials::new(&access_key, &secret_key);
+                let bucket_info = S3Fs::make_bucket(&bucket, &endpoint_url, &region);
+                showtimes_fs::FsPool::S3Fs(S3Fs::new(bucket_info, credentials))
             }
-            (_, _, _, _, Some(directory)) => {
+            (_, _, _, _, _, Some(directory)) => {
                 let dir_path = std::path::PathBuf::from(directory);
 
                 showtimes_fs::FsPool::LocalFs(LocalFs::new(dir_path))
@@ -108,16 +108,16 @@ impl Migration for M20240821113204FallbackImagesInvalids {
         let default_projects = assets_dir.join("default-projects.png");
         let default_users = assets_dir.join("default-users.png");
 
-        let mut file_default_servers = tokio::fs::File::open(default_servers).await?;
-        let mut file_default_projects = tokio::fs::File::open(default_projects).await?;
-        let mut file_default_users = tokio::fs::File::open(default_users).await?;
+        let file_default_servers = tokio::fs::File::open(default_servers).await?;
+        let file_default_projects = tokio::fs::File::open(default_projects).await?;
+        let file_default_users = tokio::fs::File::open(default_users).await?;
 
         tracing::info!("Uploading default servers image...");
         storages
             .file_stream_upload(
                 "server",
                 "default.png",
-                &mut file_default_servers,
+                file_default_servers,
                 None,
                 Some(FsFileKind::Invalids),
             )
@@ -127,7 +127,7 @@ impl Migration for M20240821113204FallbackImagesInvalids {
             .file_stream_upload(
                 "project",
                 "default.png",
-                &mut file_default_projects,
+                file_default_projects,
                 None,
                 Some(FsFileKind::Invalids),
             )
@@ -137,7 +137,7 @@ impl Migration for M20240821113204FallbackImagesInvalids {
             .file_stream_upload(
                 "user",
                 "default.png",
-                &mut file_default_users,
+                file_default_users,
                 None,
                 Some(FsFileKind::Invalids),
             )

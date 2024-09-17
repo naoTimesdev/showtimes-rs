@@ -43,9 +43,8 @@ async-trait = "0.1.82"
 # File server
 bytes = "1"
 mime_guess = "2.0.5"
-aws-config = { version = "1.5.6", features = ["behavior-version-latest"] }
-aws-credential-types = "1.2.1"
-aws-sdk-s3 = { version = "1.49.0", features = ["http-1x"] }
+rusty-s3 = { version = "0.5.0", features = ["full"] }
+tokio-util = { version = "0.7.12", features = ["codec"] }
 
 # Web server
 axum = { version = "0.7.5", features = ["ws", "tracing"] }
@@ -80,3 +79,7 @@ debug-assertions = true
 lto = "fat"
 opt-level = "s"
 codegen-units = 1
+
+[patch.crates-io]
+# Use git version for rusty-s3
+rusty-s3 = { git = "https://github.com/paolobarbolini/rusty-s3.git", rev = "9b3ea2f1862a2b92af2f9b7604052e2ff3b2f2d1" }

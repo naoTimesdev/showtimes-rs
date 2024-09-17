@@ -14,7 +14,7 @@ use showtimes_db::{
 };
 use showtimes_fs::{
     local::LocalFs,
-    s3::{S3Fs, S3FsCredentialsProvider, S3FsRegionProvider},
+    s3::{S3Fs, S3FsCredentials},
 };
 use showtimes_shared::ulid::Ulid;
 
@@ -98,33 +98,34 @@ impl Migration for M20240725045840Init {
         let s3_secret_key = std::env::var("S3_SECRET_KEY").ok();
         let local_storage = std::env::var("LOCAL_STORAGE").ok();
 
-        let region_info = match (s3_region, s3_endpoint_url) {
-            (Some(region), Some(endpoint)) => {
-                Some(S3FsRegionProvider::new(&region, Some(&endpoint)))
-            }
-            (Some(region), None) => Some(S3FsRegionProvider::new(&region, None)),
-            _ => None,
-        };
-
         let storages: showtimes_fs::FsPool = match (
             s3_bucket,
-            region_info,
+            s3_region,
+            s3_endpoint_url,
             s3_access_key,
             s3_secret_key,
             local_storage,
         ) {
-            (Some(bucket), Some(region), Some(access_key), Some(secret_key), _) => {
+            (
+                Some(bucket),
+                Some(region),
+                Some(endpoint_url),
+                Some(access_key),
+                Some(secret_key),
+                _,
+            ) => {
                 tracing::info!(
                     " Creating S3Fs with region: {}, bucket: {}, endpoint: {:?}",
-                    region.region(),
+                    region,
                     bucket,
-                    region.endpoint_url(),
+                    region,
                 );
 
-                let credentials = S3FsCredentialsProvider::new(&access_key, &secret_key);
-                showtimes_fs::FsPool::S3Fs(S3Fs::new(&bucket, credentials, region).await)
+                let credentials = S3FsCredentials::new(&access_key, &secret_key);
+                let bucket_info = S3Fs::make_bucket(&bucket, &endpoint_url, &region);
+                showtimes_fs::FsPool::S3Fs(S3Fs::new(bucket_info, credentials))
             }
-            (_, _, _, _, Some(directory)) => {
+            (_, _, _, _, _, Some(directory)) => {
                 let dir_path = std::path::PathBuf::from(directory);
 
                 showtimes_fs::FsPool::LocalFs(LocalFs::new(dir_path))

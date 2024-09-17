@@ -116,7 +116,7 @@ pub async fn mutate_servers_create(
                 .file_stream_upload(
                     server.id,
                     &filename,
-                    &mut file_target,
+                    file_target,
                     None,
                     Some(showtimes_fs::FsFileKind::Images),
                 )
@@ -283,7 +283,7 @@ pub async fn mutate_servers_update(
             .file_stream_upload(
                 server_mut.id,
                 &filename,
-                &mut file_target,
+                file_target,
                 None,
                 Some(showtimes_fs::FsFileKind::Images),
             )

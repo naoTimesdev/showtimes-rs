@@ -1,187 +1,104 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
-use crate::{make_file_path, FsFileKind, FsFileObject, FsImpl};
-use aws_config::AppName;
-use aws_credential_types::provider::{self, error::CredentialsError, future, ProvideCredentials};
-use aws_credential_types::Credentials;
-use aws_sdk_s3::primitives::{ByteStream, DateTimeFormat, SdkBody};
-use aws_sdk_s3::types::{Delete, ObjectIdentifier};
-use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tokio::sync::Mutex;
+use crate::{make_file_path, FsFileKind, FsFileObject};
+use futures::TryStreamExt;
+use rusty_s3::{
+    actions::{
+        CreateBucket, DeleteObjects, HeadBucket, ListObjectsV2, ObjectIdentifier, PutObject,
+    },
+    S3Action,
+};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-#[derive(Debug, Clone)]
-pub struct S3FsCredentialsProvider {
-    access_key: String,
-    secret_key: String,
-}
+pub use rusty_s3::{Bucket, Credentials as S3FsCredentials};
 
-impl S3FsCredentialsProvider {
-    pub fn new(access_key: &str, secret_key: &str) -> Self {
-        Self {
-            access_key: access_key.to_string(),
-            secret_key: secret_key.to_string(),
-        }
-    }
-
-    fn credentials(&self) -> provider::Result {
-        if self.access_key.is_empty() {
-            return Err(CredentialsError::not_loaded("Access key is empty"));
-        }
-        if self.secret_key.is_empty() {
-            return Err(CredentialsError::not_loaded("Secret key is empty"));
-        };
-
-        Ok(Credentials::new(
-            self.access_key.clone(),
-            self.secret_key.clone(),
-            None,
-            None,
-            ENV_PROVIDER,
-        ))
-    }
-}
-
-const ENV_PROVIDER: &str = "S3FsCredentialsProvider";
-
-impl ProvideCredentials for S3FsCredentialsProvider {
-    fn provide_credentials<'a>(&'a self) -> future::ProvideCredentials<'a>
-    where
-        Self: 'a,
-    {
-        future::ProvideCredentials::ready(self.credentials())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct S3FsRegionProvider {
-    region: String,
-    endpoint_url: Option<String>,
-}
-
-impl S3FsRegionProvider {
-    pub fn new(region: &str, endpoint_url: Option<&str>) -> Self {
-        Self {
-            region: region.to_string(),
-            endpoint_url: endpoint_url.map(|s| s.to_string()),
-        }
-    }
-
-    pub fn region(&self) -> &str {
-        &self.region
-    }
-
-    pub fn endpoint_url(&self) -> Option<&str> {
-        self.endpoint_url.as_deref()
-    }
-}
+const ONE_HOUR: Duration = Duration::from_secs(3600);
 
 #[derive(Debug, Clone)]
 pub struct S3Fs {
-    bucket_name: String,
-    client: Arc<Mutex<aws_sdk_s3::Client>>,
+    /// Shared HTTP client.
+    client: Arc<reqwest::Client>,
+    /// Region information
+    bucket: Bucket,
+    /// Credentials
+    credentials: S3FsCredentials,
 }
 
 impl S3Fs {
     /// Create a new instance of [`S3Fs`] filesystem implementation.
     ///
     /// # Parameters
-    /// * `bucket`: The name of the bucket.
+    /// * `bucket`: The bucket information.
     /// * `credentials`: The credentials provider.
-    /// * `region`: The region of the bucket.
-    pub async fn new(
-        bucket: &str,
-        credentials: S3FsCredentialsProvider,
-        region: S3FsRegionProvider,
-    ) -> Self {
-        // Test if the bucket exists
-        let config_loader = aws_config::from_env()
-            .app_name(AppName::new("showtimes-fs-rs").unwrap())
-            .region(aws_types::region::Region::new(region.region))
-            .credentials_provider(credentials);
-        let config_loader = match &region.endpoint_url {
-            Some(endpoint_url) => config_loader.endpoint_url(endpoint_url),
-            None => config_loader,
-        };
-
-        let config = config_loader.load().await;
-
-        tracing::debug!("Creating S3Fs with config: {:?}", config);
-        let client = aws_sdk_s3::Client::new(&config);
+    pub fn new(bucket: Bucket, credentials: S3FsCredentials) -> Self {
+        let ua = format!("showtimes-fs-rs/{}", env!("CARGO_PKG_VERSION"));
+        let client = reqwest::Client::builder().user_agent(ua).build().unwrap();
 
         Self {
-            bucket_name: bucket.to_string(),
-            client: Arc::new(Mutex::new(client)),
-        }
-    }
-}
-
-struct CustomS3Writer {
-    temp_bytes: bytes::BytesMut,
-}
-
-impl CustomS3Writer {
-    fn new() -> Self {
-        Self {
-            temp_bytes: bytes::BytesMut::new(),
+            client: Arc::new(client),
+            bucket,
+            credentials,
         }
     }
 
-    fn as_bytes(&self) -> bytes::Bytes {
-        self.temp_bytes.clone().freeze()
-    }
-}
-
-impl AsyncWrite for CustomS3Writer {
-    fn poll_write(
-        self: std::pin::Pin<&mut Self>,
-        _: &mut std::task::Context<'_>,
-        buf: &[u8],
-    ) -> std::task::Poll<Result<usize, std::io::Error>> {
-        let this = std::pin::Pin::into_inner(self);
-        let len = buf.len();
-        this.temp_bytes.extend_from_slice(buf);
-        std::task::Poll::Ready(Ok(len))
-    }
-
-    fn poll_flush(
-        self: std::pin::Pin<&mut Self>,
-        _: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), std::io::Error>> {
-        std::task::Poll::Ready(Ok(()))
+    /// Create a new instance of [`Bucket`]
+    pub fn make_bucket(
+        name: impl Into<String>,
+        endpoint: impl Into<String>,
+        region: impl Into<String>,
+    ) -> Bucket {
+        let endpoint: String = endpoint.into();
+        let name: String = name.into();
+        let region: String = region.into();
+        Bucket::new(
+            reqwest::Url::parse(&endpoint).unwrap(),
+            rusty_s3::UrlStyle::VirtualHost,
+            name,
+            region,
+        )
+        .unwrap()
     }
 
-    fn poll_shutdown(
-        self: std::pin::Pin<&mut Self>,
-        _: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), std::io::Error>> {
-        std::task::Poll::Ready(Ok(()))
-    }
-}
+    pub(crate) async fn init(&self) -> anyhow::Result<()> {
+        // Check if the bucket exists
+        tracing::debug!(
+            "Initializing, checking if bucket exists: {}",
+            self.bucket.name()
+        );
+        let head_action = HeadBucket::new(&self.bucket, Some(&self.credentials));
+        let signed_url = head_action.sign(ONE_HOUR);
 
-#[async_trait::async_trait]
-impl FsImpl for S3Fs {
-    async fn init(&self) -> anyhow::Result<()> {
-        let bucket = self.bucket_name.clone();
-        let client = self.client.lock().await;
-        tracing::debug!("Initializing, checking if bucket {} exists...", bucket);
-        let buckets = client.list_buckets().send().await?;
+        let response = self.client.head(signed_url).send().await?;
 
-        let matched = buckets
-            .buckets()
-            .iter()
-            .find(|&b| b.name() == Some(&bucket));
-        tracing::debug!("Bucket {} match into: {:?}", bucket, matched);
-        match matched {
-            Some(_) => Ok(()),
-            None => {
-                // Create the bucket
-                client.create_bucket().bucket(&bucket).send().await?;
+        // Check status code
+        if response.status().is_success() {
+            tracing::debug!(
+                "Bucket {} found, initialization complete",
+                self.bucket.name()
+            );
+            Ok(())
+        } else {
+            // Ensure it's 404
+            if response.status() == reqwest::StatusCode::NOT_FOUND {
+                // Create bucket
+                tracing::debug!("Bucket {} not found, creating", self.bucket.name());
+                let create_action = CreateBucket::new(&self.bucket, &self.credentials);
+                let signed_url = create_action.sign(ONE_HOUR);
+                let response = self.client.put(signed_url).send().await?;
+
+                response.error_for_status()?;
+
+                tracing::debug!("Bucket {} created", self.bucket.name());
+
                 Ok(())
+            } else {
+                tracing::error!("Failed to check bucket: {}", response.status());
+                anyhow::bail!("Failed to check bucket: {}", response.status());
             }
         }
     }
 
-    async fn file_stat(
+    pub(crate) async fn file_stat(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         filename: impl Into<String> + std::marker::Send,
@@ -190,237 +107,219 @@ impl FsImpl for S3Fs {
     ) -> anyhow::Result<FsFileObject> {
         let filename: String = filename.into();
         let key = make_file_path(&base_key.into(), &filename, parent_id, kind.clone());
-        let client = self.client.lock().await;
-        tracing::debug!("Checking file stat for: {}", &key);
-        let object = client
-            .head_object()
-            .bucket(&self.bucket_name)
-            .key(&key)
+
+        let head_action = HeadBucket::new(&self.bucket, Some(&self.credentials));
+        let signed_url = head_action.sign(ONE_HOUR);
+
+        let response = self
+            .client
+            .head(signed_url)
             .send()
-            .await?;
+            .await?
+            .error_for_status()?;
 
-        let content_type = match object.content_type {
-            Some(content_type) => {
-                // Check if octet-stream
-                if content_type.to_ascii_lowercase().contains("/octet-stream") {
-                    let guessed = mime_guess::from_path(filename);
-                    guessed.first_or_octet_stream().to_string()
-                } else {
-                    content_type
-                }
-            }
-            None => {
-                let guessed = mime_guess::from_path(filename);
-                guessed.first_or_octet_stream().to_string()
-            }
-        };
+        let content_length: i64 = response
+            .headers()
+            .get(reqwest::header::CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(-1);
 
-        let last_mod = match object.last_modified {
-            Some(last_mod) => match last_mod.fmt(DateTimeFormat::DateTime) {
-                Ok(s) => match chrono::DateTime::parse_from_rfc3339(&s) {
-                    Ok(dt) => Some(dt.with_timezone(&chrono::Utc)),
-                    Err(_) => None,
-                },
-                Err(_) => None,
-            },
-            None => None,
-        };
+        // Last modified
+        let last_modified = response
+            .headers()
+            .get(reqwest::header::LAST_MODIFIED)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| {
+                // Parse with chrono
+                chrono::DateTime::parse_from_rfc2822(v).ok()
+            })
+            .and_then(|v| {
+                // TO UTC
+                Some(v.with_timezone(&chrono::Utc))
+            });
 
-        let fs_meta = FsFileObject {
-            filename: key.clone(),
+        // Content type
+        let content_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| {
+                // Guess from filename
+                mime_guess::from_path(&filename)
+                    .first_or_octet_stream()
+                    .to_string()
+            });
+
+        Ok(FsFileObject {
+            filename: key,
             content_type,
-            size: object.content_length.unwrap_or(-1),
-            last_modified: last_mod,
-        };
-
-        tracing::debug!("File stat for {}: {:?}", &key, fs_meta);
-
-        Ok(fs_meta)
+            size: content_length,
+            last_modified,
+        })
     }
 
-    async fn file_exists(
+    pub(crate) async fn file_exists(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<bool> {
-        let key = make_file_path(&base_key.into(), &filename.into(), parent_id, kind.clone());
-        let client = self.client.lock().await;
-        tracing::debug!("Checking file existence for: {}", &key);
-        let object = client
-            .head_object()
-            .bucket(&self.bucket_name)
-            .key(&key)
-            .send()
-            .await?;
+        let result = self.file_stat(base_key, filename, parent_id, kind).await?;
 
-        Ok(object.content_length.unwrap_or(-1) > 0)
+        Ok(result.size > 0)
     }
 
-    async fn file_stream_upload<R: AsyncReadExt + Unpin + Send>(
+    pub(crate) async fn file_stream_upload<R>(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         filename: impl Into<String> + std::marker::Send,
-        stream: &mut R,
+        stream: R,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<FsFileObject> {
-        let base_key: String = base_key.into();
+    ) -> anyhow::Result<FsFileObject>
+    where
+        R: AsyncReadExt + Send + Unpin + 'static,
+    {
+        // TODO: Support multipart upload for file more than 5MB
         let filename: String = filename.into();
+        let base_key = base_key.into();
         let key = make_file_path(&base_key, &filename, parent_id, kind.clone());
-        let client = self.client.lock().await;
-        // Create a temporary writer since AWS SDK s3 FUCKING SUCKS!
-        tracing::debug!("Initializing file upload to: {}", &key);
         let guessed = mime_guess::from_path(&filename);
         let content_type = guessed.first_or_octet_stream().to_string();
 
-        let mut target = CustomS3Writer::new();
-        tokio::io::copy(stream, &mut target).await?;
-        let body = ByteStream::new(SdkBody::from(target.as_bytes()));
+        let mut action = PutObject::new(&self.bucket, Some(&self.credentials), &key);
+        action.headers_mut().insert("content-type", &content_type);
+        let signed_url = action.sign(ONE_HOUR);
 
-        tracing::debug!("Sending file stream into: {}", &key);
-        client
-            .put_object()
-            .bucket(&self.bucket_name)
-            .content_type(content_type)
-            .key(&key)
+        // POST Body, FramedRead fails because the lifetime of stream ('1) outlives the lifetime of the function
+        let reader =
+            tokio_util::codec::FramedRead::new(stream, tokio_util::codec::BytesCodec::new());
+        let body = reqwest::Body::wrap_stream(reader);
+
+        self.client
+            .put(signed_url)
+            .header("content-type", &content_type)
             .body(body)
             .send()
+            .await?
+            .error_for_status()?;
+
+        let file_stat = self
+            .file_stat(&base_key, &filename, parent_id, kind)
             .await?;
 
-        // unlock so we can do file stat
-        tracing::debug!("Upload complete, unlocking Mutex guard for: {}", &key);
-        std::mem::drop(client);
-
-        self.file_stat(base_key, filename, parent_id, kind).await
+        Ok(file_stat)
     }
 
-    async fn file_stream_download<W: AsyncWriteExt + Unpin + Send>(
+    pub(crate) async fn file_stream_download<'wlife, W: AsyncWriteExt + Unpin + Send>(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         filename: impl Into<String> + std::marker::Send,
-        writer: &mut W,
+        writer: &'wlife mut W,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()> {
-        let key = make_file_path(&base_key.into(), &filename.into(), parent_id, kind.clone());
-        let client = self.client.lock().await;
-        tracing::debug!("Initializing file download for: {}", &key);
-        let mut resp = client
-            .get_object()
-            .bucket(&self.bucket_name)
-            .key(&key)
-            .send()
-            .await?;
+        let filename: String = filename.into();
+        let key = make_file_path(&base_key.into(), &filename, parent_id, kind.clone());
 
-        tracing::debug!("Downloading file stream for: {}", &key);
-        while let Some(bytes) = resp.body.try_next().await? {
-            match writer.write_all(&bytes).await {
-                Ok(_) => (),
-                Err(e) => {
-                    // If broken pipe, just shut down, else re-throw
-                    if e.kind() == tokio::io::ErrorKind::BrokenPipe {
-                        break;
-                    }
-                    match writer.shutdown().await {
-                        Ok(_) => {
-                            tracing::debug!("Writer shutdown successfully for: {}", &key);
-                            return Err(e.into());
-                        }
-                        Err(e) => {
-                            tracing::error!("Failed to shutdown writer: {:?}", e);
-                            return Err(e.into());
-                        }
-                    }
-                }
-            }
-            writer.flush().await?;
+        let action = rusty_s3::actions::GetObject::new(&self.bucket, Some(&self.credentials), &key);
+        let signed_url = action.sign(ONE_HOUR);
+
+        let response = self.client.get(signed_url).send().await?;
+
+        let mut stream = response.bytes_stream();
+
+        while let Some(chunk) = stream.try_next().await? {
+            writer.write_all(&chunk).await?;
         }
-        tracing::debug!("Download complete for: {}", &key);
-        writer.flush().await?;
 
         Ok(())
     }
 
-    async fn file_delete(
+    pub(crate) async fn file_delete(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()> {
-        let key = make_file_path(&base_key.into(), &filename.into(), parent_id, kind.clone());
-        let client = self.client.lock().await;
-        tracing::debug!("Deleting file: {}", &key);
-        client
-            .delete_object()
-            .bucket(&self.bucket_name)
-            .key(&key)
+        let filename: String = filename.into();
+        let key = make_file_path(&base_key.into(), &filename, parent_id, kind.clone());
+
+        let action =
+            rusty_s3::actions::DeleteObject::new(&self.bucket, Some(&self.credentials), &key);
+        let signed_url = action.sign(ONE_HOUR);
+
+        self.client
+            .delete(signed_url)
             .send()
-            .await?;
+            .await?
+            .error_for_status()?;
 
         Ok(())
     }
 
-    async fn directory_delete(
+    pub(crate) async fn directory_delete(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<()> {
-        let client = self.client.lock().await;
+        let mut last_key: Option<String> = None;
+        let mut stop = false;
         let prefix = make_file_path(&base_key.into(), "", parent_id, kind);
 
-        tracing::debug!("Collecting objects with prefix: {}", &prefix);
-        let mut pages = client
-            .list_objects_v2()
-            .bucket(&self.bucket_name)
-            .prefix(&prefix)
-            .into_paginator()
-            .send();
-
-        let mut delete_objects: Vec<ObjectIdentifier> = Vec::new();
-        while let Some(page) = pages.next().await {
-            let page = page?;
-            if let Some(content) = page.contents {
-                let objects: Vec<ObjectIdentifier> = content
-                    .iter()
-                    .filter_map(|c| {
-                        c.key().map(|key| {
-                            ObjectIdentifier::builder()
-                                .set_key(Some(key.to_string()))
-                                .build()
-                                .unwrap()
-                        })
-                    })
-                    .collect();
-
-                tracing::debug!("Adding {} objects for deletion", objects.len());
-
-                delete_objects.extend(objects);
+        while !stop {
+            let mut action =
+                rusty_s3::actions::ListObjectsV2::new(&self.bucket, Some(&self.credentials));
+            action.with_max_keys(500);
+            action.with_prefix(&prefix);
+            if let Some(last_key) = &last_key {
+                action.with_start_after(last_key);
             }
-        }
 
-        tracing::debug!("Deleting {} objects", delete_objects.len());
-        // Split into 100 objects per request
-        let chunks = delete_objects.chunks(100);
-        let chunks_count = chunks.len();
-        for (idx, chunk) in chunks.enumerate() {
-            tracing::debug!("Deleting chunk #{} out of #{}", idx, chunks_count);
-            let delete_in = Delete::builder()
-                .set_objects(Some(chunk.to_vec()))
-                .build()?;
+            let signed_url = action.sign(ONE_HOUR);
 
-            client
-                .delete_objects()
-                .bucket(&self.bucket_name)
-                .delete(delete_in)
+            let response = self
+                .client
+                .get(signed_url)
                 .send()
-                .await?;
+                .await?
+                .error_for_status()?;
+            let text_data = response.text().await?;
+
+            let parsed = ListObjectsV2::parse_response(&text_data)?;
+
+            let delete_keys: Vec<ObjectIdentifier> = parsed
+                .contents
+                .iter()
+                .map(|obj| ObjectIdentifier::new(obj.key.clone()))
+                .collect();
+
+            if delete_keys.is_empty() {
+                break;
+            }
+
+            let del_action =
+                DeleteObjects::new(&self.bucket, Some(&self.credentials), delete_keys.iter());
+            let signed_del = del_action.sign(Duration::from_secs(60));
+            let (body, content_md5) = del_action.body_with_md5();
+
+            self.client
+                .post(signed_del)
+                .header("Content-MD5", content_md5)
+                .body(body)
+                .send()
+                .await?
+                .error_for_status()?;
+
+            stop = parsed.start_after.is_none();
+            last_key = parsed.start_after;
         }
 
-        tracing::debug!("Deletion complete");
         Ok(())
     }
 }

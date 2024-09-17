@@ -51,66 +51,6 @@ pub struct FsFileObject {
     pub last_modified: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-/// Base trait for the filesystem implementations.
-///
-/// Implement some of the basic operations needed for it to work with Showtimes.
-#[async_trait::async_trait]
-pub trait FsImpl {
-    /// Initialize the filesystem.
-    ///
-    /// This can be used to test if the filesystem is working correctly.
-    async fn init(&self) -> anyhow::Result<()>;
-    /// Stat or get a file information in the filesystem.
-    async fn file_stat(
-        &self,
-        base_key: impl Into<String> + std::marker::Send,
-        filename: impl Into<String> + std::marker::Send,
-        parent_id: Option<&str>,
-        kind: Option<FsFileKind>,
-    ) -> anyhow::Result<FsFileObject>;
-    /// Check if a file exists in the filesystem.
-    async fn file_exists(
-        &self,
-        base_key: impl Into<String> + std::marker::Send,
-        filename: impl Into<String> + std::marker::Send,
-        parent_id: Option<&str>,
-        kind: Option<FsFileKind>,
-    ) -> anyhow::Result<bool>;
-    /// Upload a file to the filesystem.
-    async fn file_stream_upload<R: AsyncReadExt + Unpin + Send>(
-        &self,
-        base_key: impl Into<String> + std::marker::Send,
-        filename: impl Into<String> + std::marker::Send,
-        stream: &mut R,
-        parent_id: Option<&str>,
-        kind: Option<FsFileKind>,
-    ) -> anyhow::Result<FsFileObject>;
-    /// Download a file from the filesystem.
-    async fn file_stream_download<W: AsyncWriteExt + Unpin + Send>(
-        &self,
-        base_key: impl Into<String> + std::marker::Send,
-        filename: impl Into<String> + std::marker::Send,
-        writer: &mut W,
-        parent_id: Option<&str>,
-        kind: Option<FsFileKind>,
-    ) -> anyhow::Result<()>;
-    /// Delete a file from the filesystem.
-    async fn file_delete(
-        &self,
-        base_key: impl Into<String> + std::marker::Send,
-        filename: impl Into<String> + std::marker::Send,
-        parent_id: Option<&str>,
-        kind: Option<FsFileKind>,
-    ) -> anyhow::Result<()>;
-    /// Delete a directory from the filesystem.
-    async fn directory_delete(
-        &self,
-        base_key: impl Into<String> + std::marker::Send,
-        parent_id: Option<&str>,
-        kind: Option<FsFileKind>,
-    ) -> anyhow::Result<()>;
-}
-
 /// Make a file path from the base key, filename, parent id, and kind.
 pub(crate) fn make_file_path(
     base_key: &str,
@@ -166,17 +106,20 @@ impl FsPool {
         }
     }
     /// Upload a file to the filesystem.
-    pub async fn file_stream_upload<R: AsyncReadExt + Unpin + Send>(
+    pub async fn file_stream_upload<R>(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         filename: impl Into<String> + std::marker::Send,
-        stream: &mut R,
+        mut stream: R,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<FsFileObject> {
+    ) -> anyhow::Result<FsFileObject>
+    where
+        R: AsyncReadExt + Send + Unpin + 'static,
+    {
         match self {
             Self::LocalFs(fs) => {
-                fs.file_stream_upload(base_key, filename, stream, parent_id, kind)
+                fs.file_stream_upload(base_key, filename, &mut stream, parent_id, kind)
                     .await
             }
             Self::S3Fs(fs) => {
@@ -186,14 +129,17 @@ impl FsPool {
         }
     }
     /// Download a file from the filesystem.
-    pub async fn file_stream_download<W: AsyncWriteExt + Unpin + Send>(
+    pub async fn file_stream_download<W>(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         filename: impl Into<String> + std::marker::Send,
         writer: &mut W,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        W: AsyncWriteExt + Unpin + Send,
+    {
         match self {
             Self::LocalFs(fs) => {
                 fs.file_stream_download(base_key, filename, writer, parent_id, kind)

@@ -169,7 +169,7 @@ pub async fn mutate_users_update(
             .file_stream_upload(
                 user_info.id.to_string(),
                 &filename,
-                &mut file_target,
+                file_target,
                 None,
                 Some(showtimes_fs::FsFileKind::Images),
             )

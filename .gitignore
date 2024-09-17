@@ -11,6 +11,8 @@ coverage.*
 lcov.info
 cobertura.xml
 
+*.mm_profdata
+
 # Config
 .env
 .env.development

@@ -845,7 +845,7 @@ pub async fn mutate_projects_create(
                 .file_stream_upload(
                     project.id,
                     &filename,
-                    &mut file_target,
+                    file_target,
                     Some(&srv.id.to_string()),
                     Some(showtimes_fs::FsFileKind::Images),
                 )
@@ -866,13 +866,13 @@ pub async fn mutate_projects_create(
 
             let cover_key = format!("cover.{}", cover_format);
 
-            let mut stream = std::io::Cursor::new(cover_bytes);
+            let stream = std::io::Cursor::new(cover_bytes);
 
             storages
                 .file_stream_upload(
                     project.id,
                     &cover_key,
-                    &mut stream,
+                    stream,
                     Some(&srv.id.to_string()),
                     Some(showtimes_fs::FsFileKind::Images),
                 )
@@ -1391,7 +1391,7 @@ pub async fn mutate_projects_update(
             .file_stream_upload(
                 prj_info.id,
                 &filename,
-                &mut file_target,
+                file_target,
                 Some(&prj_info.creator.to_string()),
                 Some(showtimes_fs::FsFileKind::Images),
             )

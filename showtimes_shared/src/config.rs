@@ -84,8 +84,8 @@ pub struct StorageS3 {
     pub access_key: String,
     /// The secret key for the S3 storage
     pub secret_key: String,
-    /// The endpoint URL override for the S3 storage
-    pub endpoint_url: Option<String>,
+    /// The endpoint URL for the S3 storage
+    pub endpoint_url: String,
 }
 
 /// Axiom configuration

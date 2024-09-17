@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
-use tokio::io::{AsyncRead, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::{make_file_path, FsFileKind, FsFileObject, FsImpl};
+use crate::{make_file_path, FsFileKind, FsFileObject};
 
 #[derive(Debug, Clone)]
 pub struct LocalFs {
@@ -21,11 +21,8 @@ impl LocalFs {
     pub fn new(directory: PathBuf) -> Self {
         Self { directory }
     }
-}
 
-#[async_trait::async_trait]
-impl FsImpl for LocalFs {
-    async fn init(&self) -> anyhow::Result<()> {
+    pub(crate) async fn init(&self) -> anyhow::Result<()> {
         // Test if the directory exists
         tracing::debug!(
             "Initializing, checking if the directory exists: {:?}",
@@ -39,7 +36,7 @@ impl FsImpl for LocalFs {
         Ok(())
     }
 
-    async fn file_stat(
+    pub(crate) async fn file_stat(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         filename: impl Into<String> + std::marker::Send,
@@ -72,7 +69,7 @@ impl FsImpl for LocalFs {
         Ok(fs_meta)
     }
 
-    async fn file_exists(
+    pub(crate) async fn file_exists(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         filename: impl Into<String> + std::marker::Send,
@@ -88,14 +85,17 @@ impl FsImpl for LocalFs {
         Ok(is_exists)
     }
 
-    async fn file_stream_upload<R: AsyncRead + Unpin + Send>(
+    pub(crate) async fn file_stream_upload<R>(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         filename: impl Into<String> + std::marker::Send,
         stream: &mut R,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<FsFileObject> {
+    ) -> anyhow::Result<FsFileObject>
+    where
+        R: AsyncReadExt + Send + Unpin + 'static,
+    {
         let base_key: String = base_key.into();
         let filename: String = filename.into();
         let key = make_file_path(&base_key, &filename, parent_id, kind.clone());
@@ -108,14 +108,17 @@ impl FsImpl for LocalFs {
         self.file_stat(base_key, filename, parent_id, kind).await
     }
 
-    async fn file_stream_download<W: AsyncWriteExt + Unpin + Send>(
+    pub(crate) async fn file_stream_download<W>(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         filename: impl Into<String> + std::marker::Send,
         writer: &mut W,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        W: AsyncWriteExt + Unpin + Send,
+    {
         let key = make_file_path(&base_key.into(), &filename.into(), parent_id, kind.clone());
         let path = self.directory.join(&key);
 
@@ -129,7 +132,7 @@ impl FsImpl for LocalFs {
         Ok(())
     }
 
-    async fn file_delete(
+    pub(crate) async fn file_delete(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         filename: impl Into<String> + std::marker::Send,
@@ -145,7 +148,7 @@ impl FsImpl for LocalFs {
         Ok(())
     }
 
-    async fn directory_delete(
+    pub(crate) async fn directory_delete(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
