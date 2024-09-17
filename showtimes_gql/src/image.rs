@@ -31,7 +31,7 @@ impl ImageFormatMini {
     pub fn as_extension(&self) -> &'static str {
         match self {
             Self::Png => "png",
-            Self::Jpeg => "jpeg",
+            Self::Jpeg => "jpg",
             Self::Gif => "gif",
             Self::WebP => "webp",
         }
