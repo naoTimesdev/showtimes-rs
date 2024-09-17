@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use axum::{response::IntoResponse, routing::get, Router};
-use futures::TryStreamExt;
 use routes::graphql::GRAPHQL_ROUTE;
 use serde_json::json;
 use showtimes_fs::s3::S3FsCredentials;
@@ -96,13 +95,6 @@ async fn entrypoint() -> anyhow::Result<()> {
     )
     .await?;
     clickhouse_conn.create_tables().await?;
-
-    let mut iterator = clickhouse_conn
-        .query::<showtimes_events::m::UserUpdatedEvent>(showtimes_events::m::EventKind::UserUpdated)
-        .await?;
-    while let Some(event) = iterator.try_next().await? {
-        tracing::info!("Event: {:?}", event);
-    }
 
     // Initialize the filesystem
     tracing::info!("🔌📁 Loading filesystem...");

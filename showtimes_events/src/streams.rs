@@ -3,7 +3,6 @@ use std::fmt::Debug;
 use clickhouse::Client;
 
 use crate::{m::EventKind, models::SHEvent, TABLE_NAME};
-use futures::FutureExt;
 
 pub struct SHClickStream<
     T: serde::de::DeserializeOwned + Send + Sync + Clone + Unpin + Debug + 'static,
@@ -193,57 +192,19 @@ where
             false
         }
     }
-}
 
-// Implement futures::Stream for SHClickStream which basically "similar" to yield-ing the data
-impl<T> futures::Stream for SHClickStream<T>
-where
-    T: serde::de::DeserializeOwned + Send + Sync + Clone + Debug + Unpin + 'static,
-{
-    type Item = Result<Vec<SHEvent<T>>, clickhouse::error::Error>;
+    pub async fn fetch_all(&mut self) -> Result<Vec<SHEvent<T>>, clickhouse::error::Error> {
+        let mut all_events = Vec::new();
+        loop {
+            let events = self.advance().await?;
+            if events.is_empty() || self.is_exhausted() {
+                break;
+            }
 
-    fn poll_next(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        tracing::debug!("Polling SHClickStream for kind {:?}", self.kind);
-        if self.is_exhausted() {
-            tracing::debug!("Exhausted SHClickStream for kind {:?}", self.kind);
-            return std::task::Poll::Ready(None);
+            all_events.extend(events);
         }
 
-        let kind = self.kind;
-
-        let fut = self.advance();
-        futures::pin_mut!(fut);
-        tracing::debug!("Polling SHClickStream for with kind {:?} on? future", kind,);
-        let res = fut.poll_unpin(cx);
-        tracing::debug!(
-            "Polling SHClickStream for with kind {:?} on? future result: {:?}",
-            kind,
-            &res
-        );
-        match res {
-            std::task::Poll::Ready(Ok(res)) => {
-                // If we have empty result, we should return None
-                if res.is_empty() {
-                    std::task::Poll::Ready(None)
-                } else {
-                    std::task::Poll::Ready(Some(Ok(res)))
-                }
-            }
-            // Fails!
-            std::task::Poll::Ready(Err(e)) => {
-                tracing::error!("Error polling SHClickStream for kind {:?}: {:?}", kind, e);
-                std::task::Poll::Ready(Some(Err(e)))
-            }
-            // Still pending
-            std::task::Poll::Pending => std::task::Poll::Pending,
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, self.upper_bound)
+        Ok(all_events)
     }
 }
 
