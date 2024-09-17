@@ -442,7 +442,7 @@ impl MutationRoot {
         mutations::collaborations::mutate_collaborations_initiate(ctx, user, input).await
     }
 
-    /// Accept a collaboration between projects
+    /// Accept a collaboration request between projects
     #[graphql(
         name = "collaborateAccept",
         guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)"
@@ -455,6 +455,36 @@ impl MutationRoot {
         let user = find_authenticated_user(ctx).await?;
 
         mutations::collaborations::mutate_collaborations_accept(ctx, user, id).await
+    }
+
+    /// Deny a collaboration request between projects
+    #[graphql(
+        name = "collaborateDeny",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)"
+    )]
+    async fn collaborate_deny(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The collaboration ID to deny")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<OkResponse> {
+        let user = find_authenticated_user(ctx).await?;
+
+        mutations::collaborations::mutate_collaborations_cancel(ctx, user, id, true).await
+    }
+
+    /// Retract a collaboration request between projects
+    #[graphql(
+        name = "collaborateRetract",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)"
+    )]
+    async fn collaborate_retract(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The collaboration ID to retract")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<OkResponse> {
+        let user = find_authenticated_user(ctx).await?;
+
+        mutations::collaborations::mutate_collaborations_cancel(ctx, user, id, false).await
     }
 
     /// Delete a project from Showtimes

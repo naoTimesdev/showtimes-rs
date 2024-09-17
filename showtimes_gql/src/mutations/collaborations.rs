@@ -9,7 +9,7 @@ use crate::{
     data_loader::{ProjectDataLoader, ServerDataLoader},
     models::{
         collaborations::{CollaborationInviteGQL, CollaborationSyncGQL},
-        prelude::UlidGQL,
+        prelude::{OkResponse, UlidGQL},
     },
 };
 
@@ -239,4 +239,51 @@ pub async fn mutate_collaborations_accept(
     };
 
     Ok(sync_gql)
+}
+
+pub async fn mutate_collaborations_cancel(
+    ctx: &async_graphql::Context<'_>,
+    user: showtimes_db::m::User,
+    invite: UlidGQL,
+    is_deny: bool,
+) -> async_graphql::Result<OkResponse> {
+    let db = ctx.data_unchecked::<DatabaseShared>();
+    let meili = ctx.data_unchecked::<SearchClientShared>();
+
+    let invite_db = showtimes_db::CollaborationInviteHandler::new(db);
+    let invite_data = invite_db
+        .find_by_id(&(*invite.to_string()))
+        .await?
+        .ok_or_else(|| {
+            Error::new("Collaboration invite not found").extend_with(|_, e| {
+                e.set("id", invite.to_string());
+                e.set("reason", "invalid_invite");
+            })
+        })?;
+
+    // Check target server permissions
+    let server_id = if is_deny {
+        invite_data.target.server
+    } else {
+        invite_data.source.server
+    };
+    check_permissions(ctx, &user, server_id).await?;
+
+    // Deny the invite
+    invite_db.delete(&invite_data).await?;
+
+    // Remove from search index
+    let index_invite = meili.index(showtimes_search::models::ServerCollabInvite::index_name());
+    let task_invite_del = index_invite
+        .delete_document(&invite_data.id.to_string())
+        .await?;
+    task_invite_del
+        .wait_for_completion(meili, None, None)
+        .await?;
+
+    if is_deny {
+        Ok(OkResponse::ok("Invite denied"))
+    } else {
+        Ok(OkResponse::ok("Invite retracted"))
+    }
 }
