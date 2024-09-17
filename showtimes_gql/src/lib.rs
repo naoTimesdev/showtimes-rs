@@ -1,11 +1,13 @@
 #![doc = include_str!("../README.md")]
 
+use futures::{Stream, StreamExt};
+
 use async_graphql::dataloader::DataLoader;
 use async_graphql::extensions::Tracing;
-use async_graphql::{Context, EmptySubscription, Object};
+use async_graphql::{Context, EmptySubscription, Object, Subscription};
 use data_loader::{find_authenticated_user, ServerAndOwnerId, ServerDataLoader, ServerOwnerId};
 use models::collaborations::{CollaborationInviteGQL, CollaborationSyncGQL};
-use models::prelude::{OkResponse, PaginatedGQL};
+use models::prelude::{OkResponse, PaginatedGQL, UlidGQL};
 use models::projects::ProjectGQL;
 use models::search::QuerySearchRoot;
 use models::servers::ServerGQL;
@@ -23,7 +25,8 @@ mod mutations;
 mod queries;
 
 pub type ShowtimesGQLSchema = async_graphql::Schema<QueryRoot, MutationRoot, EmptySubscription>;
-pub use async_graphql::http::{graphiql_plugin_explorer, GraphiQLSource};
+pub use async_graphql::http::{graphiql_plugin_explorer, GraphiQLSource, ALL_WEBSOCKET_PROTOCOLS};
+pub use async_graphql::{Data, Error};
 pub use image::MAX_IMAGE_SIZE;
 
 pub struct QueryRoot;
@@ -220,6 +223,42 @@ impl QueryRoot {
     async fn search(&self) -> QuerySearchRoot {
         // This is just an empty root which has dynamic fields
         QuerySearchRoot::new()
+    }
+
+    /// Query user updates from specific IDs
+    ///
+    /// Warning: This will return all user updates from your provided IDs. It's recommended to use
+    /// `watchUserUpdate` subscription instead for real-time updates. This is mainly used to get
+    /// older updates that is not yet processed by the client connecting to the subscription.
+    #[graphql(
+        name = "eventUpdateUser",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn event_update_user(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The starting ID to query")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<Vec<UlidGQL>> {
+        let query_stream = ctx.data_unchecked::<showtimes_events::SharedSHClickHouse>();
+
+        let mut stream = query_stream
+            .query::<showtimes_events::m::UserUpdatedEvent>(
+                showtimes_events::m::EventKind::UserUpdated,
+            )
+            .await?
+            .start_after(*id);
+
+        let mut results = Vec::new();
+        while !stream.is_exhausted() {
+            let event_batch = stream.advance().await?;
+            results.extend(
+                event_batch
+                    .into_iter()
+                    .map(|event| UlidGQL::from(event.id())),
+            );
+        }
+
+        Ok(results)
     }
 }
 
@@ -515,6 +554,25 @@ impl MutationRoot {
         let user = find_authenticated_user(ctx).await?;
 
         mutations::servers::mutate_servers_delete(ctx, user, id).await
+    }
+}
+
+pub struct SubscriptionRoot;
+
+#[Subscription]
+impl SubscriptionRoot {
+    /// Watch for user updates
+    ///
+    /// Because of limitation in async-graphql, we sadly cannot combine stream of
+    /// our broker with the stream from ClickHouse data if user provided a start IDs.
+    #[graphql(
+        name = "watchUserUpdate",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn watch_user_update(&self) -> impl Stream<Item = UlidGQL> {
+        // TODO: Find a way to combine this with ClickHouse data
+        showtimes_events::MemoryBroker::<showtimes_events::m::UserUpdatedEvent>::subscribe()
+            .map(|event| UlidGQL::from(event.id()))
     }
 }
 

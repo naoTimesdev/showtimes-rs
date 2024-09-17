@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use axum::{response::IntoResponse, routing::get, Router};
-use routes::graphql::GRAPHQL_ROUTE;
+use routes::graphql::{GRAPHQL_ROUTE, GRAPHQL_WS_ROUTE};
 use serde_json::json;
 use showtimes_fs::s3::S3FsCredentials;
 use showtimes_shared::Config;
@@ -184,6 +184,7 @@ async fn entrypoint() -> anyhow::Result<()> {
                 .post(routes::graphql::graphql_handler)
                 .layer(onion::GraphQLRequestLimit::new()),
         )
+        .route(GRAPHQL_WS_ROUTE, get(routes::graphql::graphql_ws_handler))
         .route("/_/health", get(|| async { "OK" }))
         .route("/images/:id/:filename", get(routes::image::image_by_id))
         .route(

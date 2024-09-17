@@ -1,26 +1,31 @@
 use std::sync::{Arc, OnceLock};
 
-use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
+use async_graphql_axum::{GraphQLProtocol, GraphQLRequest, GraphQLResponse, GraphQLWebSocket};
 use axum::{
-    extract::State,
+    extract::{State, WebSocketUpgrade},
     http::HeaderMap,
-    response::{Html, IntoResponse},
+    response::{Html, IntoResponse, Response},
 };
-use showtimes_gql::{graphiql_plugin_explorer, GraphiQLSource};
+use showtimes_gql::{
+    graphiql_plugin_explorer, Data as GQLData, Error as GQLError, GraphiQLSource,
+    ALL_WEBSOCKET_PROTOCOLS,
+};
 use showtimes_session::{manager::SessionKind, oauth2::discord::DiscordClient};
 use showtimes_shared::Config;
 
 use crate::state::ShowtimesState;
 
 pub const GRAPHQL_ROUTE: &str = "/graphql";
+pub const GRAPHQL_WS_ROUTE: &str = "/graphql/ws";
 static DISCORD_CLIENT: OnceLock<Arc<DiscordClient>> = OnceLock::new();
 
 pub async fn graphql_playground() -> impl IntoResponse {
     let plugins = vec![graphiql_plugin_explorer()];
     let source = GraphiQLSource::build()
         .endpoint(GRAPHQL_ROUTE)
+        .subscription_endpoint(GRAPHQL_WS_ROUTE)
         .plugins(&plugins)
-        .title("GraphiQL Playgronud")
+        .title("GraphiQL Playground")
         .finish();
 
     Html(source)
@@ -91,4 +96,84 @@ pub async fn graphql_handler(
     };
 
     state.schema.execute(req).await.into()
+}
+
+pub async fn graphql_ws_handler(
+    State(state): State<ShowtimesState>,
+    protocol: GraphQLProtocol,
+    websocket: WebSocketUpgrade,
+) -> Response {
+    websocket
+        .protocols(ALL_WEBSOCKET_PROTOCOLS)
+        .on_upgrade(move |stream| {
+            GraphQLWebSocket::new(stream, state.schema.clone(), protocol)
+                .on_connection_init(move |value| on_ws_init(state.clone(), value))
+                .serve()
+        })
+}
+
+async fn on_ws_init(state: ShowtimesState, value: serde_json::Value) -> Result<GQLData, GQLError> {
+    #[derive(serde::Deserialize)]
+    struct Payload {
+        token: String,
+    }
+
+    let mut data = GQLData::default();
+
+    if let Ok(payload) = serde_json::from_value::<Payload>(value) {
+        // If master key, format is MasterKey
+        let session_kind = if payload.token == state.config.master_key {
+            SessionKind::MasterKey
+        } else if payload.token.starts_with("nsh_") {
+            // Try parse API key, if fails then assume bearer
+            showtimes_shared::APIKey::from_string(&payload.token)
+                .map(|_| SessionKind::APIKey)
+                .ok()
+                .unwrap_or_else(|| SessionKind::Bearer)
+        } else {
+            SessionKind::Bearer
+        };
+
+        match state
+            .session
+            .lock()
+            .await
+            .get_session(payload.token, session_kind)
+            .await
+        {
+            Ok(session) => {
+                tracing::debug!("[WS] Got session: {:?}", session);
+                data.insert(session.get_claims().clone());
+                data.insert(session);
+            }
+            Err(err) => {
+                tracing::error!("[WS] Error getting session: {:?}", err);
+            }
+        }
+    }
+
+    data.insert(state.db.clone());
+    data.insert(state.config.clone());
+
+    let discord_client = DISCORD_CLIENT.get_or_init(|| {
+        Arc::new(DiscordClient::new(
+            state.config.discord.client_id.clone(),
+            state.config.discord.client_secret.clone(),
+        ))
+    });
+
+    data.insert(discord_client.clone());
+    data.insert(state.meili.clone());
+    data.insert(state.clickhouse.clone());
+    data.insert(state.session.clone());
+    data.insert(state.storage.clone());
+    data.insert(state.anilist_provider.clone());
+    if let Some(tmdb_provider) = state.tmdb_provider.as_ref() {
+        data.insert(tmdb_provider.clone());
+    }
+    if let Some(vndb_provider) = state.vndb_provider.as_ref() {
+        data.insert(vndb_provider.clone());
+    }
+
+    Ok(data)
 }
