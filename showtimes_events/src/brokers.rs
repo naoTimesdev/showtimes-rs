@@ -19,12 +19,14 @@ use futures::{
 };
 use slab::Slab;
 
+use crate::models::SHEvent;
+
 type Brokers = HashMap<TypeId, Box<dyn Any + Send>>;
 
 static BROKERS: LazyLock<Mutex<Brokers>> = LazyLock::new(|| Mutex::new(Brokers::new()));
 
-struct Senders<T>(Slab<UnboundedSender<T>>);
-struct BrokerStream<T: Sync + Send + Clone + 'static>(usize, UnboundedReceiver<T>);
+struct Senders<T: Sync + Send + Clone + 'static>(Slab<UnboundedSender<SHEvent<T>>>);
+struct BrokerStream<T: Sync + Send + Clone + 'static>(usize, UnboundedReceiver<SHEvent<T>>);
 
 fn with_senders<T, F, R>(f: F) -> R
 where
@@ -47,7 +49,7 @@ impl<T: Sync + Send + Clone + 'static> Drop for BrokerStream<T> {
 }
 
 impl<T: Sync + Send + Clone + 'static> Stream for BrokerStream<T> {
-    type Item = T;
+    type Item = SHEvent<T>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.1.poll_next_unpin(cx)
@@ -59,7 +61,7 @@ pub struct MemoryBroker<T>(PhantomData<T>);
 
 impl<T: Sync + Send + Clone + 'static> MemoryBroker<T> {
     /// Publish a message to the broker
-    pub fn publish(msg: T) {
+    pub fn publish(msg: SHEvent<T>) {
         with_senders::<T, _, _>(|senders| {
             tracing::debug!(
                 "Publishing message of type {:?} to {} subscribers",
@@ -78,7 +80,7 @@ impl<T: Sync + Send + Clone + 'static> MemoryBroker<T> {
     }
 
     /// Subscribe to the message of the specified type and returns a `Stream`.
-    pub fn subscribe() -> impl Stream<Item = T> {
+    pub fn subscribe() -> impl Stream<Item = SHEvent<T>> {
         with_senders::<T, _, _>(|senders| {
             let (tx, rx) = futures::channel::mpsc::unbounded();
             let id = senders.0.insert(tx);

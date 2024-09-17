@@ -88,6 +88,22 @@ where
         self.actor = Some(actor);
         self
     }
+
+    pub fn id(&self) -> showtimes_shared::ulid::Ulid {
+        self.id
+    }
+
+    pub fn kind(&self) -> EventKind {
+        self.kind
+    }
+
+    pub fn data(&self) -> &T {
+        &self.data
+    }
+
+    pub fn actor(&self) -> Option<&str> {
+        self.actor.as_deref()
+    }
 }
 
 fn deserialize_event_data<'de, T, D>(deserializer: D) -> Result<T, D::Error>

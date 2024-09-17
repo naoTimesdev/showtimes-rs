@@ -146,11 +146,11 @@ impl SHClickHouse {
     where
         T: serde::Serialize + Send + Sync + Clone + Debug + 'static,
     {
-        push_event(&self.client, kind, &data, actor).await?;
+        let events = push_event(&self.client, kind, &data, actor).await?;
 
-        for d in data {
+        for ev in events {
             // Publish one by one
-            MemoryBroker::publish(d);
+            MemoryBroker::publish(ev);
         }
 
         Ok(())
@@ -169,11 +169,11 @@ impl SHClickHouse {
     {
         let client = self.client.clone();
         tokio::task::spawn(async move {
-            push_event(&client, kind, &data, actor).await?;
+            let events = push_event(&client, kind, &data, actor).await?;
 
-            for d in data {
+            for ev in events {
                 // Publish one by one
-                MemoryBroker::publish(d);
+                MemoryBroker::publish(ev);
             }
 
             Ok(())
@@ -221,7 +221,7 @@ async fn push_event<T>(
     kind: m::EventKind,
     data: &[T],
     actor: Option<String>,
-) -> Result<(), clickhouse::error::Error>
+) -> Result<Vec<crate::m::SHEvent<T>>, clickhouse::error::Error>
 where
     T: serde::Serialize + Send + Sync + Clone + Debug + 'static,
 {
@@ -232,8 +232,11 @@ where
         DATABASE_NAME
     );
     let mut insert = client.insert(TABLE_NAME)?;
+    let mut combined_events = vec![];
     for d in data {
-        insert.write(&make_event(kind, d, actor.clone())).await?;
+        let event = make_event(kind, d, actor.clone());
+        insert.write(&event).await?;
+        combined_events.push(event);
     }
     tracing::debug!(
         "Inserting event \"{:?}\" to ClickHouse with {} event(s) (table = {}, db = {})",
@@ -244,5 +247,5 @@ where
     );
     insert.end().await?;
 
-    Ok(())
+    Ok(combined_events)
 }

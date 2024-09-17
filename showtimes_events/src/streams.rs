@@ -4,6 +4,7 @@ use clickhouse::Client;
 
 use crate::{m::EventKind, models::SHEvent, TABLE_NAME};
 
+#[derive(Clone)]
 pub struct SHClickStream<
     T: serde::de::DeserializeOwned + Send + Sync + Clone + Unpin + Debug + 'static,
 > {
