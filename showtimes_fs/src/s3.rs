@@ -4,7 +4,8 @@ use crate::{make_file_path, FsFileKind, FsFileObject};
 use futures::TryStreamExt;
 use rusty_s3::{
     actions::{
-        CreateBucket, DeleteObjects, HeadBucket, ListObjectsV2, ObjectIdentifier, PutObject,
+        CreateBucket, DeleteObjects, HeadBucket, HeadObject, ListObjectsV2, ObjectIdentifier,
+        PutObject,
     },
     S3Action,
 };
@@ -112,7 +113,7 @@ impl S3Fs {
         let key = make_file_path(&base_key.into(), &filename, parent_id, kind.clone());
 
         tracing::debug!("Checking file stat for: {}", &key);
-        let head_action = HeadBucket::new(&self.bucket, Some(&self.credentials));
+        let head_action = HeadObject::new(&self.bucket, Some(&self.credentials), &key);
         let signed_url = head_action.sign(ONE_HOUR);
 
         let response = self
