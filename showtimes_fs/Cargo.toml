@@ -15,10 +15,8 @@ anyhow.workspace = true
 chrono.workspace = true
 futures.workspace = true
 tosho-macros.workspace = true
-async-trait.workspace = true
 tracing.workspace = true
 
-bytes.workspace = true
 mime_guess.workspace = true
 rusty-s3.workspace = true
 reqwest.workspace = true

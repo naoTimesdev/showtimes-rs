@@ -21,10 +21,11 @@ recently was stabilized in Rust `1.80.0`.
 1. Clone the repository
 2. Run `cargo build --release --all`
 3. Do configuration using `config.toml` file (see `config.toml.example` for reference)
-4. Run the binary with `cargo run --release --bin showtimes`
-   - Or run the binary directly: `./target/release/showtimes`
+4. Build the binary with `cargo build --locked --release --bin showtimes`
+   - Or use the `--profile production` flag for a more optimized build
+5. Run the binary with: `./target/release/showtimes`
    - Or in Windows: `.\target\release\showtimes.exe`
-5. Access the API at `http://127.0.0.1:5560` by default
+6. Access the API at `http://127.0.0.1:5560` by default
 
 ## License
 
