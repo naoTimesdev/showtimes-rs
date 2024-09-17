@@ -124,70 +124,61 @@ where
         let offset = self.internal_offset.unwrap_or(0);
 
         tracing::debug!(
-            "Starting SHClickStream for kind {:?} with offset {}",
+            "Requesting SHClickStream for kind {:?} with offset {}",
             self.kind,
             offset
         );
-        let mut cursor = match self.start_after {
-            Some(start_after) => self
-                .client
-                .query(&format!(
-                    r#"SELECT ?fields FROM {}
-                WHERE (
-                    toUInt128(id) > toUInt128(toUUID(?)) AND
-                    kind = ?
-                )
-                ORDER BY toUInt128(id) ASC
-                OFFSET ? ROW FETCH FIRST ? ROWS ONLY
-                "#,
-                    TABLE_NAME,
-                ))
-                .bind(start_after.to_string())
-                .bind(self.kind as u8)
-                .bind(offset)
-                .bind(self.per_page)
-                .fetch::<SHEvent<T>>()?,
-            None => self
-                .client
-                .query(&format!(
-                    r#"SELECT ?fields FROM {}
-                    WHERE (
-                        kind = ?
-                    )
-                    ORDER BY toUInt128(id) ASC
-                    OFFSET ? ROW FETCH FIRST ? ROWS ONLY
-                    "#,
-                    TABLE_NAME,
-                ))
-                .bind(self.kind as u8)
-                .bind(offset)
-                .bind(self.per_page)
-                .fetch::<SHEvent<T>>()?,
+        let all_events = match self.start_after {
+            Some(start_after) => {
+                self.client
+                    .query(&format!(
+                        r#"SELECT ?fields FROM {}
+                           WHERE (
+                               toUInt128(id) > toUInt128(toUUID(?)) AND
+                               kind = ?
+                           )
+                           ORDER BY toUInt128(id) ASC
+                           OFFSET ? ROW FETCH FIRST ? ROWS ONLY"#,
+                        TABLE_NAME,
+                    ))
+                    .bind(start_after.to_string())
+                    .bind(self.kind as u8)
+                    .bind(offset)
+                    .bind(self.per_page)
+                    .fetch_all::<SHEvent<T>>()
+                    .await?
+            }
+            None => {
+                self.client
+                    .query(&format!(
+                        r#"SELECT ?fields FROM {}
+                           WHERE (
+                               kind = ?
+                           )
+                           ORDER BY toUInt128(id) ASC
+                           OFFSET ? ROW FETCH FIRST ? ROWS ONLY"#,
+                        TABLE_NAME,
+                    ))
+                    .bind(self.kind as u8)
+                    .bind(offset)
+                    .bind(self.per_page)
+                    .fetch_all::<SHEvent<T>>()
+                    .await?
+            }
         };
 
         tracing::debug!(
-            "Starting SHClickStream for kind {:?} with offset {}",
-            self.kind,
-            offset
-        );
-
-        let mut events = Vec::new();
-        while let Some(event) = cursor.next().await? {
-            events.push(event);
-        }
-
-        tracing::debug!(
             "Got {} SHClickStream for kind {:?} with offset {}",
-            events.len(),
+            all_events.len(),
             self.kind,
             offset
         );
 
         self.initialize = true;
         self.internal_offset = Some(offset + self.per_page);
-        self.current = Some(events.clone());
+        self.current = Some(all_events.clone());
 
-        Ok(events)
+        Ok(all_events)
     }
 
     // Check if exhausted
