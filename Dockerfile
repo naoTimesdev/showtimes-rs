@@ -3,6 +3,8 @@ FROM rust:latest
 WORKDIR /showtimes
 COPY . .
 
-RUN cargo build --locked --release --bin showtimes
+RUN cargo build --locked --profile production --bin showtimes
 
-CMD ["./target/release/showtimes"]
+EXPOSE 5560
+
+CMD ["./target/production/showtimes"]
