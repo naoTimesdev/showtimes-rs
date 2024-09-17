@@ -225,9 +225,9 @@ where
     tracing::debug!(
         "Inserting event \"{:?}\" to ClickHouse with {} event(s) (table = {}, db = {})",
         kind,
+        data.len(),
         TABLE_NAME,
         DATABASE_NAME,
-        data.len()
     );
     insert.end().await?;
 
