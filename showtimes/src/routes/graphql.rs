@@ -53,6 +53,9 @@ fn get_token_or_bearer(headers: &HeaderMap, config: &Config) -> Option<(SessionK
     })
 }
 
+/// The main GraphQL handler
+///
+/// This handler will handle all GraphQL requests, it will also handle the authentication
 pub async fn graphql_handler(
     State(state): State<ShowtimesState>,
     headers: HeaderMap,
@@ -98,8 +101,13 @@ pub async fn graphql_handler(
     state.schema.execute(req).await.into()
 }
 
+/// Websocket handler for GraphQL
+///
+/// This Websocket handler use both `graphql-ws` and `graphql-transport-ws` protocols.
+/// The handler will always need a token/session since all request is authenticated only.
 pub async fn graphql_ws_handler(
     State(state): State<ShowtimesState>,
+    headers: HeaderMap,
     protocol: GraphQLProtocol,
     websocket: WebSocketUpgrade,
 ) -> Response {
@@ -107,12 +115,16 @@ pub async fn graphql_ws_handler(
         .protocols(ALL_WEBSOCKET_PROTOCOLS)
         .on_upgrade(move |stream| {
             GraphQLWebSocket::new(stream, state.schema.clone(), protocol)
-                .on_connection_init(move |value| on_ws_init(state.clone(), value))
+                .on_connection_init(move |value| on_ws_init(state.clone(), headers, value))
                 .serve()
         })
 }
 
-async fn on_ws_init(state: ShowtimesState, value: serde_json::Value) -> Result<GQLData, GQLError> {
+async fn on_ws_init(
+    state: ShowtimesState,
+    headers: HeaderMap,
+    value: serde_json::Value,
+) -> Result<GQLData, GQLError> {
     #[derive(serde::Deserialize)]
     struct Payload {
         token: String,
@@ -142,13 +154,38 @@ async fn on_ws_init(state: ShowtimesState, value: serde_json::Value) -> Result<G
             .await
         {
             Ok(session) => {
-                tracing::debug!("[WS] Got session: {:?}", session);
+                tracing::debug!("[WS] Got session (from payload): {:?}", session);
                 data.insert(session.get_claims().clone());
                 data.insert(session);
             }
             Err(err) => {
-                tracing::error!("[WS] Error getting session: {:?}", err);
+                tracing::error!("[WS] Error getting session (from payload): {:?}", err);
+                return Err(GQLError::new(format!(
+                    "Error validating token session: {}",
+                    err
+                )));
             }
+        }
+    } else {
+        if let Some((kind, token)) = get_token_or_bearer(&headers, &state.config) {
+            match state.session.lock().await.get_session(token, kind).await {
+                Ok(session) => {
+                    tracing::debug!("[WS] Got session (from header): {:?}", session);
+                    data.insert(session.get_claims().clone());
+                    data.insert(session);
+                }
+                Err(err) => {
+                    tracing::error!("[WS] Error getting session (from header): {:?}", err);
+                    return Err(GQLError::new(format!(
+                        "Error validating token session: {}",
+                        err
+                    )));
+                }
+            }
+        } else {
+            tracing::error!("[WS] No token found in payload or header");
+            // Close/deny the connection
+            return Err(GQLError::new("No token found in payload or header"));
         }
     }
 
