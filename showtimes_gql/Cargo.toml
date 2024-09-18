@@ -13,6 +13,7 @@ description = "Library for GraphQL definitions of Showtimes API"
 tokio.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
+time.workspace = true
 tracing.workspace = true
 futures.workspace = true
 

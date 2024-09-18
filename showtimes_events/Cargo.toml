@@ -16,10 +16,10 @@ serde_repr = "0.1"
 serde_json.workspace = true
 tracing.workspace = true
 futures.workspace = true
+time.workspace = true
 
 clickhouse.workspace = true
 slab = "0.4"
-time = "0.3.36"
 uuid.workspace = true
 
 showtimes-shared = { path = "../showtimes_shared" }

@@ -21,4 +21,3 @@ mime_guess.workspace = true
 rusty-s3.workspace = true
 reqwest.workspace = true
 tokio-util.workspace = true
-time = "0.3"

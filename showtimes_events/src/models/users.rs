@@ -26,6 +26,12 @@ impl From<&showtimes_db::m::User> for UserCreatedEvent {
     }
 }
 
+impl UserCreatedEvent {
+    pub fn id(&self) -> showtimes_shared::ulid::Ulid {
+        self.id
+    }
+}
+
 /// A user updated data event
 ///
 /// Used in conjuction with the [`UserUpdatedEvent`]
@@ -44,6 +50,26 @@ pub struct UserUpdatedDataEvent {
 }
 
 impl UserUpdatedDataEvent {
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    pub fn api_key(&self) -> Option<&showtimes_shared::APIKey> {
+        self.api_key.as_ref()
+    }
+
+    pub fn kind(&self) -> Option<showtimes_db::m::UserKind> {
+        self.kind
+    }
+
+    pub fn avatar(&self) -> Option<&showtimes_db::m::ImageMetadata> {
+        self.avatar.as_ref()
+    }
+
+    pub fn discord_meta(&self) -> Option<&showtimes_db::m::DiscordUser> {
+        self.discord_meta.as_ref()
+    }
+
     pub fn set_name(&mut self, name: impl Into<String>) {
         self.name = Some(name.into());
     }
@@ -81,5 +107,17 @@ impl UserUpdatedEvent {
         after: UserUpdatedDataEvent,
     ) -> Self {
         Self { id, before, after }
+    }
+
+    pub fn id(&self) -> showtimes_shared::ulid::Ulid {
+        self.id
+    }
+
+    pub fn before(&self) -> &UserUpdatedDataEvent {
+        &self.before
+    }
+
+    pub fn after(&self) -> &UserUpdatedDataEvent {
+        &self.after
     }
 }

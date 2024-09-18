@@ -41,6 +41,7 @@ pub enum EventKind {
     CollaborationRetracted = 44,
 }
 
+/// The event structure that is broadcasted and stored
 #[derive(Clone, Debug, Row, Serialize, Deserialize)]
 pub struct SHEvent<T: Send + Sync + Clone> {
     /// The ID of the event, this is randomly generated
@@ -103,6 +104,10 @@ where
 
     pub fn actor(&self) -> Option<&str> {
         self.actor.as_deref()
+    }
+
+    pub fn timestamp(&self) -> ::time::OffsetDateTime {
+        self.timestamp
     }
 }
 
