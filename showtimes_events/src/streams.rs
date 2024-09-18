@@ -11,7 +11,7 @@ pub struct SHClickStream<
     client: Client,
     kind: EventKind,
     // User defined
-    start_after: Option<showtimes_shared::ulid::Ulid>,
+    start_after: Option<uuid::Uuid>,
     // Our internal state
     internal_offset: Option<usize>,
     per_page: usize,
@@ -24,12 +24,9 @@ impl<T> SHClickStream<T>
 where
     T: serde::de::DeserializeOwned + Send + Sync + Clone + Unpin + Debug + 'static,
 {
-    pub(crate) async fn init(
-        client: Client,
-        kind: EventKind,
-    ) -> Result<Self, clickhouse::error::Error> {
+    pub(crate) fn init(client: Client, kind: EventKind) -> Self {
         tracing::debug!("Initializing SHClickStream for kind {:?}", kind);
-        let mut init = Self {
+        Self {
             client,
             kind,
             start_after: None,
@@ -38,12 +35,7 @@ where
             initialize: false,
             upper_bound: None,
             per_page: 50,
-        };
-
-        // Do initial count
-        init.calculate().await?;
-
-        Ok(init)
+        }
     }
 
     /// Set the per page count
@@ -64,7 +56,7 @@ where
             return self;
         }
 
-        self.start_after = Some(start_after);
+        self.start_after = Some(showtimes_shared::ulid_to_uuid(start_after));
         self
     }
 
@@ -121,6 +113,9 @@ where
     }
 
     pub async fn advance(&mut self) -> Result<Vec<SHEvent<T>>, clickhouse::error::Error> {
+        // Do initial count
+        self.calculate().await?;
+
         let offset = self.internal_offset.unwrap_or(0);
 
         tracing::debug!(

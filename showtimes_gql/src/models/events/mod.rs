@@ -27,7 +27,6 @@ impl QueryEventsRoot {
             .query::<showtimes_events::m::UserCreatedEvent>(
                 showtimes_events::m::EventKind::UserCreated,
             )
-            .await?
             .start_after(*id);
 
         let user_query: ServerQueryUser = user.into();
@@ -64,7 +63,6 @@ impl QueryEventsRoot {
             .query::<showtimes_events::m::UserUpdatedEvent>(
                 showtimes_events::m::EventKind::UserUpdated,
             )
-            .await?
             .start_after(*id);
 
         let user_query: ServerQueryUser = user.into();

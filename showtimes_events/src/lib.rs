@@ -181,14 +181,11 @@ impl SHClickHouse {
     }
 
     /// Query the events from the database with proper pagination
-    pub async fn query<T>(
-        &self,
-        kind: m::EventKind,
-    ) -> Result<streams::SHClickStream<T>, clickhouse::error::Error>
+    pub fn query<T>(&self, kind: m::EventKind) -> streams::SHClickStream<T>
     where
         T: serde::de::DeserializeOwned + Send + Sync + Clone + Unpin + std::fmt::Debug + 'static,
     {
-        streams::SHClickStream::init(self.client.clone(), kind).await
+        streams::SHClickStream::init(self.client.clone(), kind)
     }
 }
 
