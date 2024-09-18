@@ -47,7 +47,7 @@ tokio-util = { version = "0.7.12", features = ["codec"] }
 
 # Web server
 axum = { version = "0.7.5", features = ["ws", "tracing"] }
-async-graphql = { version = "7.0.9", features = ["tracing", "bson", "unblock", "dataloader"] }
+async-graphql = { version = "7.0.9", default-features = false, features = ["tracing", "bson", "unblock", "dataloader", "altair", "tempfile"] }
 async-graphql-axum = "7.0.9"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
