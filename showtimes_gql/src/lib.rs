@@ -6,7 +6,7 @@ use futures::{Stream, StreamExt};
 
 use async_graphql::dataloader::DataLoader;
 use async_graphql::extensions::Tracing;
-use async_graphql::{Context, EmptySubscription, Object, Subscription};
+use async_graphql::{Context, Object, Subscription};
 use data_loader::{find_authenticated_user, ServerAndOwnerId, ServerDataLoader, ServerOwnerId};
 use models::collaborations::{CollaborationInviteGQL, CollaborationSyncGQL};
 use models::events::prelude::EventGQL;
@@ -30,7 +30,7 @@ mod models;
 mod mutations;
 mod queries;
 
-pub type ShowtimesGQLSchema = async_graphql::Schema<QueryRoot, MutationRoot, EmptySubscription>;
+pub type ShowtimesGQLSchema = async_graphql::Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
 pub use async_graphql::http::{
     AltairConfigOptions, AltairSettingsLanguage, AltairSettingsState, AltairSource,
     AltairWindowOptions, ALL_WEBSOCKET_PROTOCOLS,
@@ -603,7 +603,7 @@ impl SubscriptionRoot {
 
 /// Create the GraphQL schema
 pub fn create_schema(db_pool: &DatabaseShared) -> ShowtimesGQLSchema {
-    async_graphql::Schema::build(QueryRoot, MutationRoot, EmptySubscription)
+    async_graphql::Schema::build(QueryRoot, MutationRoot, SubscriptionRoot)
         .extension(Tracing)
         .data(DataLoader::new(
             data_loader::UserDataLoader::new(db_pool),
