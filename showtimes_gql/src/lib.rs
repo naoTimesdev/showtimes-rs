@@ -31,10 +31,7 @@ mod mutations;
 mod queries;
 
 pub type ShowtimesGQLSchema = async_graphql::Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
-pub use async_graphql::http::{
-    AltairConfigOptions, AltairSettingsLanguage, AltairSettingsState, AltairSource,
-    AltairWindowOptions, ALL_WEBSOCKET_PROTOCOLS,
-};
+pub use async_graphql::http::{graphiql_plugin_explorer, GraphiQLSource, ALL_WEBSOCKET_PROTOCOLS};
 pub use async_graphql::{Data, Error};
 pub use image::MAX_IMAGE_SIZE;
 

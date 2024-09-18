@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, OnceLock},
-};
+use std::sync::{Arc, OnceLock};
 
 use async_graphql_axum::{GraphQLProtocol, GraphQLRequest, GraphQLResponse, GraphQLWebSocket};
 use axum::{
@@ -10,8 +7,8 @@ use axum::{
     response::{Html, IntoResponse, Response},
 };
 use showtimes_gql::{
-    AltairConfigOptions, AltairSettingsState, AltairSource, AltairWindowOptions, Data as GQLData,
-    Error as GQLError, ALL_WEBSOCKET_PROTOCOLS,
+    graphiql_plugin_explorer, Data as GQLData, Error as GQLError, GraphiQLSource,
+    ALL_WEBSOCKET_PROTOCOLS,
 };
 use showtimes_session::{manager::SessionKind, oauth2::discord::DiscordClient};
 use showtimes_shared::Config;
@@ -22,72 +19,13 @@ pub const GRAPHQL_ROUTE: &str = "/graphql";
 pub const GRAPHQL_WS_ROUTE: &str = "/graphql/ws";
 static DISCORD_CLIENT: OnceLock<Arc<DiscordClient>> = OnceLock::new();
 
-const INITIAL_QUERY: &str = r#"# Welcome to Showtimes API
-# 
-# Showtimes is a management tools for a group to manage and track their
-# traanslations, releases, and more for many multimedia projects focused on Japanese media.
-#
-# The following is a playground to test your queries. This playground is a fully
-# functional GraphQL IDE with the ability to save your queries.
-#
-# Type queries into this side of the screen, and you will see intelligent
-# typeaheads aware of the current GraphQL type schema and live syntax and
-# validation errors highlighted within the text.
-#
-# GraphQL queries typically start with a "{" character. Lines that start
-# with a # are ignored.
-#
-# An example GraphQL query might look like:
-#
-#     {
-#       field(arg: "value") {
-#         subField
-#       }
-#     }
-#
-#
-
-query getCurrentUser {
-    current {
-        user {
-            id
-            username
-            apiKey
-            avatar {
-                url
-            }
-        }
-        token
-    }
-}
-"#;
-
 pub async fn graphql_playground() -> impl IntoResponse {
-    let default_headers = HashMap::from([(
-        "Authorization".to_string(),
-        "Token nsh_your-api-token".to_string(),
-    )]);
-
-    let source = AltairSource::build()
-        .options(AltairConfigOptions {
-            window_options: Some(AltairWindowOptions {
-                endpoint_url: Some(GRAPHQL_ROUTE.to_string()),
-                subscriptions_endpoint: Some(GRAPHQL_WS_ROUTE.to_string()),
-                initial_query: Some(INITIAL_QUERY.to_string()),
-                initial_name: Some("Showtimes API".to_string()),
-                initial_headers: default_headers,
-                ..Default::default()
-            }),
-            disable_account: Some(true),
-            instance_storage_namespace: Some("altair_showtimes_".to_string()),
-            initial_settings: Some(AltairSettingsState {
-                tab_size: Some(4),
-                plugin_list: vec!["altair-graphql-plugin-graphql-explorer".to_string()],
-                schema_reload_on_start: Some(true),
-                ..Default::default()
-            }),
-            ..Default::default()
-        })
+    let plugins = vec![graphiql_plugin_explorer()];
+    let source = GraphiQLSource::build()
+        .endpoint(GRAPHQL_ROUTE)
+        .subscription_endpoint(GRAPHQL_WS_ROUTE)
+        .plugins(&plugins)
+        .title("GraphiQL Playground")
         .finish();
 
     Html(source)
