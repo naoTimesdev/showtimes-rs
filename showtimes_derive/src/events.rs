@@ -140,7 +140,12 @@ fn expand_option_field(
 
     let set_field_name = format!("set_{}", field_name);
     let set_field_ident = syn::Ident::new(&set_field_name, field_name.span());
+
+    let clear_field_name = format!("clear_{}", field_name);
+    let clear_field_ident = syn::Ident::new(&clear_field_name, field_name.span());
+
     let (doc_get, doc_set) = make_field_comment(field_name, true);
+    let doc_clear = format!("Clear the value of `{}` to [`None`]", field_name);
 
     // If string, we can use as_deref
     if field_ty_name.contains("String") {
@@ -153,6 +158,11 @@ fn expand_option_field(
             #[doc = #doc_set]
             pub fn #set_field_ident(&mut self, #field_name: impl Into<String>) {
                 self.#field_name = Some(#field_name.into());
+            }
+
+            #[doc = #doc_clear]
+            pub fn #clear_field_ident(&mut self) {
+                self.#field_name = None;
             }
         };
 
@@ -199,6 +209,11 @@ fn expand_option_field(
             #get_field
 
             #set_field
+
+            #[doc = #doc_clear]
+            pub fn #clear_field_ident(&mut self) {
+                self.#field_name = None;
+            }
         };
 
         getter
@@ -215,6 +230,7 @@ fn expand_regular_field(
 
     let set_field_name = format!("set_{}", field_name);
     let set_field_ident = syn::Ident::new(&set_field_name, field_name.span());
+
     let (doc_get, doc_set) = make_field_comment(field_name, false);
 
     // If string, we can use as_deref
@@ -309,8 +325,8 @@ fn has_event_copy_ident(field: &syn::Field) -> bool {
 /// If `option_mode` use the "if it exists" comment
 fn make_field_comment(field: &syn::Ident, option_mode: bool) -> (String, String) {
     let if_it_exists = if option_mode { " if it exists" } else { "" };
-    let doc_get = format!("Get the value of {}{}", field, if_it_exists);
-    let doc_set = format!("Set the value of {} to the given value", field);
+    let doc_get = format!("Get the value of `{}`{}", field, if_it_exists);
+    let doc_set = format!("Set the value of `{}` to the given value", field);
 
     (doc_get, doc_set)
 }
