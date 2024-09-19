@@ -12,13 +12,15 @@ use crate::{
     models::users::{UserGQL, UserKindGQL, UserSessionGQL},
 };
 
+use super::execute_search_events;
+
 /// The user input object on what to update
 ///
 /// All fields are optional
 #[derive(InputObject)]
 pub struct UserInputGQL {
     /// The user's username
-    #[graphql(validator(min_length = 5, max_length = 128))]
+    #[graphql(validator(min_length = 3, max_length = 128))]
     username: Option<String>,
     /// The user's kind
     ///
@@ -200,7 +202,7 @@ pub async fn mutate_users_update(
         let user_search = showtimes_search::models::User::from(user_clone);
         user_search.update_document(&search_arc).await
     });
-    let task_event = ctx
+    let task_events = ctx
         .data_unchecked::<showtimes_events::SharedSHClickHouse>()
         .create_event_async(
             showtimes_events::m::EventKind::UserUpdated,
@@ -212,9 +214,7 @@ pub async fn mutate_users_update(
             },
         );
 
-    let (r_a, r_b) = tokio::try_join!(task_search, task_event)?;
-    r_a?;
-    r_b?;
+    execute_search_events(task_search, task_events).await?;
 
     let user_gql: UserGQL = user_info.into();
 

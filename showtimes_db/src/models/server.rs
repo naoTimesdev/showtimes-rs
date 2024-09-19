@@ -226,6 +226,37 @@ impl ServerCollaborationSync {
             updated: chrono::Utc::now(),
         }
     }
+
+    /// Get a specific project and remove it from the list
+    pub fn get_and_remove(
+        &mut self,
+        project: showtimes_shared::ulid::Ulid,
+    ) -> Option<ServerCollaborationSyncTarget> {
+        let index = self.projects.iter().position(|p| p.project == project);
+        if let Some(index) = index {
+            Some(self.projects.remove(index))
+        } else {
+            None
+        }
+    }
+
+    /// Get a specific server and remove it from the list
+    pub fn get_and_remove_server(
+        &mut self,
+        server: showtimes_shared::ulid::Ulid,
+    ) -> Option<ServerCollaborationSyncTarget> {
+        let index = self.projects.iter().position(|p| p.server == server);
+        if let Some(index) = index {
+            Some(self.projects.remove(index))
+        } else {
+            None
+        }
+    }
+
+    /// Get the length of the projects or synchronization list
+    pub fn length(&self) -> usize {
+        self.projects.len()
+    }
 }
 
 /// An information for a collaboration invite (for source)

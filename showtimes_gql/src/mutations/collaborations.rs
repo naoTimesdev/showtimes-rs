@@ -1,7 +1,8 @@
 use async_graphql::{dataloader::DataLoader, Error, ErrorExtensions, InputObject};
 use showtimes_db::{
-    m::ServerCollaborationSyncTarget, mongodb::bson::doc, CollaborationInviteHandler,
-    DatabaseShared,
+    m::{ServerCollaborationSyncTarget, UserKind},
+    mongodb::bson::doc,
+    CollaborationInviteHandler, DatabaseShared,
 };
 use showtimes_search::SearchClientShared;
 
@@ -12,6 +13,8 @@ use crate::{
         prelude::{OkResponse, UlidGQL},
     },
 };
+
+use super::execute_search_events;
 
 /// The user input object on what to update
 ///
@@ -141,8 +144,26 @@ pub async fn mutate_collaborations_initiate(
     invite_handler.save(&mut collab_invite, None).await?;
 
     // Save in search index
-    let invite_search = showtimes_search::models::ServerCollabInvite::from(collab_invite.clone());
-    invite_search.update_document(meili).await?;
+    let invite_clone = collab_invite.clone();
+    let meili_clone = meili.clone();
+    let task_search = tokio::task::spawn(async move {
+        let invite_search = showtimes_search::models::ServerCollabInvite::from(invite_clone);
+        invite_search.update_document(&meili_clone).await
+    });
+    // Save in event
+    let task_events = ctx
+        .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+        .create_event_async(
+            showtimes_events::m::EventKind::CollaborationCreated,
+            showtimes_events::m::CollabCreatedEvent::from(&collab_invite),
+            if user.kind == UserKind::Owner {
+                None
+            } else {
+                Some(user.id.to_string())
+            },
+        );
+
+    execute_search_events(task_search, task_events).await?;
 
     Ok(collab_invite.into())
 }
@@ -216,9 +237,28 @@ pub async fn mutate_collaborations_accept(
 
         // Update DB
         sync_handler.save(sync, None).await?;
-        // Update search
-        let sync_search = showtimes_search::models::ServerCollabSync::from(sync.clone());
-        sync_search.update_document(meili).await?;
+
+        // Save in search index
+        let sync_clone = sync.clone();
+        let meili_clone = meili.clone();
+        let task_search = tokio::task::spawn(async move {
+            let sync_search = showtimes_search::models::ServerCollabSync::from(sync_clone);
+            sync_search.update_document(&meili_clone).await
+        });
+        // Save in event
+        let task_events = ctx
+            .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+            .create_event_async(
+                showtimes_events::m::EventKind::CollaborationAccepted,
+                showtimes_events::m::CollabAcceptedEvent::new(invite_data.id, sync.id),
+                if user.kind == UserKind::Owner {
+                    None
+                } else {
+                    Some(user.id.to_string())
+                },
+            );
+
+        execute_search_events(task_search, task_events).await?;
 
         sync.clone().into()
     } else {
@@ -231,12 +271,36 @@ pub async fn mutate_collaborations_accept(
         // Save to DB
         sync_handler.save(&mut sync, None).await?;
 
-        // Save to search index
-        let sync_search = showtimes_search::models::ServerCollabSync::from(sync.clone());
-        sync_search.update_document(meili).await?;
+        // Save in search index
+        let sync_clone = sync.clone();
+        let meili_clone = meili.clone();
+        let task_search = tokio::task::spawn(async move {
+            let sync_search = showtimes_search::models::ServerCollabSync::from(sync_clone);
+            sync_search.update_document(&meili_clone).await
+        });
+        // Save in event
+        let task_events = ctx
+            .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+            .create_event_async(
+                showtimes_events::m::EventKind::CollaborationAccepted,
+                showtimes_events::m::CollabAcceptedEvent::new(invite_data.id, sync.id),
+                if user.kind == UserKind::Owner {
+                    None
+                } else {
+                    Some(user.id.to_string())
+                },
+            );
+
+        execute_search_events(task_search, task_events).await?;
 
         sync.clone().into()
     };
+
+    // Delete invite
+    invite_db.delete(&invite_data).await?;
+    // Remove from search index
+    let invite_search = showtimes_search::models::ServerCollabInvite::from(invite_data.clone());
+    invite_search.delete_document(meili).await?;
 
     Ok(sync_gql)
 }
@@ -273,8 +337,39 @@ pub async fn mutate_collaborations_cancel(
     invite_db.delete(&invite_data).await?;
 
     // Remove from search index
-    let invite_search = showtimes_search::models::ServerCollabInvite::from(invite_data.clone());
-    invite_search.delete_document(meili).await?;
+    let meili_clone = meili.clone();
+    let invite_clone = invite_data.clone();
+
+    let task_search = tokio::task::spawn(async move {
+        let invite_search = showtimes_search::models::ServerCollabInvite::from(invite_clone);
+        invite_search.delete_document(&meili_clone).await
+    });
+
+    // Save in event
+    let event_ch = ctx.data_unchecked::<showtimes_events::SharedSHClickHouse>();
+    let task_events = if is_deny {
+        event_ch.create_event_async(
+            showtimes_events::m::EventKind::CollaborationRejected,
+            showtimes_events::m::CollabRejectedEvent::from(&invite_data),
+            if user.kind == UserKind::Owner {
+                None
+            } else {
+                Some(user.id.to_string())
+            },
+        )
+    } else {
+        event_ch.create_event_async(
+            showtimes_events::m::EventKind::CollaborationRetracted,
+            showtimes_events::m::CollabRetractedEvent::from(&invite_data),
+            if user.kind == UserKind::Owner {
+                None
+            } else {
+                Some(user.id.to_string())
+            },
+        )
+    };
+
+    execute_search_events(task_search, task_events).await?;
 
     if is_deny {
         Ok(OkResponse::ok("Invite denied"))

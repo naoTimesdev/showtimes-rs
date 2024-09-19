@@ -4,7 +4,7 @@ use async_graphql::{
     dataloader::DataLoader, CustomValidator, Enum, Error, ErrorExtensions, InputObject, Upload,
 };
 use chrono::TimeZone;
-use showtimes_db::{mongodb::bson::doc, DatabaseShared, ProjectHandler};
+use showtimes_db::{m::UserKind, mongodb::bson::doc, DatabaseShared, ProjectHandler};
 use showtimes_fs::FsPool;
 use showtimes_metadata::m::AnilistMediaFormat;
 use showtimes_search::SearchClientShared;
@@ -21,6 +21,8 @@ use crate::{
         search::ExternalSearchSource,
     },
 };
+
+use super::execute_search_events;
 
 /// The input information of an external metadata source
 #[derive(InputObject)]
@@ -653,6 +655,32 @@ async fn make_and_update_project(
     Ok(prj_gql)
 }
 
+// TODO: Merge with `make_and_update_project`
+async fn make_and_update_project_events(
+    db: &showtimes_db::DatabaseShared,
+    meili: &showtimes_search::SearchClientShared,
+    project: &mut showtimes_db::m::Project,
+    task_events: tokio::task::JoinHandle<Result<(), showtimes_events::ClickHouseError>>,
+) -> async_graphql::Result<ProjectGQL> {
+    // Save the project
+    let prj_handler = ProjectHandler::new(db);
+    prj_handler.save(project, None).await?;
+
+    // Update index
+    let prj_clone = project.clone();
+    let meili_clone = meili.clone();
+    let task_search = tokio::task::spawn(async move {
+        let prj_search = showtimes_search::models::Project::from(prj_clone);
+        prj_search.update_document(&meili_clone).await
+    });
+
+    execute_search_events(task_search, task_events).await?;
+
+    let prj_gql: ProjectGQL = project.clone().into();
+
+    Ok(prj_gql)
+}
+
 async fn check_permissions(
     ctx: &async_graphql::Context<'_>,
     id: showtimes_shared::ulid::Ulid,
@@ -898,8 +926,21 @@ pub async fn mutate_projects_create(
     project.poster =
         showtimes_db::m::Poster::new_with_color(poster_url, input.poster_color.unwrap_or(16614485));
 
+    // Create event commit tasks
+    let task_events = ctx
+        .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+        .create_event_async(
+            showtimes_events::m::EventKind::ProjectCreated,
+            showtimes_events::m::ProjectCreatedEvent::from(&project),
+            if user.kind == UserKind::Owner {
+                None
+            } else {
+                Some(user.id.to_string())
+            },
+        );
+
     // Save the project
-    make_and_update_project(db, meili, &mut project).await
+    make_and_update_project_events(db, meili, &mut project, task_events).await
 }
 
 async fn download_cover(url: &str) -> anyhow::Result<Vec<u8>> {
@@ -998,25 +1039,77 @@ pub async fn mutate_projects_delete(
     if let Some(collab_info) = collab_info {
         let mut collab_info = collab_info;
         // Remove ourselves from the collab
-        collab_info.projects.retain(|p| p.project != prj_info.id);
+        let collab_project = collab_info.get_and_remove(prj_info.id);
 
-        // If only 1 or zero, delete this link
-        if collab_info.projects.len() < 2 {
-            // Delete from DB
-            collab_handler.delete(&collab_info).await?;
+        // Check if actually removed
+        if let Some(collab_project) = collab_project {
+            // If only 1 or zero, delete this link
+            if collab_info.length() < 2 {
+                // Delete from DB
+                collab_handler.delete(&collab_info).await?;
 
-            // Delete from search engine
-            let collab_search =
-                showtimes_search::models::ServerCollabSync::from(collab_info.clone());
-            collab_search.delete_document(meili).await?;
-        } else {
-            // Save the collab
-            collab_handler.save(&mut collab_info, None).await?;
+                // Delete from search engine
+                let collab_search =
+                    showtimes_search::models::ServerCollabSync::from(collab_info.clone());
+                collab_search.delete_document(meili).await?;
 
-            // Update search engine
-            let collab_search =
-                showtimes_search::models::ServerCollabSync::from(collab_info.clone());
-            collab_search.update_document(meili).await?;
+                // Delete from search engine
+                let collab_clone = collab_info.clone();
+                let meili_clone = meili.clone();
+                let task_search = tokio::task::spawn(async move {
+                    let collab_search =
+                        showtimes_search::models::ServerCollabSync::from(collab_clone);
+                    collab_search.delete_document(&meili_clone).await
+                });
+                // Create task events
+                let task_events = ctx
+                    .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+                    .create_event_async(
+                        showtimes_events::m::EventKind::CollaborationDeleted,
+                        showtimes_events::m::CollabDeletedEvent::new(
+                            collab_info.id,
+                            &collab_project,
+                            true,
+                        ),
+                        if user.kind == UserKind::Owner {
+                            None
+                        } else {
+                            Some(user.id.to_string())
+                        },
+                    );
+
+                execute_search_events(task_search, task_events).await?;
+            } else {
+                // Save the collab
+                collab_handler.save(&mut collab_info, None).await?;
+
+                // Update search engine
+                let collab_clone = collab_info.clone();
+                let meili_clone = meili.clone();
+                let task_search = tokio::task::spawn(async move {
+                    let collab_search =
+                        showtimes_search::models::ServerCollabSync::from(collab_clone);
+                    collab_search.update_document(&meili_clone).await
+                });
+                // Create task events
+                let task_events = ctx
+                    .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+                    .create_event_async(
+                        showtimes_events::m::EventKind::CollaborationDeleted,
+                        showtimes_events::m::CollabDeletedEvent::new(
+                            collab_info.id,
+                            &collab_project,
+                            false,
+                        ),
+                        if user.kind == UserKind::Owner {
+                            None
+                        } else {
+                            Some(user.id.to_string())
+                        },
+                    );
+
+                execute_search_events(task_search, task_events).await?;
+            }
         }
     }
 
@@ -1053,8 +1146,38 @@ pub async fn mutate_projects_delete(
         // Delete from search engine
         let index_invite = meili.index(showtimes_search::models::ServerCollabInvite::index_name());
 
-        let task_del = index_invite.delete_documents(&all_ids).await?;
-        task_del.wait_for_completion(meili, None, None).await?;
+        let meili_clone = meili.clone();
+        let task_search = tokio::task::spawn(async move {
+            match index_invite.delete_documents(&all_ids).await {
+                Ok(task_del) => {
+                    match task_del.wait_for_completion(&meili_clone, None, None).await {
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(e),
+                    }
+                }
+                Err(e) => Err(e),
+            }
+        });
+
+        let deleted_events: Vec<showtimes_events::m::CollabRetractedEvent> = collab_invite_info
+            .iter()
+            .map(|collab| showtimes_events::m::CollabRetractedEvent::new(collab.id))
+            .collect();
+
+        // Create task events
+        let task_events = ctx
+            .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+            .create_event_many_async(
+                showtimes_events::m::EventKind::CollaborationRetracted,
+                deleted_events,
+                if user.kind == UserKind::Owner {
+                    None
+                } else {
+                    Some(user.id.to_string())
+                },
+            );
+
+        execute_search_events(task_search, task_events).await?;
     }
 
     // Delete poster
@@ -1075,8 +1198,26 @@ pub async fn mutate_projects_delete(
     prj_handler.delete(&prj_info).await?;
 
     // Delete from search engine
-    let project_search = showtimes_search::models::Project::from(prj_info.clone());
-    project_search.delete_document(meili).await?;
+    let prj_clone = prj_info.clone();
+    let meili_clone = meili.clone();
+    let task_search = tokio::task::spawn(async move {
+        let project_search = showtimes_search::models::Project::from(prj_clone);
+        project_search.delete_document(&meili_clone).await
+    });
+    // Create task events
+    let task_events = ctx
+        .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+        .create_event_async(
+            showtimes_events::m::EventKind::ProjectDeleted,
+            showtimes_events::m::ProjectCreatedEvent::from(&prj_info),
+            if user.kind == UserKind::Owner {
+                None
+            } else {
+                Some(user.id.to_string())
+            },
+        );
+
+    execute_search_events(task_search, task_events).await?;
 
     Ok(OkResponse::ok("Project deleted"))
 }

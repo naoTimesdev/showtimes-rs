@@ -15,7 +15,9 @@ use crate::{
     },
 };
 
-use super::{IntegrationActionGQL, IntegrationInputGQL, IntegrationValidator};
+use super::{
+    execute_search_events, IntegrationActionGQL, IntegrationInputGQL, IntegrationValidator,
+};
 
 /// The server input object for creating a new server
 #[derive(InputObject)]
@@ -40,7 +42,7 @@ pub struct ServerCreateInputGQL {
 #[derive(InputObject)]
 pub struct ServerUpdateInputGQL {
     /// The server name
-    #[graphql(validator(min_length = 5, max_length = 128))]
+    #[graphql(validator(min_length = 3, max_length = 128))]
     name: Option<String>,
     /// The list of integration to add, update, or remove
     #[graphql(validator(custom = "IntegrationValidator::new()"))]
@@ -74,6 +76,10 @@ pub async fn mutate_servers_create(
 ) -> async_graphql::Result<ServerGQL> {
     let db = ctx.data_unchecked::<DatabaseShared>();
     let meili = ctx.data_unchecked::<SearchClientShared>();
+
+    if user.kind == UserKind::Owner {
+        return Err(Error::new("This account cannot create a server"));
+    }
 
     let current_user = vec![showtimes_db::m::ServerUser::new(
         user.id,
@@ -148,8 +154,26 @@ pub async fn mutate_servers_create(
     srv_handler.save_direct(&mut server, None).await?;
 
     // Commit to search engine
-    let srv_search = showtimes_search::models::Server::from(server.clone());
-    srv_search.update_document(meili).await?;
+    let server_clone = server.clone();
+    let meili_clone = meili.clone();
+    let task_search = tokio::task::spawn(async move {
+        let srv_search = showtimes_search::models::Server::from(server_clone);
+        srv_search.update_document(&meili_clone).await
+    });
+    // Commit to events
+    let task_events = ctx
+        .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+        .create_event_async(
+            showtimes_events::m::EventKind::ServerCreated,
+            showtimes_events::m::ServerCreatedEvent::from(&server),
+            if user.kind == UserKind::Owner {
+                None
+            } else {
+                Some(user.id.to_string())
+            },
+        );
+
+    execute_search_events(task_search, task_events).await?;
 
     Ok(server.into())
 }
@@ -215,10 +239,19 @@ pub async fn mutate_servers_update(
     let server =
         get_and_check_server(ctx, *id, &user, showtimes_db::m::UserPrivilege::Admin).await?;
     let mut server_mut = server.clone();
+
+    let mut server_before = showtimes_events::m::ServerUpdatedDataEvent::default();
+    let mut server_after = showtimes_events::m::ServerUpdatedDataEvent::default();
+
     if let Some(name) = input.name {
+        server_before.set_name(&server_mut.name);
         server_mut.name = name;
+        server_after.set_name(&server_mut.name);
     }
 
+    server_before.set_integrations(&server_mut.integrations);
+
+    let mut any_integrations_changes = false;
     for (idx, integration) in input.integrations.unwrap_or_default().iter().enumerate() {
         match (integration.action, integration.original_id.clone()) {
             (IntegrationActionGQL::Add, _) => {
@@ -230,6 +263,7 @@ pub async fn mutate_servers_update(
 
                 if same_integration.is_none() {
                     server_mut.add_integration(integration.into());
+                    any_integrations_changes = true;
                 }
             }
             (IntegrationActionGQL::Update, Some(original_id)) => {
@@ -249,6 +283,7 @@ pub async fn mutate_servers_update(
                 let new_integration = integration.into();
                 server_mut.remove_integration(old_integration);
                 server_mut.add_integration(new_integration);
+                any_integrations_changes = true;
             }
             (IntegrationActionGQL::Update, None) => {
                 return Err(
@@ -264,8 +299,15 @@ pub async fn mutate_servers_update(
                 // Check if the integration exists
                 let integration: showtimes_db::m::IntegrationId = integration.into();
                 server_mut.remove_integration(&integration);
+                any_integrations_changes = true;
             }
         }
+    }
+
+    if any_integrations_changes {
+        server_after.set_integrations(&server_mut.integrations);
+    } else {
+        server_before.clear_integrations();
     }
 
     if let Some(avatar_upload) = input.avatar {
@@ -297,6 +339,10 @@ pub async fn mutate_servers_update(
             None::<String>,
         );
 
+        if let Some(avatar) = &server_mut.avatar {
+            server_before.set_avatar(avatar);
+        }
+        server_after.set_avatar(&image_meta);
         server_mut.avatar = Some(image_meta);
     }
 
@@ -305,8 +351,30 @@ pub async fn mutate_servers_update(
     srv_handler.save(&mut server_mut, None).await?;
 
     // Update index
-    let srv_search = showtimes_search::models::Server::from(server_mut.clone());
-    srv_search.update_document(meili).await?;
+    let server_clone = server_mut.clone();
+    let meili_clone = meili.clone();
+    let task_search = tokio::task::spawn(async move {
+        let srv_search = showtimes_search::models::Server::from(server_clone);
+        srv_search.update_document(&meili_clone).await
+    });
+    // Commit to events
+    let task_events = ctx
+        .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+        .create_event_async(
+            showtimes_events::m::EventKind::ServerUpdated,
+            showtimes_events::m::ServerUpdatedEvent::new(
+                server_mut.id,
+                server_before,
+                server_after,
+            ),
+            if user.kind == UserKind::Owner {
+                None
+            } else {
+                Some(user.id.to_string())
+            },
+        );
+
+    execute_search_events(task_search, task_events).await?;
 
     let srv_gql: ServerGQL = server_mut.into();
 
@@ -335,39 +403,109 @@ pub async fn mutate_servers_delete(
         .await?;
 
     let mut collab_deleted: Vec<String> = vec![];
+    let mut collab_deleted_events: Vec<showtimes_events::m::CollabDeletedEvent> = vec![];
     let mut collab_updated: Vec<showtimes_db::m::ServerCollaborationSync> = vec![];
+    let mut collab_updated_events: Vec<showtimes_events::m::CollabDeletedEvent> = vec![];
     for collab in collab_info {
         let mut collab_mut = collab.clone();
-        collab_mut.projects.retain(|p| p.server != server.id);
+        let srv_collab_data = collab_mut.get_and_remove_server(server.id);
+        if let Some(srv_collab_data) = srv_collab_data {
+            // If only 1 or zero, delete this link
+            if collab_mut.length() < 2 {
+                // Delete from DB
+                collab_handler.delete(&collab).await?;
 
-        // If only 1 or zero, delete this link
-        if collab_mut.projects.len() < 2 {
-            // Delete from DB
-            collab_handler.delete(&collab).await?;
+                // Delete from search engine
+                collab_deleted_events.push(showtimes_events::m::CollabDeletedEvent::new(
+                    collab.id,
+                    &srv_collab_data,
+                    true,
+                ));
 
-            // Delete from search engine
-            collab_deleted.push(collab.id.to_string());
-        } else {
-            collab_handler.save(&mut collab_mut, None).await?;
-            collab_updated.push(collab_mut);
+                collab_deleted.push(collab.id.to_string());
+            } else {
+                collab_handler.save(&mut collab_mut, None).await?;
+
+                collab_updated_events.push(showtimes_events::m::CollabDeletedEvent::new(
+                    collab.id,
+                    &srv_collab_data,
+                    false,
+                ));
+                collab_updated.push(collab_mut);
+            }
         }
     }
 
-    if !collab_deleted.is_empty() {
+    if !collab_deleted.is_empty() && !collab_deleted_events.is_empty() {
         let index_collab = meili.index(showtimes_search::models::ServerCollabSync::index_name());
-        let task_del = index_collab.delete_documents(&collab_deleted).await?;
-        task_del.wait_for_completion(meili, None, None).await?;
+
+        // Search adjustment
+        let meili_clone = meili.clone();
+        let task_search = tokio::task::spawn(async move {
+            match index_collab.delete_documents(&collab_deleted).await {
+                Ok(task_del) => {
+                    match task_del.wait_for_completion(&meili_clone, None, None).await {
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(e),
+                    }
+                }
+                Err(e) => Err(e),
+            }
+        });
+
+        // Commit to events
+        let task_events = ctx
+            .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+            .create_event_many_async(
+                showtimes_events::m::EventKind::CollaborationDeleted,
+                collab_deleted_events,
+                if user.kind == UserKind::Owner {
+                    None
+                } else {
+                    Some(user.id.to_string())
+                },
+            );
+
+        execute_search_events(task_search, task_events).await?;
     }
 
-    if !collab_updated.is_empty() {
+    if !collab_updated.is_empty() && !collab_updated_events.is_empty() {
         let index_collab = meili.index(showtimes_search::models::ServerCollabSync::index_name());
-        let task_update = index_collab
-            .add_or_update(
-                &collab_updated,
-                Some(showtimes_search::models::ServerCollabSync::index_name()),
-            )
-            .await?;
-        task_update.wait_for_completion(meili, None, None).await?;
+
+        // Search adjustment
+        let meili_clone = meili.clone();
+        let task_search = tokio::task::spawn(async move {
+            match index_collab
+                .add_or_update(
+                    &collab_updated,
+                    Some(showtimes_search::models::ServerCollabSync::index_name()),
+                )
+                .await
+            {
+                Ok(task_del) => {
+                    match task_del.wait_for_completion(&meili_clone, None, None).await {
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(e),
+                    }
+                }
+                Err(e) => Err(e),
+            }
+        });
+
+        // Commit to events
+        let task_events = ctx
+            .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+            .create_event_many_async(
+                showtimes_events::m::EventKind::CollaborationDeleted,
+                collab_updated_events,
+                if user.kind == UserKind::Owner {
+                    None
+                } else {
+                    Some(user.id.to_string())
+                },
+            );
+
+        execute_search_events(task_search, task_events).await?;
     }
 
     let collab_invite_handler = showtimes_db::CollaborationInviteHandler::new(db);
@@ -402,8 +540,39 @@ pub async fn mutate_servers_delete(
         // Delete from search engine
         let index_invite = meili.index(showtimes_search::models::ServerCollabInvite::index_name());
 
-        let task_del = index_invite.delete_documents(&all_invite_ids).await?;
-        task_del.wait_for_completion(meili, None, None).await?;
+        let meili_clone = meili.clone();
+        let task_search = tokio::task::spawn(async move {
+            match index_invite.delete_documents(&all_invite_ids).await {
+                Ok(task_del) => {
+                    match task_del.wait_for_completion(&meili_clone, None, None).await {
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(e),
+                    }
+                }
+                Err(e) => Err(e),
+            }
+        });
+
+        // Create events for retracted
+        let retracted_events: Vec<showtimes_events::m::CollabRetractedEvent> = collab_invite_info
+            .iter()
+            .map(|collab| showtimes_events::m::CollabRetractedEvent::new(collab.id))
+            .collect();
+
+        // Create task events
+        let task_events = ctx
+            .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+            .create_event_many_async(
+                showtimes_events::m::EventKind::CollaborationRetracted,
+                retracted_events,
+                if user.kind == UserKind::Owner {
+                    None
+                } else {
+                    Some(user.id.to_string())
+                },
+            );
+
+        execute_search_events(task_search, task_events).await?;
     }
 
     // Delete projects
@@ -432,8 +601,39 @@ pub async fn mutate_servers_delete(
         // Delete from search engine
         let index_project = meili.index(showtimes_search::models::Project::index_name());
 
-        let task_del = index_project.delete_documents(&all_project_ids).await?;
-        task_del.wait_for_completion(meili, None, None).await?;
+        let meili_clone = meili.clone();
+        let task_search = tokio::task::spawn(async move {
+            match index_project.delete_documents(&all_project_ids).await {
+                Ok(task_del) => {
+                    match task_del.wait_for_completion(&meili_clone, None, None).await {
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(e),
+                    }
+                }
+                Err(e) => Err(e),
+            }
+        });
+
+        // Create events for deleted
+        let deleted_events: Vec<showtimes_events::m::ProjectDeletedEvent> = project_info
+            .iter()
+            .map(|project| showtimes_events::m::ProjectDeletedEvent::new(project.id))
+            .collect();
+
+        // Create task events
+        let task_events = ctx
+            .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+            .create_event_many_async(
+                showtimes_events::m::EventKind::ProjectDeleted,
+                deleted_events,
+                if user.kind == UserKind::Owner {
+                    None
+                } else {
+                    Some(user.id.to_string())
+                },
+            );
+
+        execute_search_events(task_search, task_events).await?;
     }
 
     // Delete assets
@@ -446,8 +646,26 @@ pub async fn mutate_servers_delete(
     srv_handler.delete(&server).await?;
 
     // Delete from search engine
-    let srv_search = showtimes_search::models::Server::from(server.clone());
-    srv_search.delete_document(meili).await?;
+    let srv_clone = server.clone();
+    let meili_clone = meili.clone();
+    let task_search = tokio::task::spawn(async move {
+        let srv_search = showtimes_search::models::Server::from(srv_clone);
+        srv_search.delete_document(&meili_clone).await
+    });
+    // Commit to events
+    let task_events = ctx
+        .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+        .create_event_async(
+            showtimes_events::m::EventKind::ServerDeleted,
+            showtimes_events::m::ServerDeletedEvent::new(server.id),
+            if user.kind == UserKind::Owner {
+                None
+            } else {
+                Some(user.id.to_string())
+            },
+        );
+
+    execute_search_events(task_search, task_events).await?;
 
     Ok(OkResponse::ok("Server deleted"))
 }

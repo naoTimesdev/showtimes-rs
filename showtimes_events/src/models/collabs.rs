@@ -68,6 +68,12 @@ pub struct CollabRetractedEvent {
     id: showtimes_shared::ulid::Ulid,
 }
 
+impl CollabRetractedEvent {
+    pub fn new(id: showtimes_shared::ulid::Ulid) -> Self {
+        Self { id }
+    }
+}
+
 impl From<showtimes_db::m::ServerCollaborationInvite> for CollabRetractedEvent {
     fn from(value: showtimes_db::m::ServerCollaborationInvite) -> Self {
         Self { id: value.id }
@@ -98,12 +104,12 @@ pub struct CollabDeletedEvent {
 impl CollabDeletedEvent {
     pub fn new(
         id: showtimes_shared::ulid::Ulid,
-        target: showtimes_db::m::ServerCollaborationSyncTarget,
+        target: &showtimes_db::m::ServerCollaborationSyncTarget,
         is_deleted: bool,
     ) -> Self {
         Self {
             id,
-            target,
+            target: *target,
             is_deleted,
         }
     }

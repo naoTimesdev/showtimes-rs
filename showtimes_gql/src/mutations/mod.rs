@@ -244,3 +244,14 @@ impl CustomValidator<Option<Vec<String>>> for NonEmptyValidator {
         Ok(())
     }
 }
+
+pub(super) async fn execute_search_events(
+    task_search: tokio::task::JoinHandle<Result<(), showtimes_search::MeiliError>>,
+    task_events: tokio::task::JoinHandle<Result<(), showtimes_events::ClickHouseError>>,
+) -> async_graphql::Result<()> {
+    let (r_search, r_events) = tokio::try_join!(task_search, task_events)?;
+    r_search?;
+    r_events?;
+
+    Ok(())
+}
