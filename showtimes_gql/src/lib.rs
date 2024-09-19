@@ -10,6 +10,9 @@ use async_graphql::{Context, Object, Subscription};
 use data_loader::{find_authenticated_user, ServerAndOwnerId, ServerDataLoader, ServerOwnerId};
 use models::collaborations::{CollaborationInviteGQL, CollaborationSyncGQL};
 use models::events::prelude::EventGQL;
+use models::events::servers::{
+    ServerCreatedEventDataGQL, ServerDeletedEventDataGQL, ServerUpdatedEventDataGQL,
+};
 use models::events::users::{
     UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDataGQL,
 };
@@ -612,6 +615,84 @@ impl SubscriptionRoot {
         showtimes_events::MemoryBroker::<showtimes_events::m::UserDeletedEvent>::subscribe().map(
             move |event| {
                 let inner = UserDeletedEventDataGQL::new(event.data());
+                EventGQL::new(
+                    event.id(),
+                    inner,
+                    event.kind().into(),
+                    event.actor().map(|a| a.to_string()),
+                    event.timestamp(),
+                )
+            },
+        )
+    }
+
+    /// Watch for server created events
+    ///
+    /// Because of limitation in async-graphql, we sadly cannot combine stream of
+    /// our broker with the stream from ClickHouse data if user provided a start IDs.
+    #[graphql(
+        name = "watchServerCreated",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn watch_server_created(
+        &self,
+    ) -> impl Stream<Item = EventGQL<ServerCreatedEventDataGQL>> {
+        // TODO: Find a way to combine this with ClickHouse data
+        showtimes_events::MemoryBroker::<showtimes_events::m::ServerCreatedEvent>::subscribe().map(
+            move |event| {
+                let inner = ServerCreatedEventDataGQL::new(event.data().id());
+                EventGQL::new(
+                    event.id(),
+                    inner,
+                    event.kind().into(),
+                    event.actor().map(|a| a.to_string()),
+                    event.timestamp(),
+                )
+            },
+        )
+    }
+
+    /// Watch for server updates events
+    ///
+    /// Because of limitation in async-graphql, we sadly cannot combine stream of
+    /// our broker with the stream from ClickHouse data if user provided a start IDs.
+    #[graphql(
+        name = "watchServerUpdated",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn watch_server_updated(
+        &self,
+    ) -> impl Stream<Item = EventGQL<ServerUpdatedEventDataGQL>> {
+        // TODO: Find a way to combine this with ClickHouse data
+        showtimes_events::MemoryBroker::<showtimes_events::m::ServerUpdatedEvent>::subscribe().map(
+            move |event| {
+                let inner = ServerUpdatedEventDataGQL::from(event.data());
+                EventGQL::new(
+                    event.id(),
+                    inner,
+                    event.kind().into(),
+                    event.actor().map(|a| a.to_string()),
+                    event.timestamp(),
+                )
+            },
+        )
+    }
+
+    /// Watch for server deleted events
+    ///
+    /// Because of limitation in async-graphql, we sadly cannot combine stream of
+    /// our broker with the stream from ClickHouse data if user provided a start IDs.
+    #[graphql(
+        name = "watchServerDeleted",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn watch_server_deleted(
+        &self,
+    ) -> impl Stream<Item = EventGQL<ServerDeletedEventDataGQL>> {
+        // TODO: Find a way to combine this with ClickHouse data
+        showtimes_events::MemoryBroker::<showtimes_events::m::ServerDeletedEvent>::subscribe().map(
+            move |event| {
+                let inner = ServerDeletedEventDataGQL::from(event.data());
                 EventGQL::new(
                     event.id(),
                     inner,

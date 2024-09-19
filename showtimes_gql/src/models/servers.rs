@@ -88,7 +88,7 @@ impl ServerUserGQL {
 }
 
 impl ServerUserGQL {
-    fn from_shared(user: &ServerUser, top_server: showtimes_shared::ulid::Ulid) -> Self {
+    pub(crate) fn from_shared(user: &ServerUser, top_server: showtimes_shared::ulid::Ulid) -> Self {
         ServerUserGQL {
             id: user.id,
             privilege: user.privilege,
