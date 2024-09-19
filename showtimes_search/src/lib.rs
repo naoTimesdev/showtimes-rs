@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use meilisearch_sdk::client::Client;
+pub use meilisearch_sdk::errors::Error as MeiliError;
 
 pub mod models;
 

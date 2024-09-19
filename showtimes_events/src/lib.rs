@@ -7,6 +7,7 @@ pub mod brokers;
 pub mod models;
 mod streams;
 pub use brokers::MemoryBroker;
+pub use clickhouse::error::Error as ClickHouseError;
 use clickhouse::Client;
 pub use models as m;
 
