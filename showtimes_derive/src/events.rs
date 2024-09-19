@@ -1,5 +1,46 @@
 use proc_macro::TokenStream;
 use quote::ToTokens;
+use syn::{punctuated::Punctuated, Attribute, Expr, Lit, Meta, Token};
+
+#[derive(Default, Clone, Copy)]
+struct EventModelAttr {
+    unref: bool,
+}
+
+fn get_eventsmodel_attr(attrs: Vec<Attribute>) -> Result<EventModelAttr, syn::Error> {
+    let mut unref = false;
+
+    for attr in &attrs {
+        if attr.path().is_ident("events") {
+            let nested = attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
+
+            for meta in nested {
+                if let Meta::NameValue(nameval) = meta {
+                    if nameval.path.is_ident("unref") {
+                        // Is a boolean
+                        if let Expr::Lit(lit) = nameval.value {
+                            if let Lit::Bool(val) = lit.lit {
+                                unref = val.value;
+                            } else {
+                                return Err(syn::Error::new_spanned(
+                                    lit,
+                                    "Expected a boolean value for `unref`",
+                                ));
+                            }
+                        } else {
+                            return Err(syn::Error::new_spanned(
+                                nameval.value,
+                                "Expected a boolean value for `unref`",
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(EventModelAttr { unref })
+}
 
 /// The main function to expand the `EventModel` derive macro
 ///
@@ -40,9 +81,12 @@ use quote::ToTokens;
 pub(crate) fn expand_eventmodel(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
 
-    let fields = match &ast.data {
+    let (fields, attrs_config) = match &ast.data {
         syn::Data::Struct(data) => match &data.fields {
-            syn::Fields::Named(fields) => fields,
+            syn::Fields::Named(fields) => match get_eventsmodel_attr(ast.attrs.clone()) {
+                Ok(attrs) => (fields, attrs),
+                Err(err) => return TokenStream::from(err.to_compile_error()),
+            },
             _ => {
                 return TokenStream::from(
                     syn::Error::new_spanned(
@@ -69,9 +113,9 @@ pub(crate) fn expand_eventmodel(ast: &syn::DeriveInput) -> TokenStream {
         let field_ty_name = field_ty.clone().into_token_stream().to_string();
 
         let field = if field_ty_name.starts_with("Option") {
-            expand_option_field(field, field_name)
+            expand_option_field(field, field_name, attrs_config)
         } else {
-            expand_regular_field(field, field_name)
+            expand_regular_field(field, field_name, attrs_config)
         };
 
         getters.push(field);
@@ -86,7 +130,11 @@ pub(crate) fn expand_eventmodel(ast: &syn::DeriveInput) -> TokenStream {
     expanded.into()
 }
 
-fn expand_option_field(field: &syn::Field, field_name: &syn::Ident) -> proc_macro2::TokenStream {
+fn expand_option_field(
+    field: &syn::Field,
+    field_name: &syn::Ident,
+    attrs_config: EventModelAttr,
+) -> proc_macro2::TokenStream {
     let field_ty = &field.ty;
     let field_ty_name = field_ty.clone().into_token_stream().to_string();
 
@@ -112,8 +160,9 @@ fn expand_option_field(field: &syn::Field, field_name: &syn::Ident) -> proc_macr
     } else {
         // Modify the field type to be a reference
         let main_type = get_inner_type_of_option(field_ty).unwrap();
+        let event_copy = has_event_copy_ident(field);
 
-        let get_field = if has_event_copy_ident(field) {
+        let get_field = if event_copy {
             quote::quote! {
                 #[doc = #doc_get]
                 pub fn #field_name(&self) -> Option<#main_type> {
@@ -129,21 +178,38 @@ fn expand_option_field(field: &syn::Field, field_name: &syn::Ident) -> proc_macr
             }
         };
 
+        let set_field = if event_copy || attrs_config.unref {
+            quote::quote! {
+                #[doc = #doc_set]
+                pub fn #set_field_ident(&mut self, #field_name: #main_type) {
+                    self.#field_name = Some(#field_name);
+                }
+            }
+        } else {
+            quote::quote! {
+                #[doc = #doc_set]
+                pub fn #set_field_ident(&mut self, #field_name: &#main_type) {
+                    self.#field_name = Some(#field_name.clone());
+                }
+            }
+        };
+
         // And the set ident to be just the field type without the Option
         let getter = quote::quote! {
             #get_field
 
-            #[doc = #doc_set]
-            pub fn #set_field_ident(&mut self, #field_name: #main_type) {
-                self.#field_name = Some(#field_name);
-            }
+            #set_field
         };
 
         getter
     }
 }
 
-fn expand_regular_field(field: &syn::Field, field_name: &syn::Ident) -> proc_macro2::TokenStream {
+fn expand_regular_field(
+    field: &syn::Field,
+    field_name: &syn::Ident,
+    attrs_config: EventModelAttr,
+) -> proc_macro2::TokenStream {
     let field_ty = &field.ty;
     let field_ty_name = field_ty.clone().into_token_stream().to_string();
 
@@ -167,7 +233,9 @@ fn expand_regular_field(field: &syn::Field, field_name: &syn::Ident) -> proc_mac
 
         getter
     } else {
-        let get_field = if has_event_copy_ident(field) {
+        let event_copy = has_event_copy_ident(field);
+
+        let get_field = if event_copy {
             quote::quote! {
                 #[doc = #doc_get]
                 pub fn #field_name(&self) -> #field_ty {
@@ -183,13 +251,26 @@ fn expand_regular_field(field: &syn::Field, field_name: &syn::Ident) -> proc_mac
             }
         };
 
+        let set_field = if event_copy || attrs_config.unref {
+            quote::quote! {
+                #[doc = #doc_set]
+                pub fn #set_field_ident(&mut self, #field_name: #field_ty) {
+                    self.#field_name = #field_name;
+                }
+            }
+        } else {
+            quote::quote! {
+                #[doc = #doc_set]
+                pub fn #set_field_ident(&mut self, #field_name: &#field_ty) {
+                    self.#field_name = #field_name.clone();
+                }
+            }
+        };
+
         let getter = quote::quote! {
             #get_field
 
-            #[doc = #doc_set]
-            pub fn #set_field_ident(&mut self, #field_name: #field_ty) {
-                self.#field_name = #field_name;
-            }
+            #set_field
         };
 
         getter

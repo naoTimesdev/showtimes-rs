@@ -77,7 +77,7 @@ pub fn derive_search_model(input: TokenStream) -> TokenStream {
 ///     username: String,
 /// }
 /// ```
-#[proc_macro_derive(EventModel, attributes(event_copy))]
+#[proc_macro_derive(EventModel, attributes(events, event_copy))]
 pub fn derive_event_model(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
     let input = syn::parse_macro_input!(input as syn::DeriveInput);
