@@ -2,6 +2,7 @@
 
 use proc_macro::TokenStream;
 
+mod events;
 mod search;
 mod shows;
 
@@ -64,4 +65,23 @@ pub fn derive_search_model(input: TokenStream) -> TokenStream {
 
     // Generate the implementation of the trait
     search::expand_searchmodel(&input)
+}
+
+/// Derive the `EventModel` trait for a struct
+///
+/// # Examples
+/// ```
+/// #[derive(EventModel)]
+/// pub struct UserCreatedEvent {
+///     id: String,
+///     username: String,
+/// }
+/// ```
+#[proc_macro_derive(EventModel, attributes(event_copy))]
+pub fn derive_event_model(input: TokenStream) -> TokenStream {
+    // Parse the input tokens into a syntax tree
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+
+    // Generate the implementation of the trait
+    events::expand_eventmodel(&input)
 }

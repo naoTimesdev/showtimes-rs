@@ -24,3 +24,4 @@ uuid.workspace = true
 
 showtimes-shared = { path = "../showtimes_shared" }
 showtimes-db = { path = "../showtimes_db" }
+showtimes-derive = { path = "../showtimes_derive" }

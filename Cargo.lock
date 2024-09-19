@@ -2861,6 +2861,7 @@ name = "showtimes-derive"
 version = "0.1.0"
 dependencies = [
  "mongodb",
+ "proc-macro2",
  "quote",
  "syn 2.0.77",
 ]
@@ -2875,6 +2876,7 @@ dependencies = [
  "serde_json",
  "serde_repr",
  "showtimes-db",
+ "showtimes-derive",
  "showtimes-shared",
  "slab",
  "time",
