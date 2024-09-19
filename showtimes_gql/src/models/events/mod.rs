@@ -1,6 +1,6 @@
 use async_graphql::Object;
 use prelude::EventGQL;
-use users::{UserCreatedEventDataGQL, UserUpdatedEventDataGQL};
+use users::{UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDataGQL};
 
 use crate::{data_loader::find_authenticated_user, queries::ServerQueryUser};
 
@@ -72,6 +72,39 @@ impl QueryEventsRoot {
             let event_batch = stream.advance().await?;
             results.extend(event_batch.into_iter().map(|event| {
                 let inner = UserUpdatedEventDataGQL::new(event.data(), user_query);
+                EventGQL::new(
+                    event.id(),
+                    inner,
+                    event.kind().into(),
+                    event.actor().map(|a| a.to_string()),
+                    event.timestamp(),
+                )
+            }));
+        }
+
+        Ok(results)
+    }
+
+    /// The user deleted event, use `watchUserDeleted` to get a real-time stream instead.
+    #[graphql(name = "userDeleted")]
+    async fn user_deleted(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        #[graphql(desc = "The starting ID to query")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<Vec<EventGQL<UserDeletedEventDataGQL>>> {
+        let query_stream = ctx.data_unchecked::<showtimes_events::SharedSHClickHouse>();
+
+        let mut stream = query_stream
+            .query::<showtimes_events::m::UserDeletedEvent>(
+                showtimes_events::m::EventKind::UserDeleted,
+            )
+            .start_after(*id);
+
+        let mut results = Vec::new();
+        while !stream.is_exhausted() {
+            let event_batch = stream.advance().await?;
+            results.extend(event_batch.into_iter().map(|event| {
+                let inner = UserDeletedEventDataGQL::new(event.data());
                 EventGQL::new(
                     event.id(),
                     inner,

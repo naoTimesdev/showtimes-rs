@@ -126,6 +126,13 @@ impl UserUpdatedEventDataGQL {
     }
 }
 
+/// A user deleted event
+#[derive(SimpleObject)]
+pub struct UserDeletedEventDataGQL {
+    /// The user ID that was deleted
+    id: UlidGQL,
+}
+
 impl UserCreatedEventDataGQL {
     pub fn new(event: &showtimes_events::m::UserCreatedEvent, requester: ServerQueryUser) -> Self {
         Self {
@@ -142,6 +149,14 @@ impl UserUpdatedEventDataGQL {
             before: event.before().clone(),
             after: event.after().clone(),
             requester,
+        }
+    }
+}
+
+impl UserDeletedEventDataGQL {
+    pub fn new(event: &showtimes_events::m::UserDeletedEvent) -> Self {
+        Self {
+            id: event.id().into(),
         }
     }
 }

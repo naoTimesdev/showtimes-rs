@@ -10,7 +10,9 @@ use async_graphql::{Context, Object, Subscription};
 use data_loader::{find_authenticated_user, ServerAndOwnerId, ServerDataLoader, ServerOwnerId};
 use models::collaborations::{CollaborationInviteGQL, CollaborationSyncGQL};
 use models::events::prelude::EventGQL;
-use models::events::users::{UserCreatedEventDataGQL, UserUpdatedEventDataGQL};
+use models::events::users::{
+    UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDataGQL,
+};
 use models::events::QueryEventsRoot;
 use models::prelude::{OkResponse, PaginatedGQL};
 use models::projects::ProjectGQL;
@@ -586,6 +588,30 @@ impl SubscriptionRoot {
         showtimes_events::MemoryBroker::<showtimes_events::m::UserUpdatedEvent>::subscribe().map(
             move |event| {
                 let inner = UserUpdatedEventDataGQL::new(event.data(), *STUBBED_ADMIN);
+                EventGQL::new(
+                    event.id(),
+                    inner,
+                    event.kind().into(),
+                    event.actor().map(|a| a.to_string()),
+                    event.timestamp(),
+                )
+            },
+        )
+    }
+
+    /// Watch for user deleted events
+    ///
+    /// Because of limitation in async-graphql, we sadly cannot combine stream of
+    /// our broker with the stream from ClickHouse data if user provided a start IDs.
+    #[graphql(
+        name = "watchUserDeleted",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn watch_user_deleted(&self) -> impl Stream<Item = EventGQL<UserDeletedEventDataGQL>> {
+        // TODO: Find a way to combine this with ClickHouse data
+        showtimes_events::MemoryBroker::<showtimes_events::m::UserDeletedEvent>::subscribe().map(
+            move |event| {
+                let inner = UserDeletedEventDataGQL::new(event.data());
                 EventGQL::new(
                     event.id(),
                     inner,

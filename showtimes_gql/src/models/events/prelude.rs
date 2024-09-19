@@ -2,7 +2,7 @@ use async_graphql::{Enum, OutputType, SimpleObject};
 
 use crate::models::prelude::*;
 
-use super::users::{UserCreatedEventDataGQL, UserUpdatedEventDataGQL};
+use super::users::{UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDataGQL};
 
 /// Represents the kind of event that can be published
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -48,6 +48,7 @@ pub enum EventKindGQL {
 #[derive(SimpleObject)]
 #[graphql(concrete(name = "UserCreatedEventGQL", params(UserCreatedEventDataGQL)))]
 #[graphql(concrete(name = "UserUpdatedEventGQL", params(UserUpdatedEventDataGQL)))]
+#[graphql(concrete(name = "UserDeletedEventGQL", params(UserDeletedEventDataGQL)))]
 pub struct EventGQL<T: OutputType> {
     /// The event ID
     id: UlidGQL,
