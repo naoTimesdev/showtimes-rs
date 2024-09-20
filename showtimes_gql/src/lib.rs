@@ -29,6 +29,7 @@ use showtimes_session::manager::SharedSessionManager;
 use showtimes_session::ShowtimesUserSession;
 
 mod data_loader;
+mod expand;
 mod guard;
 mod image;
 mod models;
@@ -564,17 +565,10 @@ impl SubscriptionRoot {
     )]
     async fn watch_user_created(&self) -> impl Stream<Item = EventGQL<UserCreatedEventDataGQL>> {
         // TODO: Find a way to combine this with ClickHouse data
-        showtimes_events::MemoryBroker::<showtimes_events::m::UserCreatedEvent>::subscribe().map(
-            move |event| {
-                let inner = UserCreatedEventDataGQL::new(event.data(), *STUBBED_ADMIN);
-                EventGQL::new(
-                    event.id(),
-                    inner,
-                    event.kind().into(),
-                    event.actor().map(|a| a.to_string()),
-                    event.timestamp(),
-                )
-            },
+        expand_stream_event!(
+            showtimes_events::m::UserCreatedEvent,
+            UserCreatedEventDataGQL,
+            STUBBED_ADMIN
         )
     }
 
@@ -588,17 +582,10 @@ impl SubscriptionRoot {
     )]
     async fn watch_user_updated(&self) -> impl Stream<Item = EventGQL<UserUpdatedEventDataGQL>> {
         // TODO: Find a way to combine this with ClickHouse data
-        showtimes_events::MemoryBroker::<showtimes_events::m::UserUpdatedEvent>::subscribe().map(
-            move |event| {
-                let inner = UserUpdatedEventDataGQL::new(event.data(), *STUBBED_ADMIN);
-                EventGQL::new(
-                    event.id(),
-                    inner,
-                    event.kind().into(),
-                    event.actor().map(|a| a.to_string()),
-                    event.timestamp(),
-                )
-            },
+        expand_stream_event!(
+            showtimes_events::m::UserUpdatedEvent,
+            UserUpdatedEventDataGQL,
+            STUBBED_ADMIN
         )
     }
 
@@ -612,17 +599,9 @@ impl SubscriptionRoot {
     )]
     async fn watch_user_deleted(&self) -> impl Stream<Item = EventGQL<UserDeletedEventDataGQL>> {
         // TODO: Find a way to combine this with ClickHouse data
-        showtimes_events::MemoryBroker::<showtimes_events::m::UserDeletedEvent>::subscribe().map(
-            move |event| {
-                let inner = UserDeletedEventDataGQL::new(event.data());
-                EventGQL::new(
-                    event.id(),
-                    inner,
-                    event.kind().into(),
-                    event.actor().map(|a| a.to_string()),
-                    event.timestamp(),
-                )
-            },
+        expand_stream_event!(
+            showtimes_events::m::UserDeletedEvent,
+            UserDeletedEventDataGQL
         )
     }
 
@@ -638,17 +617,9 @@ impl SubscriptionRoot {
         &self,
     ) -> impl Stream<Item = EventGQL<ServerCreatedEventDataGQL>> {
         // TODO: Find a way to combine this with ClickHouse data
-        showtimes_events::MemoryBroker::<showtimes_events::m::ServerCreatedEvent>::subscribe().map(
-            move |event| {
-                let inner = ServerCreatedEventDataGQL::new(event.data().id());
-                EventGQL::new(
-                    event.id(),
-                    inner,
-                    event.kind().into(),
-                    event.actor().map(|a| a.to_string()),
-                    event.timestamp(),
-                )
-            },
+        expand_stream_event!(
+            showtimes_events::m::ServerCreatedEvent,
+            ServerCreatedEventDataGQL
         )
     }
 
@@ -664,17 +635,9 @@ impl SubscriptionRoot {
         &self,
     ) -> impl Stream<Item = EventGQL<ServerUpdatedEventDataGQL>> {
         // TODO: Find a way to combine this with ClickHouse data
-        showtimes_events::MemoryBroker::<showtimes_events::m::ServerUpdatedEvent>::subscribe().map(
-            move |event| {
-                let inner = ServerUpdatedEventDataGQL::from(event.data());
-                EventGQL::new(
-                    event.id(),
-                    inner,
-                    event.kind().into(),
-                    event.actor().map(|a| a.to_string()),
-                    event.timestamp(),
-                )
-            },
+        expand_stream_event!(
+            showtimes_events::m::ServerUpdatedEvent,
+            ServerUpdatedEventDataGQL
         )
     }
 
@@ -690,17 +653,9 @@ impl SubscriptionRoot {
         &self,
     ) -> impl Stream<Item = EventGQL<ServerDeletedEventDataGQL>> {
         // TODO: Find a way to combine this with ClickHouse data
-        showtimes_events::MemoryBroker::<showtimes_events::m::ServerDeletedEvent>::subscribe().map(
-            move |event| {
-                let inner = ServerDeletedEventDataGQL::from(event.data());
-                EventGQL::new(
-                    event.id(),
-                    inner,
-                    event.kind().into(),
-                    event.actor().map(|a| a.to_string()),
-                    event.timestamp(),
-                )
-            },
+        expand_stream_event!(
+            showtimes_events::m::ServerDeletedEvent,
+            ServerDeletedEventDataGQL
         )
     }
 }

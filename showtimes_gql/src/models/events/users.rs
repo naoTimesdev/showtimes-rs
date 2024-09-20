@@ -153,10 +153,18 @@ impl UserUpdatedEventDataGQL {
     }
 }
 
-impl UserDeletedEventDataGQL {
-    pub fn new(event: &showtimes_events::m::UserDeletedEvent) -> Self {
+impl From<showtimes_events::m::UserDeletedEvent> for UserDeletedEventDataGQL {
+    fn from(value: showtimes_events::m::UserDeletedEvent) -> Self {
         Self {
-            id: event.id().into(),
+            id: value.id().into(),
+        }
+    }
+}
+
+impl From<&showtimes_events::m::UserDeletedEvent> for UserDeletedEventDataGQL {
+    fn from(value: &showtimes_events::m::UserDeletedEvent) -> Self {
+        Self {
+            id: value.id().into(),
         }
     }
 }

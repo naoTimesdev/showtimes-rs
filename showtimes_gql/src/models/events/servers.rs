@@ -116,9 +116,19 @@ pub struct ServerDeletedEventDataGQL {
     id: UlidGQL,
 }
 
-impl ServerCreatedEventDataGQL {
-    pub(crate) fn new(id: showtimes_shared::ulid::Ulid) -> Self {
-        Self { id }
+impl From<showtimes_events::m::ServerCreatedEvent> for ServerCreatedEventDataGQL {
+    fn from(value: showtimes_events::m::ServerCreatedEvent) -> Self {
+        Self {
+            id: value.id().into(),
+        }
+    }
+}
+
+impl From<&showtimes_events::m::ServerCreatedEvent> for ServerCreatedEventDataGQL {
+    fn from(value: &showtimes_events::m::ServerCreatedEvent) -> Self {
+        Self {
+            id: value.id().into(),
+        }
     }
 }
 
