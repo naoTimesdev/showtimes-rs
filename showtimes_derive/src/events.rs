@@ -179,6 +179,13 @@ fn expand_option_field(
                     self.#field_name
                 }
             }
+        } else if let Some(inner_ty) = get_inner_type_of_vec(main_type) {
+            quote::quote! {
+                #[doc = #doc_get]
+                pub fn #field_name(&self) -> Option<&[#inner_ty]> {
+                    self.#field_name.as_deref()
+                }
+            }
         } else {
             quote::quote! {
                 #[doc = #doc_get]
@@ -193,6 +200,13 @@ fn expand_option_field(
                 #[doc = #doc_set]
                 pub fn #set_field_ident(&mut self, #field_name: #main_type) {
                     self.#field_name = Some(#field_name);
+                }
+            }
+        } else if let Some(inner_ty) = get_inner_type_of_vec(main_type) {
+            quote::quote! {
+                #[doc = #doc_set]
+                pub fn #set_field_ident(&mut self, #field_name: &[#inner_ty]) {
+                    self.#field_name = Some(#field_name.to_vec());
                 }
             }
         } else {
@@ -258,6 +272,13 @@ fn expand_regular_field(
                     self.#field_name
                 }
             }
+        } else if let Some(inner_ty) = get_inner_type_of_vec(field_ty) {
+            quote::quote! {
+                #[doc = #doc_get]
+                pub fn #field_name(&self) -> &[#inner_ty] {
+                    &self.#field_name
+                }
+            }
         } else {
             quote::quote! {
                 #[doc = #doc_get]
@@ -272,6 +293,13 @@ fn expand_regular_field(
                 #[doc = #doc_set]
                 pub fn #set_field_ident(&mut self, #field_name: #field_ty) {
                     self.#field_name = #field_name;
+                }
+            }
+        } else if let Some(inner_ty) = get_inner_type_of_vec(field_ty) {
+            quote::quote! {
+                #[doc = #doc_set]
+                pub fn #set_field_ident(&mut self, #field_name: &[#inner_ty]) {
+                    self.#field_name = #field_name.to_vec();
                 }
             }
         } else {
@@ -293,14 +321,14 @@ fn expand_regular_field(
     }
 }
 
-fn get_inner_type_of_option(ty: &syn::Type) -> Option<&syn::Type> {
+fn get_inner_type_of_x<'a>(ty: &'a syn::Type, x: &'a str) -> Option<&'a syn::Type> {
     if let syn::Type::Path(type_path) = ty {
-        // Check if it's a path type, and the first segment of the path is "Option"
+        // Check if it's a path type, and the first segment of the path is "x"
         if let Some(segment) = type_path.path.segments.first() {
-            if segment.ident == "Option" {
-                // Check if the segment has generic arguments (i.e., Option<T>)
+            if segment.ident == x {
+                // Check if the segment has generic arguments (i.e., x<T>)
                 if let syn::PathArguments::AngleBracketed(angle_bracketed) = &segment.arguments {
-                    // Get the first generic argument (T in Option<T>)
+                    // Get the first generic argument (T in x<T>)
                     if let Some(syn::GenericArgument::Type(inner_type)) =
                         angle_bracketed.args.first()
                     {
@@ -311,6 +339,14 @@ fn get_inner_type_of_option(ty: &syn::Type) -> Option<&syn::Type> {
         }
     }
     None
+}
+
+fn get_inner_type_of_option(ty: &syn::Type) -> Option<&syn::Type> {
+    get_inner_type_of_x(ty, "Option")
+}
+
+fn get_inner_type_of_vec(ty: &syn::Type) -> Option<&syn::Type> {
+    get_inner_type_of_x(ty, "Vec")
 }
 
 fn has_event_copy_ident(field: &syn::Field) -> bool {

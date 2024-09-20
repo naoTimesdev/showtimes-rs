@@ -141,7 +141,7 @@ async fn on_ws_init(
             showtimes_shared::APIKey::from_string(&payload.token)
                 .map(|_| SessionKind::APIKey)
                 .ok()
-                .unwrap_or_else(|| SessionKind::Bearer)
+                .unwrap_or(SessionKind::Bearer)
         } else {
             SessionKind::Bearer
         };
@@ -166,27 +166,25 @@ async fn on_ws_init(
                 )));
             }
         }
-    } else {
-        if let Some((kind, token)) = get_token_or_bearer(&headers, &state.config) {
-            match state.session.lock().await.get_session(token, kind).await {
-                Ok(session) => {
-                    tracing::debug!("[WS] Got session (from header): {:?}", session);
-                    data.insert(session.get_claims().clone());
-                    data.insert(session);
-                }
-                Err(err) => {
-                    tracing::error!("[WS] Error getting session (from header): {:?}", err);
-                    return Err(GQLError::new(format!(
-                        "Error validating token session: {}",
-                        err
-                    )));
-                }
+    } else if let Some((kind, token)) = get_token_or_bearer(&headers, &state.config) {
+        match state.session.lock().await.get_session(token, kind).await {
+            Ok(session) => {
+                tracing::debug!("[WS] Got session (from header): {:?}", session);
+                data.insert(session.get_claims().clone());
+                data.insert(session);
             }
-        } else {
-            tracing::error!("[WS] No token found in payload or header");
-            // Close/deny the connection
-            return Err(GQLError::new("No token found in payload or header"));
+            Err(err) => {
+                tracing::error!("[WS] Error getting session (from header): {:?}", err);
+                return Err(GQLError::new(format!(
+                    "Error validating token session: {}",
+                    err
+                )));
+            }
         }
+    } else {
+        tracing::error!("[WS] No token found in payload or header");
+        // Close/deny the connection
+        return Err(GQLError::new("No token found in payload or header"));
     }
 
     data.insert(state.db.clone());

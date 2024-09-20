@@ -60,9 +60,9 @@ impl ServerUpdatedEventDataContentGQL {
             name: value.name().map(|v| v.to_string()),
             integrations: value
                 .integrations()
-                .map(|v| v.into_iter().map(IntegrationIdGQL::from).collect()),
+                .map(|v| v.iter().map(IntegrationIdGQL::from).collect()),
             kind: value.owners().map(|v| {
-                v.into_iter()
+                v.iter()
                     .map(|u| ServerUserGQL::from_shared(u, parent))
                     .collect()
             }),

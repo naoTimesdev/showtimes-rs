@@ -196,13 +196,11 @@ where
     T: serde::Serialize + Send + Sync + Clone + 'static,
 {
     let data_event = m::SHEvent::new(kind, data.clone());
-    let data_event = if let Some(actor) = actor {
+    if let Some(actor) = actor {
         data_event.with_actor(actor)
     } else {
         data_event
-    };
-
-    data_event
+    }
 }
 
 /// The actual event pusher to ClickHouse
