@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 const BASE_URL: &str = "https://discord.com/api/v10";
@@ -42,6 +44,7 @@ pub struct DiscordPartialGuild {
 pub struct DiscordClient {
     client_id: String,
     client_secret: String,
+    client: Arc<reqwest::Client>,
 }
 
 impl std::fmt::Debug for DiscordClient {
@@ -69,7 +72,16 @@ impl std::fmt::Display for DiscordClientError {
 
 impl DiscordClient {
     pub fn new(client_id: impl Into<String>, client_secret: impl Into<String>) -> Self {
+        let client = reqwest::ClientBuilder::new()
+            .user_agent(format!(
+                "showtimes-rs-session/{} (+https://github.com/naoTimesdev/showtimes-rs)",
+                env!("CARGO_PKG_VERSION")
+            ))
+            .build()
+            .expect("Failed to build reqwest client for Discord OAuth2");
+
         Self {
+            client: Arc::new(client),
             client_id: client_id.into(),
             client_secret: client_secret.into(),
         }
@@ -80,8 +92,8 @@ impl DiscordClient {
         code: impl Into<String>,
         redirect_uri: impl Into<String>,
     ) -> Result<DiscordToken, DiscordClientError> {
-        let client = reqwest::Client::new();
-        let res = client
+        let res = self
+            .client
             .post(format!("{}/oauth2/token", BASE_URL))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .form(&[
@@ -109,8 +121,8 @@ impl DiscordClient {
         &self,
         refresh_token: impl Into<String>,
     ) -> Result<DiscordToken, reqwest::Error> {
-        let client = reqwest::Client::new();
-        let res = client
+        let res = self
+            .client
             .post(format!("{}/oauth2/token", BASE_URL))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .form(&[
@@ -126,8 +138,8 @@ impl DiscordClient {
     }
 
     pub async fn get_user(&self, token: impl Into<String>) -> Result<DiscordUser, reqwest::Error> {
-        let client = reqwest::Client::new();
-        let res = client
+        let res = self
+            .client
             .get(format!("{}/users/@me", BASE_URL))
             .header("Authorization", format!("Bearer {}", token.into()))
             .send()
@@ -140,8 +152,8 @@ impl DiscordClient {
         &self,
         token: impl Into<String>,
     ) -> Result<Vec<DiscordPartialGuild>, reqwest::Error> {
-        let client = reqwest::Client::new();
-        let res = client
+        let res = self
+            .client
             .get(format!("{}/users/@me/guilds", BASE_URL))
             .header("Authorization", format!("Bearer {}", token.into()))
             .send()
