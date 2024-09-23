@@ -19,6 +19,15 @@ pub const GRAPHQL_ROUTE: &str = "/graphql";
 pub const GRAPHQL_WS_ROUTE: &str = "/graphql/ws";
 static DISCORD_CLIENT: OnceLock<Arc<DiscordClient>> = OnceLock::new();
 
+pub async fn graphql_sdl(State(state): State<ShowtimesState>) -> impl IntoResponse {
+    let sdl_data = state.schema.sdl();
+
+    // Return the SDL as plain text
+    let mut headers = HeaderMap::new();
+    headers.insert("Content-Type", "text/plain".parse().unwrap());
+    (headers, sdl_data)
+}
+
 pub async fn graphql_playground() -> impl IntoResponse {
     let plugins = vec![graphiql_plugin_explorer()];
     let source = GraphiQLSource::build()
