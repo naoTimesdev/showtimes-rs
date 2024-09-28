@@ -1,13 +1,15 @@
 #![doc = include_str!("../README.md")]
 
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use futures::{Stream, StreamExt};
 
 use async_graphql::dataloader::DataLoader;
 use async_graphql::extensions::Tracing;
 use async_graphql::{Context, Object, Subscription};
-use data_loader::{find_authenticated_user, ServerAndOwnerId, ServerDataLoader, ServerOwnerId};
+use data_loader::{
+    find_authenticated_user, ServerAndOwnerId, ServerDataLoader, ServerOwnerId, UserDataLoader,
+};
 use models::collaborations::{CollaborationInviteGQL, CollaborationSyncGQL};
 use models::events::prelude::EventGQL;
 use models::events::servers::{
@@ -548,6 +550,43 @@ impl MutationRoot {
         let user = find_authenticated_user(ctx).await?;
 
         mutations::servers::mutate_servers_delete(ctx, user, id).await
+    }
+
+    /// Create a session for another user.
+    ///
+    /// This is mainly used by other services to orchestrate Showtimes on behalf of the user.
+    ///
+    /// Only available for Admin users.
+    #[graphql(
+        name = "createSession",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn create_session(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The user ID to create session for")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<UserSessionGQL> {
+        let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
+        let session = ctx.data_unchecked::<SharedSessionManager>();
+        let config = ctx.data_unchecked::<Arc<showtimes_shared::config::Config>>();
+        let user = loader.load_one(*id).await?;
+
+        match user {
+            Some(user) => {
+                // Create actual session
+                let (claims, token) = showtimes_session::create_session(
+                    user.id,
+                    config.jwt.get_expiration() as i64,
+                    &config.jwt.secret,
+                )?;
+                session.lock().await.set_session(&token, claims).await?;
+
+                Ok(UserSessionGQL::new(user, token))
+            }
+            None => {
+                return Err("User not found".into());
+            }
+        }
     }
 }
 
