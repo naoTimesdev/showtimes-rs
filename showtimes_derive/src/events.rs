@@ -149,20 +149,42 @@ fn expand_option_field(
 
     // If string, we can use as_deref
     if field_ty_name.contains("String") {
-        let getter = quote::quote! {
-            #[doc = #doc_get]
-            pub fn #field_name(&self) -> Option<&str> {
-                self.#field_name.as_deref()
-            }
+        let inner_ty = get_inner_type_of_option(field_ty).unwrap();
+        let has_vec = get_inner_type_of_vec(inner_ty).is_some();
 
-            #[doc = #doc_set]
-            pub fn #set_field_ident(&mut self, #field_name: impl Into<String>) {
-                self.#field_name = Some(#field_name.into());
-            }
+        let getter = if has_vec {
+            quote::quote! {
+                #[doc = #doc_get]
+                pub fn #field_name(&self) -> Option<&[String]> {
+                    self.#field_name.as_deref()
+                }
 
-            #[doc = #doc_clear]
-            pub fn #clear_field_ident(&mut self) {
-                self.#field_name = None;
+                #[doc = #doc_set]
+                pub fn #set_field_ident(&mut self, #field_name: &[String]) {
+                    self.#field_name = Some(#field_name.to_vec());
+                }
+
+                #[doc = #doc_clear]
+                pub fn #clear_field_ident(&mut self) {
+                    self.#field_name = None;
+                }
+            }
+        } else {
+            quote::quote! {
+                #[doc = #doc_get]
+                pub fn #field_name(&self) -> Option<&str> {
+                    self.#field_name.as_deref()
+                }
+
+                #[doc = #doc_set]
+                pub fn #set_field_ident(&mut self, #field_name: impl Into<String>) {
+                    self.#field_name = Some(#field_name.into());
+                }
+
+                #[doc = #doc_clear]
+                pub fn #clear_field_ident(&mut self) {
+                    self.#field_name = None;
+                }
             }
         };
 
