@@ -271,7 +271,7 @@ pub struct Role {
 
 impl PartialEq for Role {
     fn eq(&self, other: &Self) -> bool {
-        self.key == other.key
+        self.key() == other.key() && self.name() == other.name()
     }
 }
 
@@ -373,6 +373,14 @@ impl RoleStatus {
     }
 }
 
+impl PartialEq for RoleStatus {
+    fn eq(&self, other: &Self) -> bool {
+        self.key() == other.key() && self.finished() == other.finished()
+    }
+}
+
+impl Eq for RoleStatus {}
+
 impl From<Role> for RoleStatus {
     fn from(role: Role) -> Self {
         RoleStatus {
@@ -400,6 +408,14 @@ pub struct RoleAssignee {
     #[serde(with = "ulid_opt_serializer")]
     actor: Option<showtimes_shared::ulid::Ulid>,
 }
+
+impl PartialEq for RoleAssignee {
+    fn eq(&self, other: &Self) -> bool {
+        self.key() == other.key() && self.actor() == other.actor()
+    }
+}
+
+impl Eq for RoleAssignee {}
 
 impl RoleAssignee {
     /// Create a new role assignee
@@ -561,11 +577,28 @@ impl EpisodeProgress {
         // Update the statuses
         self.statuses.retain(|s| roles_keys.contains(&s.key));
     }
+
+    /// Compare statuses with other project statuses.
+    ///
+    /// Returns true if there are no changes.
+    pub fn compare_statuses(&self, other: &Self) -> bool {
+        let mut sort_self = self.statuses.clone();
+        let mut sort_other = other.statuses.clone();
+
+        sort_self.sort_by(|a, b| a.key.cmp(&b.key));
+        sort_other.sort_by(|a, b| a.key.cmp(&b.key));
+
+        sort_self == sort_other
+    }
 }
 
 impl PartialEq for EpisodeProgress {
     fn eq(&self, other: &Self) -> bool {
         self.number == other.number
+            && self.finished == other.finished
+            && self.aired == other.aired
+            && self.compare_statuses(other)
+            && self.delay_reason == other.delay_reason
     }
 }
 
@@ -829,5 +862,44 @@ impl Project {
         new_project.updated = cur_time;
         new_project.unset_id();
         new_project
+    }
+
+    /// Compare roles list with other project roles.
+    ///
+    /// Returns true if the roles are the same.
+    pub fn compare_roles(&self, other: &Self) -> bool {
+        let mut roles = self.roles.clone();
+        let mut other_roles = other.roles.clone();
+        roles.sort();
+        other_roles.sort();
+
+        // Compare inner roles
+        roles == other_roles
+    }
+
+    /// Compare assignees list with other project assignees.
+    ///
+    /// Returns true if the assignees are the same.
+    pub fn compare_assignees(&self, other: &Self) -> bool {
+        let mut assignees = self.assignees.clone();
+        let mut other_assignees = other.assignees.clone();
+        assignees.sort_by(|a, b| a.key.cmp(&b.key));
+        other_assignees.sort_by(|a, b| a.key.cmp(&b.key));
+
+        // Compare inner assignees
+        assignees == other_assignees
+    }
+
+    /// Compare progress list with other project progress.
+    ///
+    /// Returns true if the progress are the same.
+    pub fn compare_progress(&self, other: &Self) -> bool {
+        let mut progress = self.progress.clone();
+        let mut other_progress = other.progress.clone();
+        progress.sort();
+        other_progress.sort();
+
+        // Compare inner progress
+        progress == other_progress
     }
 }

@@ -1,4 +1,7 @@
-use std::{collections::VecDeque, sync::Arc};
+use std::{
+    collections::{BTreeMap, VecDeque},
+    sync::Arc,
+};
 
 use async_graphql::{
     dataloader::DataLoader, CustomValidator, Enum, Error, ErrorExtensions, InputObject, Upload,
@@ -23,6 +26,22 @@ use crate::{
 };
 
 use super::execute_search_events;
+
+type ChangedEpisodes = BTreeMap<u64, TinyEpisodeChanges>;
+
+#[derive(Debug, Clone, Default)]
+struct TinyEpisodeChanges {
+    finished: Option<bool>,
+    before: Vec<showtimes_db::m::RoleStatus>,
+    after: Vec<showtimes_db::m::RoleStatus>,
+    silent: bool,
+}
+
+impl TinyEpisodeChanges {
+    fn changed(&self) -> bool {
+        self.finished.is_some() || !self.before.is_empty() || !self.after.is_empty()
+    }
+}
 
 /// The input information of an external metadata source
 #[derive(InputObject)]
@@ -167,6 +186,28 @@ pub struct ProjectProgressUpdateInputGQL {
     /// This will only update the status for the role that is provided
     /// in the list, to not update the status, just do not include the list
     statuses: Option<Vec<ProjectProgressStatusUpdateInputGQL>>,
+    /// Do a silent update, this will not broadcast the event for status change
+    #[graphql(default = false)]
+    silent: bool,
+}
+
+impl ProjectProgressUpdateInputGQL {
+    /// Check if any field is set
+    fn is_any_set(&self) -> bool {
+        self.finished.is_some()
+            || self.aired.is_some()
+            || self.delay_reason.is_some()
+            || self.unset_delay.is_some()
+            || self.statuses.is_some()
+    }
+
+    /// Check if any field is set that is not status
+    fn is_any_set_except_status(&self) -> bool {
+        self.finished.is_some()
+            || self.aired.is_some()
+            || self.delay_reason.is_some()
+            || self.unset_delay.is_some()
+    }
 }
 
 /// The input object for creating a new project
@@ -637,24 +678,6 @@ async fn fetch_metadata_via_tmdb(
     })
 }
 
-async fn make_and_update_project(
-    db: &showtimes_db::DatabaseShared,
-    meili: &showtimes_search::SearchClientShared,
-    project: &mut showtimes_db::m::Project,
-) -> async_graphql::Result<ProjectGQL> {
-    // Save the project
-    let prj_handler = ProjectHandler::new(db);
-    prj_handler.save(project, None).await?;
-
-    // Update index
-    let prj_search = showtimes_search::models::Project::from(project.clone());
-    prj_search.update_document(meili).await?;
-
-    let prj_gql: ProjectGQL = project.clone().into();
-
-    Ok(prj_gql)
-}
-
 enum ProjectEventsError {
     SearchError(showtimes_search::MeiliError),
     EventsError(showtimes_events::ClickHouseError),
@@ -723,6 +746,15 @@ async fn make_and_update_project_events(
     let prj_gql: ProjectGQL = project.clone().into();
 
     Ok(prj_gql)
+}
+
+async fn make_and_update_project(
+    db: &showtimes_db::DatabaseShared,
+    meili: &showtimes_search::SearchClientShared,
+    project: &mut showtimes_db::m::Project,
+) -> async_graphql::Result<ProjectGQL> {
+    let mut stub = vec![];
+    make_and_update_project_events(db, meili, project, &mut stub).await
 }
 
 async fn check_permissions(
@@ -1277,9 +1309,10 @@ pub async fn mutate_projects_delete(
 async fn sync_projects_collaborations(
     ctx: &async_graphql::Context<'_>,
     project: &showtimes_db::m::Project,
+    user: &showtimes_db::m::User,
+    changed_episodes: ChangedEpisodes,
 ) -> async_graphql::Result<()> {
     let db = ctx.data_unchecked::<DatabaseShared>();
-    let meili = ctx.data_unchecked::<SearchClientShared>();
 
     // Find all collabs
     let collab_loader = ctx.data_unchecked::<DataLoader<ServerSyncLoader>>();
@@ -1306,28 +1339,191 @@ async fn sync_projects_collaborations(
 
         // Update the roles, status, and assignees
         let mut o_project_search = vec![];
+        let mut project_update_events = vec![];
+        let mut project_episode_events = vec![];
         for o_project in all_projects.values_mut() {
+            let mut before_project = showtimes_events::m::ProjectUpdatedDataEvent::default();
+            let mut after_project = showtimes_events::m::ProjectUpdatedDataEvent::default();
+
+            let mut roles_updated = false;
+            if !o_project.compare_roles(&project) {
+                // When roles update, assignees are also updated
+                before_project.set_roles(&o_project.roles);
+                before_project.set_assignees(&o_project.assignees);
+                roles_updated = true;
+            }
+
+            let mut asignees_updated = false;
+            if !roles_updated && !o_project.compare_assignees(&project) {
+                before_project.set_assignees(&o_project.assignees);
+                asignees_updated = true;
+            }
+
             o_project.roles = project.roles.clone();
             o_project.progress = project.progress.clone();
-            o_project.propagate_roles_assignees();
+            o_project.propagate_roles();
+
+            if roles_updated {
+                after_project.set_roles(&o_project.roles);
+            } else {
+                before_project.clear_roles();
+            }
+            if asignees_updated || roles_updated {
+                after_project.set_assignees(&o_project.assignees);
+            } else {
+                before_project.clear_assignees();
+            }
+
+            if before_project.has_changes() || after_project.has_changes() {
+                project_update_events.push(showtimes_events::m::ProjectUpdatedEvent::new(
+                    o_project.id,
+                    before_project,
+                    after_project,
+                ))
+            }
+
+            // Update episodes
+            let mut any_episode_changes = false;
+            if !changed_episodes.is_empty() {
+                for (episode, changes) in &changed_episodes {
+                    let find_episode = o_project.progress.iter_mut().find(|e| e.number == *episode);
+                    if let Some(episode_info) = find_episode {
+                        let mut episode_event =
+                            showtimes_events::m::ProjectEpisodeUpdatedEvent::new(
+                                o_project.id,
+                                episode_info.number,
+                                changes.silent,
+                            );
+
+                        if let Some(finished) = changes.finished {
+                            episode_event.set_finished(finished);
+                            episode_info.set_finished(finished);
+                        }
+
+                        for status in &changes.after {
+                            if let Some(role) = episode_info
+                                .statuses
+                                .iter_mut()
+                                .find(|r| r.key() == status.key())
+                            {
+                                episode_event.push_after(role);
+                                role.set_finished(status.finished());
+                            } else {
+                                let new_role = showtimes_db::m::RoleStatus::new(
+                                    status.key().to_string(),
+                                    status.finished(),
+                                )?;
+                                episode_event.push_after(&new_role);
+                                episode_info.statuses.push(new_role);
+                            }
+                        }
+
+                        for before in &changes.before {
+                            if let Some(role) = episode_info
+                                .statuses
+                                .iter()
+                                .find(|r| r.key() == before.key())
+                            {
+                                episode_event.push_before(role);
+                            }
+                        }
+
+                        if episode_event.has_changes() {
+                            project_episode_events.push(episode_event);
+                            any_episode_changes = true;
+                        }
+                    }
+                }
+            }
 
             // Save
-            prj_handler.save(o_project, None).await?;
-            o_project_search.push(showtimes_search::models::Project::from(o_project.clone()));
+            if any_episode_changes || roles_updated || asignees_updated {
+                prj_handler.save(o_project, None).await?;
+                o_project_search.push(showtimes_search::models::Project::from(o_project.clone()));
+            }
         }
 
-        // Save the projects
+        // Tasks manager
+        let mut all_tasks_manager = vec![];
+
+        // Create project update events
+        if !project_update_events.is_empty() {
+            let event_ch = ctx
+                .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+                .clone();
+            let user = user.clone();
+            let task_events_prj: tokio::task::JoinHandle<Result<(), ProjectEventsError>> =
+                tokio::task::spawn(async move {
+                    event_ch
+                        .create_event_many(
+                            showtimes_events::m::EventKind::ProjectUpdated,
+                            project_update_events,
+                            if user.kind == UserKind::Owner {
+                                None
+                            } else {
+                                Some(user.id.to_string())
+                            },
+                        )
+                        .await
+                        .map_err(|e| e.into())
+                });
+
+            all_tasks_manager.push(task_events_prj);
+        }
+
+        // Create the episodes update event
+        if !project_episode_events.is_empty() {
+            let event_ch = ctx
+                .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+                .clone();
+            let user = user.clone();
+            let task_events_prj: tokio::task::JoinHandle<Result<(), ProjectEventsError>> =
+                tokio::task::spawn(async move {
+                    event_ch
+                        .create_event_many(
+                            showtimes_events::m::EventKind::ProjectEpisodes,
+                            project_episode_events,
+                            if user.kind == UserKind::Owner {
+                                None
+                            } else {
+                                Some(user.id.to_string())
+                            },
+                        )
+                        .await
+                        .map_err(|e| e.into())
+                });
+
+            all_tasks_manager.push(task_events_prj);
+        }
+
+        // Save to search index
         if !o_project_search.is_empty() {
+            let meili = ctx.data_unchecked::<SearchClientShared>().clone();
             let o_project_index = meili.index(showtimes_search::models::Project::index_name());
-            let o_project_task = o_project_index
-                .add_or_update(
-                    &o_project_search,
-                    Some(showtimes_search::models::Project::primary_key()),
-                )
-                .await?;
-            o_project_task
-                .wait_for_completion(meili, None, None)
-                .await?;
+            let task_search = tokio::task::spawn(async move {
+                match o_project_index
+                    .add_or_update(
+                        &o_project_search,
+                        Some(showtimes_search::models::Project::primary_key()),
+                    )
+                    .await
+                {
+                    Ok(o_project_task) => {
+                        match o_project_task.wait_for_completion(&meili, None, None).await {
+                            Ok(_) => Ok(()),
+                            Err(e) => Err(e.into()),
+                        }
+                    }
+                    Err(e) => Err(e.into()),
+                }
+            });
+
+            all_tasks_manager.push(task_search);
+        }
+
+        // Execute all tasks
+        for await_res in futures::future::join_all(all_tasks_manager).await {
+            await_res??;
         }
     }
 
@@ -1363,6 +1559,7 @@ pub async fn mutate_projects_update(
     }
 
     let mut prj_info = prj_info.unwrap();
+    let prj_id = prj_info.id;
 
     // Check perms
     check_permissions(ctx, prj_info.creator, &user, Some(prj_info.id)).await?;
@@ -1523,11 +1720,29 @@ pub async fn mutate_projects_update(
             };
 
             // Update the metadata
+            let mut added_episodes: Vec<showtimes_events::m::ProjectUpdatedEpisodeDataEvent> =
+                vec![];
             for episode in &metadata_res.progress {
                 let find_episode = prj_info.find_episode_mut(episode.number as u64);
                 match find_episode {
                     Some(db_ep) => {
+                        let mut aired_before =
+                            showtimes_events::m::ProjectUpdatedEpisodeDataEvent::updated(
+                                episode.number as u64,
+                            );
+                        if let Some(aired_at) = episode.aired_at {
+                            aired_before.set_aired(aired_at.timestamp());
+                        }
+                        before_project.add_progress(aired_before);
                         db_ep.set_aired(episode.aired_at);
+                        let mut aired_after =
+                            showtimes_events::m::ProjectUpdatedEpisodeDataEvent::updated(
+                                episode.number as u64,
+                            );
+                        if let Some(aired_at) = episode.aired_at {
+                            aired_after.set_aired(aired_at.timestamp());
+                        }
+                        after_project.add_progress(aired_after);
                     }
                     None => match episode.aired_at {
                         Some(aired_at) => {
@@ -1535,17 +1750,35 @@ pub async fn mutate_projects_update(
                                 episode.number as u64,
                                 aired_at,
                             );
+                            let mut ep_events =
+                                showtimes_events::m::ProjectUpdatedEpisodeDataEvent::added(
+                                    episode.number as u64,
+                                );
+                            ep_events.set_aired(aired_at.timestamp());
+                            added_episodes.push(ep_events);
                         }
                         None => {
                             prj_info.add_episode_with_number(episode.number as u64);
+                            added_episodes.push(
+                                showtimes_events::m::ProjectUpdatedEpisodeDataEvent::added(
+                                    episode.number as u64,
+                                ),
+                            );
                         }
                     },
                 }
             }
 
+            for added_ep in added_episodes {
+                after_project.add_progress(added_ep);
+            }
+
             // Reverse side, check if we need to remove episodes
             let mut to_be_removed: Vec<u64> = vec![];
             for episode in &prj_info.progress {
+                if episode.is_progressing() || episode.is_finished() {
+                    continue;
+                }
                 let find_episode = metadata_res
                     .progress
                     .iter()
@@ -1557,26 +1790,64 @@ pub async fn mutate_projects_update(
 
             for remove_ep in to_be_removed {
                 prj_info.remove_episode(remove_ep);
+                after_project.add_progress(
+                    showtimes_events::m::ProjectUpdatedEpisodeDataEvent::removed(remove_ep),
+                );
             }
         }
     }
 
     // Update progress
+    let mut progress_event: Vec<showtimes_events::m::ProjectEpisodeUpdatedEvent> = vec![];
+    let mut changed_episodes: ChangedEpisodes = ChangedEpisodes::new();
+
     if let Some(progress) = input.progress {
         for episode in &progress {
+            if !episode.is_any_set() {
+                continue;
+            }
+
             let find_episode = prj_info.find_episode_mut(episode.number);
             if let Some(db_ep) = find_episode {
+                let mut ep_event = showtimes_events::m::ProjectEpisodeUpdatedEvent::new(
+                    prj_id,
+                    db_ep.number,
+                    episode.silent,
+                );
+
+                let mut before_episode =
+                    showtimes_events::m::ProjectUpdatedEpisodeDataEvent::updated(db_ep.number);
+                let mut after_episode = before_episode.clone();
+
                 let aired_at = episode.aired.clone().map(|a| *a);
+                if let Some(original) = db_ep.aired {
+                    before_episode.set_aired(original.timestamp());
+                }
                 db_ep.set_aired(aired_at);
+                if let Some(after) = db_ep.aired {
+                    after_episode.set_aired(after.timestamp());
+                }
 
                 if let Some(true) = episode.unset_delay {
+                    if let Some(delay) = &db_ep.delay_reason {
+                        before_episode.set_delay_reason(delay);
+                    }
                     db_ep.clear_delay_reason();
                 } else if let Some(delay) = &episode.delay_reason {
+                    if let Some(original) = &db_ep.delay_reason {
+                        before_episode.set_delay_reason(original);
+                    }
                     db_ep.set_delay_reason(delay);
+                    after_episode.set_delay_reason(delay);
                 }
+
+                let mut tiny_changes = TinyEpisodeChanges::default();
+                tiny_changes.silent = episode.silent;
 
                 if let Some(finished) = episode.finished {
                     db_ep.set_finished(finished);
+                    tiny_changes.finished = Some(finished);
+                    ep_event.set_finished(finished);
                 }
 
                 if let Some(statuses) = &episode.statuses {
@@ -1584,9 +1855,26 @@ pub async fn mutate_projects_update(
                         let find_status =
                             db_ep.statuses.iter_mut().find(|s| s.key() == status.role);
                         if let Some(status_info) = find_status {
+                            tiny_changes.before.push(status_info.clone());
+                            ep_event.push_before(&status_info);
                             status_info.set_finished(status.finished);
+                            ep_event.push_after(&status_info);
+                            tiny_changes.after.push(status_info.clone());
                         }
                     }
+                }
+
+                if ep_event.has_changes() {
+                    progress_event.push(ep_event);
+                }
+
+                if tiny_changes.changed() {
+                    changed_episodes.insert(db_ep.number, tiny_changes);
+                }
+
+                if episode.is_any_set_except_status() {
+                    before_project.add_progress(before_episode);
+                    after_project.add_progress(after_episode);
                 }
             }
         }
@@ -1622,17 +1910,69 @@ pub async fn mutate_projects_update(
             Some(prj_info.creator.to_string()),
         );
 
+        before_project.set_poster_image(&prj_info.poster.image);
         prj_info.poster.image = image_meta;
+        after_project.set_poster_image(&prj_info.poster.image);
     }
 
     if let Some(poster_color) = input.poster_color {
         prj_info.poster.color = Some(poster_color);
     }
 
+    let event_ch = ctx
+        .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+        .clone();
+
+    let task_events_prj: tokio::task::JoinHandle<Result<(), ProjectEventsError>> =
+        tokio::task::spawn(async move {
+            event_ch
+                .create_event(
+                    showtimes_events::m::EventKind::ProjectUpdated,
+                    showtimes_events::m::ProjectUpdatedEvent::new(
+                        prj_info.id,
+                        before_project,
+                        after_project,
+                    ),
+                    if user.kind == UserKind::Owner {
+                        None
+                    } else {
+                        Some(user.id.to_string())
+                    },
+                )
+                .await
+                .map_err(|e| e.into())
+        });
+
+    let mut all_events_manager = vec![];
+    all_events_manager.push(task_events_prj);
+
+    if !progress_event.is_empty() {
+        let event_ch = ctx
+            .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+            .clone();
+        let task_events_eps = tokio::task::spawn(async move {
+            event_ch
+                .create_event_many(
+                    showtimes_events::m::EventKind::ProjectEpisodes,
+                    progress_event,
+                    if user.kind == UserKind::Owner {
+                        None
+                    } else {
+                        Some(user.id.to_string())
+                    },
+                )
+                .await
+                .map_err(|e| e.into())
+        });
+
+        all_events_manager.push(task_events_eps);
+    }
+
     // Save the project
-    let prj_gql = make_and_update_project(db, meili, &mut prj_info).await?;
+    let prj_gql =
+        make_and_update_project_events(db, meili, &mut prj_info, &mut all_events_manager).await?;
     // Sync the collaborations
-    sync_projects_collaborations(ctx, &prj_info).await?;
+    sync_projects_collaborations(ctx, &prj_info, &user, changed_episodes).await?;
 
     Ok(prj_gql)
 }
@@ -1688,7 +2028,7 @@ pub async fn mutate_projects_episode_add_auto(
     // Save the project
     let prj_gql = make_and_update_project(db, meili, &mut prj_info).await?;
     // Sync the collaborations
-    sync_projects_collaborations(ctx, &prj_info).await?;
+    sync_projects_collaborations(ctx, &prj_info, &user, ChangedEpisodes::new()).await?;
 
     Ok(prj_gql)
 }
@@ -1743,7 +2083,7 @@ pub async fn mutate_projects_episode_add_manual(
     // Save the project
     let prj_gql = make_and_update_project(db, meili, &mut prj_info).await?;
     // Sync the collaborations
-    sync_projects_collaborations(ctx, &prj_info).await?;
+    sync_projects_collaborations(ctx, &prj_info, &user, ChangedEpisodes::new()).await?;
 
     Ok(prj_gql)
 }
@@ -1781,7 +2121,7 @@ pub async fn mutate_projects_episode_remove(
     // Save the project
     let prj_gql = make_and_update_project(db, meili, &mut prj_info).await?;
     // Sync the collaborations
-    sync_projects_collaborations(ctx, &prj_info).await?;
+    sync_projects_collaborations(ctx, &prj_info, &user, ChangedEpisodes::new()).await?;
 
     Ok(prj_gql)
 }

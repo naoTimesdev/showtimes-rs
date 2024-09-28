@@ -37,15 +37,60 @@ impl From<&showtimes_db::m::Project> for ProjectCreatedEvent {
     }
 }
 
+/// A project updated episode status
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub enum ProjectUpdatedEpisodeStatus {
+    /// New episode added
+    New,
+    /// Episode removed
+    Removed,
+    /// Episode updated
+    #[default]
+    Updated,
+}
+
 /// A tiny information about episode update data event
 ///
 /// Used in conjuction with the [`ProjectEpisodeUpdatedEvent`]
 #[derive(Debug, Clone, Serialize, Deserialize, Default, EventModel)]
 pub struct ProjectUpdatedEpisodeDataEvent {
+    /// Episode number in the project
+    #[event_copy]
+    number: u64,
     /// Unix timestamp of the episode
+    #[event_copy]
     aired: Option<i64>,
     /// Episode delay reason
     delay_reason: Option<String>,
+    /// Episode status
+    #[event_copy]
+    status: ProjectUpdatedEpisodeStatus,
+}
+
+impl ProjectUpdatedEpisodeDataEvent {
+    pub fn added(episode: u64) -> Self {
+        Self {
+            number: episode,
+            status: ProjectUpdatedEpisodeStatus::New,
+            ..Default::default()
+        }
+    }
+
+    pub fn removed(episode: u64) -> Self {
+        Self {
+            number: episode,
+            status: ProjectUpdatedEpisodeStatus::Removed,
+            ..Default::default()
+        }
+    }
+
+    pub fn updated(episode: u64) -> Self {
+        Self {
+            number: episode,
+            status: ProjectUpdatedEpisodeStatus::Updated,
+            ..Default::default()
+        }
+    }
 }
 
 /// A project updated data event
@@ -68,6 +113,25 @@ pub struct ProjectUpdatedDataEvent {
     progress: Option<Vec<ProjectUpdatedEpisodeDataEvent>>,
 }
 
+impl ProjectUpdatedDataEvent {
+    pub fn add_progress(&mut self, progress: ProjectUpdatedEpisodeDataEvent) {
+        match &mut self.progress {
+            Some(p) => p.push(progress),
+            None => self.progress = Some(vec![progress]),
+        }
+    }
+
+    pub fn has_changes(&self) -> bool {
+        self.title.is_some()
+            || self.integrations.is_some()
+            || self.assignees.is_some()
+            || self.roles.is_some()
+            || self.poster_image.is_some()
+            || self.aliases.is_some()
+            || (self.progress.is_some() && self.progress.as_ref().unwrap().len() > 0)
+    }
+}
+
 /// A project updated event
 #[derive(Debug, Clone, Serialize, Deserialize, EventModel)]
 pub struct ProjectUpdatedEvent {
@@ -78,6 +142,16 @@ pub struct ProjectUpdatedEvent {
     after: ProjectUpdatedDataEvent,
 }
 
+impl ProjectUpdatedEvent {
+    pub fn new(
+        id: showtimes_shared::ulid::Ulid,
+        before: ProjectUpdatedDataEvent,
+        after: ProjectUpdatedDataEvent,
+    ) -> Self {
+        Self { id, before, after }
+    }
+}
+
 /// A project episode updated event
 #[derive(Debug, Clone, Serialize, Deserialize, EventModel)]
 pub struct ProjectEpisodeUpdatedEvent {
@@ -86,15 +160,43 @@ pub struct ProjectEpisodeUpdatedEvent {
     #[event_copy]
     id: showtimes_shared::ulid::Ulid,
     #[event_copy]
-    episode: u64,
+    number: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[event_copy]
     finished: Option<bool>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     before: Vec<showtimes_db::m::RoleStatus>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     after: Vec<showtimes_db::m::RoleStatus>,
     /// This is silent update, if true, the event should not be broadcasted
     /// when receiving this event, the client should silently update the data
     #[event_copy]
     silent: bool,
+}
+
+impl ProjectEpisodeUpdatedEvent {
+    pub fn new(id: showtimes_shared::ulid::Ulid, number: u64, silent: bool) -> Self {
+        Self {
+            id,
+            number,
+            finished: None,
+            before: Vec::new(),
+            after: Vec::new(),
+            silent,
+        }
+    }
+
+    pub fn push_before(&mut self, role: &showtimes_db::m::RoleStatus) {
+        self.before.push(role.clone());
+    }
+
+    pub fn push_after(&mut self, role: &showtimes_db::m::RoleStatus) {
+        self.after.push(role.clone());
+    }
+
+    pub fn has_changes(&self) -> bool {
+        self.before().len() > 0 || self.finished().is_some() || self.after().len() > 0
+    }
 }
 
 /// A project deleted event
@@ -120,5 +222,16 @@ impl From<showtimes_db::m::Project> for ProjectDeletedEvent {
 impl From<&showtimes_db::m::Project> for ProjectDeletedEvent {
     fn from(value: &showtimes_db::m::Project) -> Self {
         Self { id: value.id }
+    }
+}
+
+impl From<&showtimes_db::m::EpisodeProgress> for ProjectUpdatedEpisodeDataEvent {
+    fn from(value: &showtimes_db::m::EpisodeProgress) -> Self {
+        Self {
+            number: value.number,
+            aired: value.aired.map(|v| v.timestamp()),
+            delay_reason: value.delay_reason.clone(),
+            status: ProjectUpdatedEpisodeStatus::Updated,
+        }
     }
 }
