@@ -288,11 +288,7 @@ pub async fn mutate_users_authenticate(
 
             let (oauth_user, oauth_token) = showtimes_session::create_session(
                 user.id,
-                config
-                    .jwt
-                    .expiration
-                    .unwrap_or(7 * 24 * 60 * 60)
-                    .try_into()?,
+                config.jwt.get_expiration().try_into()?,
                 &config.jwt.secret,
             )?;
 
@@ -344,11 +340,7 @@ pub async fn mutate_users_authenticate(
 
             let (oauth_user, oauth_token) = showtimes_session::create_session(
                 user.id,
-                config
-                    .jwt
-                    .expiration
-                    .unwrap_or(7 * 24 * 60 * 60)
-                    .try_into()?,
+                config.jwt.get_expiration().try_into()?,
                 &config.jwt.secret,
             )?;
 
