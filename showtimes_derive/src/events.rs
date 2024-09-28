@@ -152,7 +152,9 @@ fn expand_option_field(
         let inner_ty = get_inner_type_of_option(field_ty).unwrap();
         let has_vec = get_inner_type_of_vec(inner_ty).is_some();
 
-        let getter = if has_vec {
+        
+
+        if has_vec {
             quote::quote! {
                 #[doc = #doc_get]
                 pub fn #field_name(&self) -> Option<&[String]> {
@@ -186,9 +188,7 @@ fn expand_option_field(
                     self.#field_name = None;
                 }
             }
-        };
-
-        getter
+        }
     } else {
         // Modify the field type to be a reference
         let main_type = get_inner_type_of_option(field_ty).unwrap();

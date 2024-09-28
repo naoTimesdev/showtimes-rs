@@ -128,7 +128,7 @@ impl ProjectUpdatedDataEvent {
             || self.roles.is_some()
             || self.poster_image.is_some()
             || self.aliases.is_some()
-            || (self.progress.is_some() && self.progress.as_ref().unwrap().len() > 0)
+            || (self.progress.is_some() && !self.progress.as_ref().unwrap().is_empty())
     }
 }
 
@@ -195,7 +195,7 @@ impl ProjectEpisodeUpdatedEvent {
     }
 
     pub fn has_changes(&self) -> bool {
-        self.before().len() > 0 || self.finished().is_some() || self.after().len() > 0
+        !self.before().is_empty() || self.finished().is_some() || !self.after().is_empty()
     }
 }
 
