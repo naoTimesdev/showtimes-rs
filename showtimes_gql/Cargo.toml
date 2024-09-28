@@ -19,7 +19,7 @@ futures.workspace = true
 
 async-graphql.workspace = true
 reqwest.workspace = true
-image = { version = "0.25.2", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
+image.workspace = true
 
 # Showtimes related
 showtimes-shared = { path = "../showtimes_shared" }
