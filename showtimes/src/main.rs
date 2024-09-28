@@ -26,6 +26,9 @@ async fn entrypoint() -> anyhow::Result<()> {
     // get current working directory
     let cwd = std::env::current_dir().unwrap();
 
+    let commit_hash = env!("GIT_COMMIT");
+    let commit_short = &commit_hash[..8];
+
     // load the configuration file
     let config = match Config::async_load(cwd.join("config.toml")).await {
         Ok(config) => config,
@@ -75,7 +78,7 @@ async fn entrypoint() -> anyhow::Result<()> {
         .init();
 
     let version = env!("CARGO_PKG_VERSION");
-    tracing::info!("💭 Starting showtimes v{}", version);
+    tracing::info!("💭 Starting showtimes v{}+g{}", version, commit_short);
 
     // Start loading database, storage, and other services
     tracing::info!("🔌 Loading services...");
@@ -237,7 +240,9 @@ async fn entrypoint() -> anyhow::Result<()> {
 
 async fn index() -> impl IntoResponse {
     // json response saying "success": true and current version
-    axum::Json(json!({ "success": true, "version": env!("CARGO_PKG_VERSION") }))
+    axum::Json(
+        json!({ "success": true, "version": env!("CARGO_PKG_VERSION"), "commit": env!("GIT_COMMIT") }),
+    )
 }
 
 async fn shutdown_signal() {

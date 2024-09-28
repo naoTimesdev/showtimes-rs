@@ -23,6 +23,7 @@ def walk_up_deps(package: str, version: str):
     return package_rows
 
 
+print(f"Found total of {len(cargo_lock['package'])} dependencies in Cargo.lock file.")
 duplicate_deps = {}
 merged_deps = {}
 for package in cargo_lock["package"]:
@@ -42,12 +43,14 @@ if duplicate_deps:
     for name, versions in duplicate_deps.items():
         main_ver = merged_deps[name]
         print(f"  {name}:")
-        package_tree = walk_up_deps(name, main_ver)
-        package_tree_txt = " -> ".join(package_tree)
-        print(f"    - {main_ver} ({package_tree_txt})")
+        # package_tree = walk_up_deps(name, main_ver)
+        # package_tree_txt = " -> ".join(package_tree)
+        # print(f"    - {main_ver} ({package_tree_txt})")
+        print(f"    - {main_ver}")
         for _, version, _ in versions:
-            pkg_else_tree = walk_up_deps(name, version)
-            pkg_else_tree_txt = " -> ".join(pkg_else_tree)
-            print(f"    - {version} ({pkg_else_tree_txt})")
+            # pkg_else_tree = walk_up_deps(name, version)
+            # pkg_else_tree_txt = " -> ".join(pkg_else_tree)
+            # print(f"    - {version} ({pkg_else_tree_txt})")
+            print(f"    - {version}")
 else:
     print("No duplicate dependencies found.")
