@@ -80,6 +80,18 @@ async fn entrypoint() -> anyhow::Result<()> {
     let version = env!("CARGO_PKG_VERSION");
     tracing::info!("💭 Starting showtimes v{}+g{}", version, commit_short);
 
+    // Verify config
+    tracing::info!("🔍 Verifying configuration...");
+    match config.verify() {
+        Ok(_) => {
+            tracing::info!("🔍✅ Configuration verified");
+        }
+        Err(e) => {
+            tracing::error!("🔍⚠️ Configuration verification failed: {}", e);
+            anyhow::bail!("Configuration verification failed");
+        }
+    }
+
     // Start loading database, storage, and other services
     tracing::info!("🔌 Loading services...");
     tracing::info!("🔌🔒 Loading session manager...");

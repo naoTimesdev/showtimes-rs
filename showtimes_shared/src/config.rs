@@ -2,6 +2,10 @@
 
 use serde::Deserialize;
 
+const DEFAULT_SECRET: &str = "super-duper-secret-jwt-key";
+const DEFAULT_MASTER_KEY: &str = "masterkey";
+const EXPIRY_DEFAULT: u64 = 7 * 24 * 60 * 60;
+
 /// JWT session configuration
 #[derive(Debug, Clone, Deserialize)]
 pub struct JwtSession {
@@ -11,7 +15,15 @@ pub struct JwtSession {
     ///
     /// By default, it is set to 7 days.
     /// Set to 0 to disable expiration.
+    #[serde(default)]
     pub expiration: Option<u64>,
+}
+
+impl JwtSession {
+    /// Get the expiration time for a JWT session, or return the default value
+    pub fn get_expiration(&self) -> u64 {
+        self.expiration.unwrap_or(EXPIRY_DEFAULT)
+    }
 }
 
 /// Database connection configuration
@@ -47,15 +59,21 @@ pub struct DiscordOAuth2 {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ExternalServices {
     /// The TMDb API key
+    #[serde(default)]
     pub tmdb: Option<String>,
     /// The VNDB API key
+    #[serde(default)]
     pub vndb: Option<String>,
 }
 
 /// Storage configuration
 #[derive(Debug, Clone, Deserialize)]
 pub struct Storages {
+    /// Local storage configuration
+    #[serde(default)]
     pub local: Option<StorageLocal>,
+    /// S3 storage configuration
+    #[serde(default)]
     pub s3: Option<StorageS3>,
 }
 
@@ -109,6 +127,7 @@ pub struct ClickHouseEvent {
     /// The username of the ClickHouse server
     pub username: String,
     /// The password of the ClickHouse server
+    #[serde(default)]
     pub password: Option<String>,
 }
 
@@ -118,15 +137,17 @@ pub struct Config {
     /// The host to bind the server
     ///
     /// Default to `None` which will bind to `localhost`
+    #[serde(default)]
     pub host: Option<String>,
     /// The port to bind the server
     ///
     /// Default to `5560`
+    #[serde(default)]
     pub port: Option<u16>,
     /// The master key for the server
     pub master_key: String,
     /// The log directory for the server
-    #[serde(rename = "log-directory")]
+    #[serde(rename = "log-directory", default)]
     pub log_directory: Option<String>,
     /// The database connection configuration
     pub database: Database,
@@ -157,7 +178,7 @@ impl Config {
         }
 
         if self.jwt.expiration.is_none() {
-            self.jwt.expiration = Some(7 * 24 * 60 * 60);
+            self.jwt.expiration = Some(EXPIRY_DEFAULT);
         }
 
         if let Some(log_dir) = &self.log_directory {
@@ -196,9 +217,80 @@ impl Config {
         Ok(config)
     }
 
-    pub fn verify(&self) -> anyhow::Result<()> {
+    pub fn verify(&self) -> Result<(), &'static str> {
+        // Verify master key
+        if self.master_key.is_empty() {
+            return Err("Master key is not set");
+        }
+        if self.master_key == DEFAULT_MASTER_KEY {
+            return Err("Master key is not changed from default, please change it");
+        }
+
+        // Verify JWT
+        if self.jwt.secret.is_empty() {
+            return Err("JWT secret is not set");
+        }
+        if self.jwt.secret == DEFAULT_SECRET {
+            return Err("JWT secret is not changed from default, please change it");
+        }
+
+        // --> Database will be verified when loading the connection
+        // --> Meilisearch will be verified when loading the connection
+        // --> ClickHouse will be verified when loading the connection
+
+        // Verify Discord OAuth2
+        if self.discord.client_id.is_empty() {
+            return Err("Discord OAuth2 client ID is not set");
+        }
+        if self.discord.client_secret.is_empty() {
+            return Err("Discord OAuth2 client secret is not set");
+        }
+        if self.discord.redirect_url.is_empty() {
+            return Err("Discord OAuth2 redirect URL is not set");
+        }
+
+        if self.discord.client_id == "00000000000000000000" {
+            return Err("Discord OAuth2 client ID is not changed from default, please change it");
+        }
+        if self.discord.client_secret == "supersecretdiscordclientsecret" {
+            return Err(
+                "Discord OAuth2 client secret is not changed from default, please change it",
+            );
+        }
+        if self.discord.redirect_url.contains("your.naotimes.ui") {
+            return Err(
+                "Discord OAuth2 redirect URL is not changed from default, please change it",
+            );
+        }
+
+        // Verify external services
+        if let Some(tmdb) = &self.external.tmdb {
+            if tmdb.is_empty() {
+                return Err("TMDb API key is empty, please set to null if not used");
+            }
+
+            if tmdb == "your-valid-access-token-for-tmdb" {
+                return Err(
+                    "TMDb API key is not changed from default, please change it or set to null",
+                );
+            }
+        }
+
+        if let Some(vndb) = &self.external.vndb {
+            if vndb.is_empty() {
+                return Err("VNDB API key is empty, please set to null if not used");
+            }
+
+            if vndb == "your-valid-access-token-for-vndb" {
+                return Err(
+                    "VNDB API key is not changed from default, please change it or set to null",
+                );
+            }
+        }
+
+        // Verify storage
         if !self.storages.is_available() {
-            return Err(anyhow::anyhow!("No storage is configured"));
+            return Err("No storage is configured");
         }
 
         Ok(())
