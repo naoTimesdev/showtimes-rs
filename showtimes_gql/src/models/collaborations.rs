@@ -107,15 +107,9 @@ impl CollaborationSyncGQL {
             .project_ids
             .clone()
             .into_iter()
-            .filter_map(|id| match &self.requester {
-                Some(requester) => {
-                    if id != requester.project_id {
-                        Some(id)
-                    } else {
-                        None
-                    }
-                }
-                None => Some(id),
+            .filter(|id| match &self.requester {
+                Some(requester) => id != &requester.project_id,
+                None => true,
             })
             .collect();
 

@@ -583,9 +583,7 @@ impl MutationRoot {
 
                 Ok(UserSessionGQL::new(user, token))
             }
-            None => {
-                return Err("User not found".into());
-            }
+            None => Err("User not found".into()),
         }
     }
 }
