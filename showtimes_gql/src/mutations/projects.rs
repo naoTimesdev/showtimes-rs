@@ -1346,7 +1346,7 @@ async fn sync_projects_collaborations(
             let mut after_project = showtimes_events::m::ProjectUpdatedDataEvent::default();
 
             let mut roles_updated = false;
-            if !o_project.compare_roles(&project) {
+            if !o_project.compare_roles(project) {
                 // When roles update, assignees are also updated
                 before_project.set_roles(&o_project.roles);
                 before_project.set_assignees(&o_project.assignees);
@@ -1354,7 +1354,7 @@ async fn sync_projects_collaborations(
             }
 
             let mut asignees_updated = false;
-            if !roles_updated && !o_project.compare_assignees(&project) {
+            if !roles_updated && !o_project.compare_assignees(project) {
                 before_project.set_assignees(&o_project.assignees);
                 asignees_updated = true;
             }
@@ -1841,8 +1841,10 @@ pub async fn mutate_projects_update(
                     after_episode.set_delay_reason(delay);
                 }
 
-                let mut tiny_changes = TinyEpisodeChanges::default();
-                tiny_changes.silent = episode.silent;
+                let mut tiny_changes = TinyEpisodeChanges {
+                    silent: episode.silent,
+                    ..Default::default()
+                };
 
                 if let Some(finished) = episode.finished {
                     db_ep.set_finished(finished);
@@ -1856,9 +1858,9 @@ pub async fn mutate_projects_update(
                             db_ep.statuses.iter_mut().find(|s| s.key() == status.role);
                         if let Some(status_info) = find_status {
                             tiny_changes.before.push(status_info.clone());
-                            ep_event.push_before(&status_info);
+                            ep_event.push_before(status_info);
                             status_info.set_finished(status.finished);
-                            ep_event.push_after(&status_info);
+                            ep_event.push_after(status_info);
                             tiny_changes.after.push(status_info.clone());
                         }
                     }

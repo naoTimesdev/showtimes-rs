@@ -119,7 +119,7 @@ pub struct ServerDeletedEventDataGQL {
 impl From<showtimes_events::m::ServerCreatedEvent> for ServerCreatedEventDataGQL {
     fn from(value: showtimes_events::m::ServerCreatedEvent) -> Self {
         Self {
-            id: value.id().into(),
+            id: value.id(),
         }
     }
 }
@@ -127,7 +127,7 @@ impl From<showtimes_events::m::ServerCreatedEvent> for ServerCreatedEventDataGQL
 impl From<&showtimes_events::m::ServerCreatedEvent> for ServerCreatedEventDataGQL {
     fn from(value: &showtimes_events::m::ServerCreatedEvent) -> Self {
         Self {
-            id: value.id().into(),
+            id: value.id(),
         }
     }
 }
