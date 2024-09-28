@@ -15,8 +15,7 @@ use tokio::{io::AsyncSeekExt, sync::Mutex};
 
 use crate::{
     data_loader::{
-        ProjectDataLoader, ProjectDataLoaderKey, ServerDataLoader, ServerSyncIds, ServerSyncLoader,
-        UserDataLoader,
+        ProjectDataLoader, ServerDataLoader, ServerSyncIds, ServerSyncLoader, UserDataLoader,
     },
     models::{
         prelude::{DateTimeGQL, OkResponse, UlidGQL},
@@ -1065,7 +1064,7 @@ pub async fn mutate_projects_delete(
     let storages = ctx.data_unchecked::<Arc<FsPool>>();
     let meili = ctx.data_unchecked::<SearchClientShared>();
 
-    let prj_info = prj_loader.load_one(ProjectDataLoaderKey::Id(*id)).await?;
+    let prj_info = prj_loader.load_one(*id).await?;
 
     if prj_info.is_none() {
         return Err(Error::new("Project not found").extend_with(|_, e| {
@@ -1549,7 +1548,7 @@ pub async fn mutate_projects_update(
     let meili = ctx.data_unchecked::<SearchClientShared>();
 
     // Fetch project
-    let prj_info = prj_loader.load_one(ProjectDataLoaderKey::Id(*id)).await?;
+    let prj_info = prj_loader.load_one(*id).await?;
 
     if prj_info.is_none() {
         return Err(Error::new("Project not found").extend_with(|_, e| {
@@ -1990,7 +1989,7 @@ pub async fn mutate_projects_episode_add_auto(
     let meili = ctx.data_unchecked::<SearchClientShared>();
 
     // Fetch project
-    let prj_info = prj_loader.load_one(ProjectDataLoaderKey::Id(*id)).await?;
+    let prj_info = prj_loader.load_one(*id).await?;
 
     if prj_info.is_none() {
         return Err(Error::new("Project not found").extend_with(|_, e| {
@@ -2046,7 +2045,7 @@ pub async fn mutate_projects_episode_add_manual(
     let meili = ctx.data_unchecked::<SearchClientShared>();
 
     // Fetch project
-    let prj_info = prj_loader.load_one(ProjectDataLoaderKey::Id(*id)).await?;
+    let prj_info = prj_loader.load_one(*id).await?;
 
     if prj_info.is_none() {
         return Err(Error::new("Project not found").extend_with(|_, e| {
@@ -2101,7 +2100,7 @@ pub async fn mutate_projects_episode_remove(
     let meili = ctx.data_unchecked::<SearchClientShared>();
 
     // Fetch project
-    let prj_info = prj_loader.load_one(ProjectDataLoaderKey::Id(*id)).await?;
+    let prj_info = prj_loader.load_one(*id).await?;
 
     if prj_info.is_none() {
         return Err(Error::new("Project not found").extend_with(|_, e| {

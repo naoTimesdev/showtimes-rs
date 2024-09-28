@@ -1,7 +1,7 @@
 use async_graphql::{dataloader::DataLoader, Error, ErrorExtensions, Object};
 use showtimes_shared::ulid::Ulid;
 
-use crate::data_loader::{ProjectDataLoader, ProjectDataLoaderKey, ServerDataLoader};
+use crate::data_loader::{ProjectDataLoader, ServerDataLoader};
 
 use super::{prelude::*, projects::ProjectGQL, servers::ServerGQL};
 
@@ -103,19 +103,19 @@ impl CollaborationSyncGQL {
     ) -> async_graphql::Result<Vec<ProjectGQL>> {
         let loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
 
-        let unmapped_project_ids: Vec<ProjectDataLoaderKey> = self
+        let unmapped_project_ids: Vec<showtimes_shared::ulid::Ulid> = self
             .project_ids
             .clone()
             .into_iter()
             .filter_map(|id| match &self.requester {
                 Some(requester) => {
                     if id != requester.project_id {
-                        Some(ProjectDataLoaderKey::Id(id))
+                        Some(id)
                     } else {
                         None
                     }
                 }
-                None => Some(ProjectDataLoaderKey::Id(id)),
+                None => Some(id),
             })
             .collect();
 
@@ -178,10 +178,7 @@ impl CollaborationInviteSourceGQL {
     async fn project(&self, ctx: &async_graphql::Context<'_>) -> async_graphql::Result<ProjectGQL> {
         let loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
 
-        match loader
-            .load_one(ProjectDataLoaderKey::Id(self.project_id))
-            .await?
-        {
+        match loader.load_one(self.project_id).await? {
             Some(prj) => {
                 let prj_gql: ProjectGQL = prj.into();
                 Ok(prj_gql

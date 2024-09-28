@@ -112,15 +112,6 @@ impl Loader<showtimes_shared::APIKey> for UserDataLoader {
     }
 }
 
-/// A data loader key to load project model
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub enum ProjectDataLoaderKey {
-    /// Load by ULID
-    Id(Ulid),
-    /// Load by server ID
-    Server(Ulid),
-}
-
 /// A data loader for the project model
 pub struct ProjectDataLoader {
     col: showtimes_db::ProjectHandler,
@@ -131,82 +122,6 @@ impl ProjectDataLoader {
     pub fn new(col: &DatabaseShared) -> Self {
         let col = showtimes_db::ProjectHandler::new(col);
         ProjectDataLoader { col }
-    }
-}
-
-impl Loader<ProjectDataLoaderKey> for ProjectDataLoader {
-    type Value = showtimes_db::m::Project;
-    type Error = FieldError;
-
-    async fn load(
-        &self,
-        keys: &[ProjectDataLoaderKey],
-    ) -> Result<HashMap<ProjectDataLoaderKey, Self::Value>, Self::Error> {
-        let fetch_by_ids: Vec<String> = keys
-            .iter()
-            .filter_map(|k| match k {
-                ProjectDataLoaderKey::Id(id) => Some(id.to_string()),
-                _ => None,
-            })
-            .collect();
-        let fetch_by_servers: Vec<String> = keys
-            .iter()
-            .filter_map(|k| match k {
-                ProjectDataLoaderKey::Server(id) => Some(id.to_string()),
-                _ => None,
-            })
-            .collect();
-
-        // tokio task
-        let col_ids = self.col.get_collection();
-        let col_creator = self.col.get_collection();
-        let doc_fetch_ids = doc! {
-            "id": { "$in": fetch_by_ids.clone() }
-        };
-        let mut tasks = vec![];
-        tasks.push(tokio::spawn(async move {
-            match col_ids
-                .find(doc_fetch_ids)
-                .limit(fetch_by_ids.len() as i64)
-                .await
-            {
-                Ok(cursor) => cursor.try_collect::<Vec<showtimes_db::m::Project>>().await,
-                Err(e) => Err(e),
-            }
-        }));
-        let doc_fetch_creator = doc! {
-            "creator": { "$in": fetch_by_servers.clone() }
-        };
-        tasks.push(tokio::spawn(async move {
-            match col_creator
-                .find(doc_fetch_creator)
-                .limit(fetch_by_servers.len() as i64)
-                .await
-            {
-                Ok(cursor) => cursor.try_collect::<Vec<showtimes_db::m::Project>>().await,
-                Err(e) => Err(e),
-            }
-        }));
-
-        let tasks_fut = futures::future::join_all(tasks).await;
-        // Guaranteed to have 2 tasks
-        let ids_task = tasks_fut.first().unwrap().as_ref()?.as_ref()?;
-        let creator_task = tasks_fut.last().unwrap().as_ref()?.as_ref()?;
-
-        let mapped_ids = ids_task
-            .iter()
-            .map(|u| (ProjectDataLoaderKey::Id(u.id), u.clone()))
-            .collect::<HashMap<_, _>>();
-        let mapped_creator = creator_task
-            .iter()
-            .map(|u| (ProjectDataLoaderKey::Server(u.creator), u.clone()))
-            .collect::<HashMap<_, _>>();
-
-        let mut mapped_res = HashMap::new();
-        mapped_res.extend(mapped_ids);
-        mapped_res.extend(mapped_creator);
-
-        Ok(mapped_res)
     }
 }
 
