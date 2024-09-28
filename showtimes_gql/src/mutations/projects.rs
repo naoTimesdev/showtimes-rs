@@ -655,12 +655,48 @@ async fn make_and_update_project(
     Ok(prj_gql)
 }
 
+enum ProjectEventsError {
+    SearchError(showtimes_search::MeiliError),
+    EventsError(showtimes_events::ClickHouseError),
+}
+
+impl From<showtimes_search::MeiliError> for ProjectEventsError {
+    fn from(e: showtimes_search::MeiliError) -> Self {
+        ProjectEventsError::SearchError(e)
+    }
+}
+
+impl From<showtimes_events::ClickHouseError> for ProjectEventsError {
+    fn from(e: showtimes_events::ClickHouseError) -> Self {
+        ProjectEventsError::EventsError(e)
+    }
+}
+
+impl std::fmt::Debug for ProjectEventsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProjectEventsError::SearchError(e) => write!(f, "{:?}", e),
+            ProjectEventsError::EventsError(e) => write!(f, "{:?}", e),
+        }
+    }
+}
+
+impl std::fmt::Display for ProjectEventsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProjectEventsError::SearchError(e) => write!(f, "{}", e),
+            ProjectEventsError::EventsError(e) => write!(f, "{}", e),
+        }
+    }
+}
+
 // TODO: Merge with `make_and_update_project`
 async fn make_and_update_project_events(
     db: &showtimes_db::DatabaseShared,
     meili: &showtimes_search::SearchClientShared,
     project: &mut showtimes_db::m::Project,
-    task_events: tokio::task::JoinHandle<Result<(), showtimes_events::ClickHouseError>>,
+    // JoinHandle return Result<(), dyn Error>
+    task_events: &mut Vec<tokio::task::JoinHandle<Result<(), ProjectEventsError>>>,
 ) -> async_graphql::Result<ProjectGQL> {
     // Save the project
     let prj_handler = ProjectHandler::new(db);
@@ -671,10 +707,18 @@ async fn make_and_update_project_events(
     let meili_clone = meili.clone();
     let task_search = tokio::task::spawn(async move {
         let prj_search = showtimes_search::models::Project::from(prj_clone);
-        prj_search.update_document(&meili_clone).await
+        prj_search
+            .update_document(&meili_clone)
+            .await
+            .map_err(|e| e.into())
     });
+    task_events.push(task_search);
 
-    execute_search_events(task_search, task_events).await?;
+    let awaiter = futures::future::join_all(task_events).await;
+
+    for await_res in awaiter {
+        await_res??;
+    }
 
     let prj_gql: ProjectGQL = project.clone().into();
 
@@ -927,20 +971,28 @@ pub async fn mutate_projects_create(
         showtimes_db::m::Poster::new_with_color(poster_url, input.poster_color.unwrap_or(16614485));
 
     // Create event commit tasks
-    let task_events = ctx
+    let event_ch = ctx
         .data_unchecked::<showtimes_events::SharedSHClickHouse>()
-        .create_event_async(
-            showtimes_events::m::EventKind::ProjectCreated,
-            showtimes_events::m::ProjectCreatedEvent::from(&project),
-            if user.kind == UserKind::Owner {
-                None
-            } else {
-                Some(user.id.to_string())
-            },
-        );
+        .clone();
+    let prj_clone = project.clone();
+    let task_events = tokio::task::spawn(async move {
+        event_ch
+            .create_event(
+                showtimes_events::m::EventKind::ProjectCreated,
+                showtimes_events::m::ProjectCreatedEvent::from(&prj_clone),
+                if user.kind == UserKind::Owner {
+                    None
+                } else {
+                    Some(user.id.to_string())
+                },
+            )
+            .await
+            .map_err(|e| e.into())
+    });
 
     // Save the project
-    make_and_update_project_events(db, meili, &mut project, task_events).await
+    let mut events = vec![task_events];
+    make_and_update_project_events(db, meili, &mut project, &mut events).await
 }
 
 async fn download_cover(url: &str) -> anyhow::Result<Vec<u8>> {
@@ -1315,23 +1367,34 @@ pub async fn mutate_projects_update(
     // Check perms
     check_permissions(ctx, prj_info.creator, &user, Some(prj_info.id)).await?;
 
+    let mut before_project = showtimes_events::m::ProjectUpdatedDataEvent::default();
+    let mut after_project = showtimes_events::m::ProjectUpdatedDataEvent::default();
     // Update title and aliases
     if let Some(title) = input.title {
+        before_project.set_title(&prj_info.title);
         prj_info.title = title;
+        after_project.set_title(&prj_info.title);
     }
 
     if let Some(aliases) = input.aliases {
+        before_project.set_aliases(&prj_info.aliases);
         prj_info.aliases = aliases;
+        after_project.set_aliases(&prj_info.aliases);
     }
 
     // Update roles
     if let Some(roles_update) = input.roles {
+        before_project.set_roles(&prj_info.roles);
+
+        let mut any_role_changes = false;
+
         for role in &roles_update {
             match role.action {
                 ProjectRoleUpdateAction::Update => {
                     let find_role = prj_info.roles.iter_mut().find(|r| r.key() == role.role.key);
                     if let Some(role_info) = find_role {
                         role_info.set_name(role.role.name.clone());
+                        any_role_changes = true;
                     }
                 }
                 ProjectRoleUpdateAction::Add => {
@@ -1341,16 +1404,29 @@ pub async fn mutate_projects_update(
                     ordered_roles.sort_by_key(|a| a.order());
                     let last_order = ordered_roles.last().map(|r| r.order()).unwrap_or(0);
                     prj_info.roles.push(new_role.with_order(last_order + 1));
+                    any_role_changes = true;
                 }
                 ProjectRoleUpdateAction::Remove => {
+                    let role_count = prj_info.roles.len();
                     prj_info.roles.retain(|r| r.key() != role.role.key);
+                    any_role_changes = role_count != prj_info.roles.len();
                 }
             }
+        }
+
+        if any_role_changes {
+            prj_info.propagate_roles();
+            after_project.set_roles(&prj_info.roles);
+        } else {
+            before_project.clear_roles();
         }
     }
 
     // Update assignees
     if let Some(assignees_update) = input.assignees {
+        before_project.set_assignees(&prj_info.assignees);
+        let mut any_assignee_changes = false;
+
         for assignee in &assignees_update {
             // Depending on the ID, remove or add
             let find_role = prj_info
@@ -1377,11 +1453,18 @@ pub async fn mutate_projects_update(
                         role_info.set_actor(None);
                     }
                 }
+                any_assignee_changes = true;
             }
         }
 
         // Propagate the changes to assignees and roles
         prj_info.propagate_roles();
+
+        if any_assignee_changes {
+            after_project.set_assignees(&prj_info.assignees);
+        } else {
+            before_project.clear_assignees();
+        }
     }
 
     if input.sync_metadata {

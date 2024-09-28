@@ -147,9 +147,14 @@ impl SHClickHouse {
     where
         T: serde::Serialize + Send + Sync + Clone + Debug + 'static,
     {
-        let events = push_event(&self.client, kind, &data, actor).await?;
+        let all_events: Vec<models::SHEvent<T>> = data
+            .iter()
+            .map(|d| make_event(kind, d, actor.clone()))
+            .collect::<Vec<_>>();
 
-        for ev in events {
+        push_event(&self.client, kind, &all_events).await?;
+
+        for ev in all_events {
             // Publish one by one
             MemoryBroker::publish(ev);
         }
@@ -170,9 +175,14 @@ impl SHClickHouse {
     {
         let client = self.client.clone();
         tokio::task::spawn(async move {
-            let events = push_event(&client, kind, &data, actor).await?;
+            let all_events: Vec<models::SHEvent<T>> = data
+                .iter()
+                .map(|d| make_event(kind, d, actor.clone()))
+                .collect::<Vec<_>>();
 
-            for ev in events {
+            push_event(&client, kind, &all_events).await?;
+
+            for ev in all_events {
                 // Publish one by one
                 MemoryBroker::publish(ev);
             }
@@ -215,9 +225,8 @@ where
 async fn push_event<T>(
     client: &Client,
     kind: m::EventKind,
-    data: &[T],
-    actor: Option<String>,
-) -> Result<Vec<crate::m::SHEvent<T>>, clickhouse::error::Error>
+    data: &[crate::m::SHEvent<T>],
+) -> Result<(), clickhouse::error::Error>
 where
     T: serde::Serialize + Send + Sync + Clone + Debug + 'static,
 {
@@ -228,11 +237,9 @@ where
         DATABASE_NAME
     );
     let mut insert = client.insert(TABLE_NAME)?;
-    let mut combined_events = vec![];
     for d in data {
-        let event = make_event(kind, d, actor.clone());
-        insert.write(&event).await?;
-        combined_events.push(event);
+        // let event = make_event(kind, d, actor.clone());
+        insert.write(d).await?;
     }
     tracing::debug!(
         "Inserting event \"{:?}\" to ClickHouse with {} event(s) (table = {}, db = {})",
@@ -243,5 +250,5 @@ where
     );
     insert.end().await?;
 
-    Ok(combined_events)
+    Ok(())
 }

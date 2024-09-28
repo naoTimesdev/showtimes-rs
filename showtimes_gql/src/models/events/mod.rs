@@ -5,6 +5,7 @@ use users::{UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDa
 
 use crate::{expand_query_event, expand_query_event_with_user};
 
+pub mod collaborations;
 pub mod prelude;
 pub mod servers;
 pub mod users;

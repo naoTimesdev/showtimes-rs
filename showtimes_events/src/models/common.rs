@@ -75,7 +75,7 @@ impl<T> SHEvent<T>
 where
     T: serde::Serialize + Send + Sync + Clone + 'static,
 {
-    pub(crate) fn new(kind: EventKind, data: T) -> Self {
+    pub fn new(kind: EventKind, data: T) -> Self {
         Self {
             id: showtimes_shared::ulid_serializer::default(),
             kind,
