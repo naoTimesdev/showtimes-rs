@@ -771,8 +771,8 @@ impl Project {
 
     /// Create a new episode/chapter progress with specific episode/chapter number.
     pub fn add_episode_with_number(&mut self, number: u64) {
-        self.progress
-            .push(EpisodeProgress::new_with_roles(number, false, &self.roles));
+        let episode = EpisodeProgress::new_with_roles(number, false, &self.roles);
+        self.progress.push(episode);
     }
 
     /// Create a new episode/chapter progress with specific episode/chapter number and airing date.
