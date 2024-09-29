@@ -990,7 +990,6 @@ pub async fn mutate_projects_create(
                 },
             )
             .await
-            .map_err(|e| e.into())
     });
 
     // Save the project
@@ -1633,13 +1632,7 @@ pub async fn mutate_projects_update(
     if let Some(assignees_update) = &input.assignees {
         let user_ids_keys = assignees_update
             .iter()
-            .filter_map(|a| {
-                if let Some(id) = &a.id {
-                    Some(**id)
-                } else {
-                    None
-                }
-            })
+            .filter_map(|a| a.id.as_ref().map(|id| **id))
             .collect::<Vec<showtimes_shared::ulid::Ulid>>();
         loaded_users = usr_loader.load_many(user_ids_keys).await?;
     }
@@ -1980,9 +1973,8 @@ pub async fn mutate_projects_episode_add_manual(
         for episode in episodes {
             let exist_mut = project.find_episode_mut(episode.number);
             if let Some(repl_mut) = exist_mut {
-                let mut aired_before = showtimes_events::m::ProjectUpdatedEpisodeDataEvent::updated(
-                    repl_mut.number as u64,
-                );
+                let mut aired_before =
+                    showtimes_events::m::ProjectUpdatedEpisodeDataEvent::updated(repl_mut.number);
                 let mut aired_after = aired_before.clone();
                 if let Some(aired_at) = repl_mut.aired {
                     aired_before.set_aired(aired_at.timestamp());
@@ -2001,7 +1993,7 @@ pub async fn mutate_projects_episode_add_manual(
                         project.add_episode_with_number_and_airing(episode.number, **aired);
                         let mut ep_events =
                             showtimes_events::m::ProjectUpdatedEpisodeDataEvent::added(
-                                episode.number as u64,
+                                episode.number,
                             );
                         ep_events.set_aired(aired.timestamp());
                         after_project.add_progress(ep_events);
@@ -2010,7 +2002,7 @@ pub async fn mutate_projects_episode_add_manual(
                         project.add_episode_with_number(episode.number);
                         after_project.add_progress(
                             showtimes_events::m::ProjectUpdatedEpisodeDataEvent::added(
-                                episode.number as u64,
+                                episode.number,
                             ),
                         );
                     }
