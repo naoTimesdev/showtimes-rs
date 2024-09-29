@@ -71,6 +71,21 @@ impl From<&showtimes_db::m::Project> for Project {
     }
 }
 
+impl From<&mut showtimes_db::m::Project> for Project {
+    fn from(value: &mut showtimes_db::m::Project) -> Self {
+        let poster_url = value.poster.image.as_url();
+        Self {
+            id: value.id,
+            title: value.title.clone(),
+            poster_url: Some(poster_url),
+            integrations: value.integrations.clone(),
+            aliases: value.aliases.clone(),
+            parent: value.creator,
+            created: value.created,
+            updated: value.updated,
+        }
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-servers",
