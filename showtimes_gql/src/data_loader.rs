@@ -381,6 +381,33 @@ impl ServerSyncIds {
     }
 }
 
+impl Loader<Ulid> for ServerSyncLoader {
+    type Value = showtimes_db::m::ServerCollaborationSync;
+    type Error = FieldError;
+
+    async fn load(&self, keys: &[Ulid]) -> Result<HashMap<Ulid, Self::Value>, Self::Error> {
+        let keys_to_string = keys.iter().map(|k| k.to_string()).collect::<Vec<_>>();
+
+        let result = self
+            .col
+            .get_collection()
+            .find(doc! {
+                "id": { "$in": keys_to_string }
+            })
+            .limit(keys.len() as i64)
+            .await?;
+
+        let all_results = result
+            .try_collect::<Vec<showtimes_db::m::ServerCollaborationSync>>()
+            .await?;
+
+        let mapped_res: HashMap<Ulid, showtimes_db::m::ServerCollaborationSync> =
+            all_results.iter().map(|u| (u.id, u.clone())).collect();
+
+        Ok(mapped_res)
+    }
+}
+
 impl Loader<ServerSyncServerId> for ServerSyncLoader {
     type Value = Vec<showtimes_db::m::ServerCollaborationSync>;
     type Error = FieldError;

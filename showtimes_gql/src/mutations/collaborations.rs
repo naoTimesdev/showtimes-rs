@@ -7,7 +7,7 @@ use showtimes_db::{
 use showtimes_search::SearchClientShared;
 
 use crate::{
-    data_loader::{ProjectDataLoader, ServerDataLoader},
+    data_loader::{ProjectDataLoader, ServerDataLoader, ServerSyncLoader},
     models::{
         collaborations::{CollaborationInviteGQL, CollaborationSyncGQL},
         prelude::{OkResponse, UlidGQL},
@@ -376,4 +376,101 @@ pub async fn mutate_collaborations_cancel(
     } else {
         Ok(OkResponse::ok("Invite retracted"))
     }
+}
+
+pub async fn mutate_collaborations_unlink(
+    ctx: &async_graphql::Context<'_>,
+    user: showtimes_db::m::User,
+    sync_id: UlidGQL,
+    initiator: UlidGQL,
+) -> async_graphql::Result<OkResponse> {
+    let loader = ctx.data_unchecked::<DataLoader<ServerSyncLoader>>();
+    let db = ctx.data_unchecked::<DatabaseShared>();
+
+    let sync_handler = showtimes_db::CollaborationSyncHandler::new(db);
+    let sync = loader.load_one(*sync_id).await?;
+
+    if sync.is_none() {
+        return Err(
+            Error::new("Collaboration sync not found").extend_with(|_, e| {
+                e.set("id", sync_id.to_string());
+                e.set("reason", "invalid_sync");
+            }),
+        );
+    }
+
+    let mut sync = sync.unwrap();
+
+    // Initiator is the project ID, find the project
+    let project_sync = sync.get_and_remove(*initiator);
+
+    if project_sync.is_none() {
+        return Err(
+            Error::new("Project not found in collaboration data").extend_with(|_, e| {
+                e.set("id", initiator.to_string());
+                e.set("reason", "invalid_project");
+            }),
+        );
+    }
+
+    let project_sync = project_sync.unwrap();
+
+    // Check permissions
+    check_permissions(ctx, &user, project_sync.server).await?;
+
+    // Check if we need to delete the sync
+    if sync.length() < 2 {
+        // Delete the sync
+        sync_handler.delete(&sync).await?;
+
+        // Remove from search index
+        let sync_clone = sync.clone();
+        let meili_clone = ctx.data_unchecked::<SearchClientShared>().clone();
+        let task_search = tokio::task::spawn(async move {
+            let sync_search = showtimes_search::models::ServerCollabSync::from(sync_clone);
+            sync_search.delete_document(&meili_clone).await
+        });
+
+        // Save in event
+        let task_events = ctx
+            .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+            .create_event_async(
+                showtimes_events::m::EventKind::CollaborationDeleted,
+                showtimes_events::m::CollabDeletedEvent::new(sync.id, &project_sync, true),
+                if user.kind == UserKind::Owner {
+                    None
+                } else {
+                    Some(user.id.to_string())
+                },
+            );
+
+        execute_search_events(task_search, task_events).await?;
+    } else {
+        sync_handler.save(&mut sync, None).await?;
+
+        // Save in search index
+        let sync_clone = sync.clone();
+        let meili_clone = ctx.data_unchecked::<SearchClientShared>().clone();
+        let task_search = tokio::task::spawn(async move {
+            let sync_search = showtimes_search::models::ServerCollabSync::from(sync_clone);
+            sync_search.update_document(&meili_clone).await
+        });
+
+        // Save in event
+        let task_events = ctx
+            .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+            .create_event_async(
+                showtimes_events::m::EventKind::CollaborationDeleted,
+                showtimes_events::m::CollabDeletedEvent::new(sync.id, &project_sync, false),
+                if user.kind == UserKind::Owner {
+                    None
+                } else {
+                    Some(user.id.to_string())
+                },
+            );
+
+        execute_search_events(task_search, task_events).await?;
+    }
+
+    Ok(OkResponse::ok("Collaboration deleted or unlinked"))
 }

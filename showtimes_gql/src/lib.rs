@@ -522,6 +522,23 @@ impl MutationRoot {
         mutations::collaborations::mutate_collaborations_cancel(ctx, user, id, false).await
     }
 
+    /// Delete or unlink a collaboration between projects
+    #[graphql(
+        name = "collaborateDelete",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::User)"
+    )]
+    async fn collaborate_delete(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The collaboration ID target")] id: crate::models::prelude::UlidGQL,
+        #[graphql(desc = "The target project to delete or remove")]
+        target: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<OkResponse> {
+        let user = find_authenticated_user(ctx).await?;
+
+        mutations::collaborations::mutate_collaborations_unlink(ctx, user, id, target).await
+    }
+
     /// Delete a project from Showtimes
     #[graphql(
         name = "deleteProject",
