@@ -293,7 +293,7 @@ impl From<showtimes_events::m::ProjectUpdatedEpisodeDataEvent>
     fn from(value: showtimes_events::m::ProjectUpdatedEpisodeDataEvent) -> Self {
         Self {
             number: value.number(),
-            aired: value.aired().clone(),
+            aired: value.aired(),
             delay_reason: value.delay_reason().map(|v| v.to_string()),
             status: value.status().into(),
         }
@@ -306,7 +306,7 @@ impl From<&showtimes_events::m::ProjectUpdatedEpisodeDataEvent>
     fn from(value: &showtimes_events::m::ProjectUpdatedEpisodeDataEvent) -> Self {
         Self {
             number: value.number(),
-            aired: value.aired().clone(),
+            aired: value.aired(),
             delay_reason: value.delay_reason().map(|v| v.to_string()),
             status: value.status().into(),
         }
