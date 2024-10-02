@@ -1,11 +1,16 @@
 use async_graphql::Object;
 use prelude::EventGQL;
+use projects::{
+    ProjectCreatedEventDataGQL, ProjectDeletedEventDataGQL, ProjectEpisodeUpdatedEventDataGQL,
+    ProjectUpdatedEventDataGQL,
+};
 use servers::{ServerCreatedEventDataGQL, ServerDeletedEventDataGQL, ServerUpdatedEventDataGQL};
 use users::{UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDataGQL};
 
 use crate::{expand_query_event, expand_query_event_with_user};
 
 pub mod prelude;
+pub mod projects;
 pub mod servers;
 pub mod users;
 
@@ -108,6 +113,70 @@ impl QueryEventsRoot {
             ServerDeletedEventDataGQL,
             showtimes_events::m::ServerDeletedEvent,
             showtimes_events::m::EventKind::ServerDeleted
+        );
+    }
+
+    /// The project created event, use `watchProjectCreated` to get a real-time stream instead.
+    #[graphql(name = "projectCreated")]
+    async fn project_created(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        #[graphql(desc = "The starting ID to query")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<Vec<EventGQL<ProjectCreatedEventDataGQL>>> {
+        expand_query_event!(
+            ctx,
+            id,
+            ProjectCreatedEventDataGQL,
+            showtimes_events::m::ProjectCreatedEvent,
+            showtimes_events::m::EventKind::ProjectCreated
+        );
+    }
+
+    /// The project updated event, use `watchProjectUpdated` to get a real-time stream instead.
+    #[graphql(name = "projectUpdated")]
+    async fn project_updated(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        #[graphql(desc = "The starting ID to query")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<Vec<EventGQL<ProjectUpdatedEventDataGQL>>> {
+        expand_query_event!(
+            ctx,
+            id,
+            ProjectUpdatedEventDataGQL,
+            showtimes_events::m::ProjectUpdatedEvent,
+            showtimes_events::m::EventKind::ProjectUpdated
+        );
+    }
+
+    /// The project episode updated event, use `watchProjectEpisodeUpdated` to get a real-time stream instead.
+    #[graphql(name = "projectEpisodeUpdated")]
+    async fn project_episode_updated(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        #[graphql(desc = "The starting ID to query")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<Vec<EventGQL<ProjectEpisodeUpdatedEventDataGQL>>> {
+        expand_query_event!(
+            ctx,
+            id,
+            ProjectEpisodeUpdatedEventDataGQL,
+            showtimes_events::m::ProjectEpisodeUpdatedEvent,
+            showtimes_events::m::EventKind::ProjectEpisodes
+        );
+    }
+
+    /// The project deleted event, use `watchProjectDeleted` to get a real-time stream instead.
+    #[graphql(name = "projectDeleted")]
+    async fn project_deleted(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        #[graphql(desc = "The starting ID to query")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<Vec<EventGQL<ProjectDeletedEventDataGQL>>> {
+        expand_query_event!(
+            ctx,
+            id,
+            ProjectDeletedEventDataGQL,
+            showtimes_events::m::ProjectDeletedEvent,
+            showtimes_events::m::EventKind::ProjectDeleted
         );
     }
 }

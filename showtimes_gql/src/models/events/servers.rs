@@ -43,7 +43,7 @@ impl ServerCreatedEventDataGQL {
 pub struct ServerUpdatedEventDataContentGQL {
     /// The change in the server name
     name: Option<String>,
-    /// The change in the server integrations API key
+    /// The change in the server integrations
     integrations: Option<Vec<IntegrationIdGQL>>,
     /// The change in the owners of the server
     kind: Option<Vec<ServerUserGQL>>,
@@ -118,17 +118,13 @@ pub struct ServerDeletedEventDataGQL {
 
 impl From<showtimes_events::m::ServerCreatedEvent> for ServerCreatedEventDataGQL {
     fn from(value: showtimes_events::m::ServerCreatedEvent) -> Self {
-        Self {
-            id: value.id(),
-        }
+        Self { id: value.id() }
     }
 }
 
 impl From<&showtimes_events::m::ServerCreatedEvent> for ServerCreatedEventDataGQL {
     fn from(value: &showtimes_events::m::ServerCreatedEvent) -> Self {
-        Self {
-            id: value.id(),
-        }
+        Self { id: value.id() }
     }
 }
 

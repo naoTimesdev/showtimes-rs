@@ -12,6 +12,10 @@ use data_loader::{
 };
 use models::collaborations::{CollaborationInviteGQL, CollaborationSyncGQL};
 use models::events::prelude::EventGQL;
+use models::events::projects::{
+    ProjectCreatedEventDataGQL, ProjectDeletedEventDataGQL, ProjectEpisodeUpdatedEventDataGQL,
+    ProjectUpdatedEventDataGQL,
+};
 use models::events::servers::{
     ServerCreatedEventDataGQL, ServerDeletedEventDataGQL, ServerUpdatedEventDataGQL,
 };
@@ -710,6 +714,78 @@ impl SubscriptionRoot {
         expand_stream_event!(
             showtimes_events::m::ServerDeletedEvent,
             ServerDeletedEventDataGQL
+        )
+    }
+
+    /// Watch for project created events
+    ///
+    /// Because of limitation in async-graphql, we sadly cannot combine stream of
+    /// our broker with the stream from ClickHouse data if user provided a start IDs.
+    #[graphql(
+        name = "watchProjectCreated",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn watch_project_created(
+        &self,
+    ) -> impl Stream<Item = EventGQL<ProjectCreatedEventDataGQL>> {
+        // TODO: Find a way to combine this with ClickHouse data
+        expand_stream_event!(
+            showtimes_events::m::ProjectCreatedEvent,
+            ProjectCreatedEventDataGQL
+        )
+    }
+
+    /// Watch for project updates events
+    ///
+    /// Because of limitation in async-graphql, we sadly cannot combine stream of
+    /// our broker with the stream from ClickHouse data if user provided a start IDs.
+    #[graphql(
+        name = "watchProjectUpdated",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn watch_project_updated(
+        &self,
+    ) -> impl Stream<Item = EventGQL<ProjectUpdatedEventDataGQL>> {
+        // TODO: Find a way to combine this with ClickHouse data
+        expand_stream_event!(
+            showtimes_events::m::ProjectUpdatedEvent,
+            ProjectUpdatedEventDataGQL
+        )
+    }
+
+    /// Watch for project episodes update events
+    ///
+    /// Because of limitation in async-graphql, we sadly cannot combine stream of
+    /// our broker with the stream from ClickHouse data if user provided a start IDs.
+    #[graphql(
+        name = "watchProjectEpisodeUpdated",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn watch_project_episode_updated(
+        &self,
+    ) -> impl Stream<Item = EventGQL<ProjectEpisodeUpdatedEventDataGQL>> {
+        // TODO: Find a way to combine this with ClickHouse data
+        expand_stream_event!(
+            showtimes_events::m::ProjectEpisodeUpdatedEvent,
+            ProjectEpisodeUpdatedEventDataGQL
+        )
+    }
+
+    /// Watch for project deleted events
+    ///
+    /// Because of limitation in async-graphql, we sadly cannot combine stream of
+    /// our broker with the stream from ClickHouse data if user provided a start IDs.
+    #[graphql(
+        name = "watchProjectDeleted",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn watch_project_deleted(
+        &self,
+    ) -> impl Stream<Item = EventGQL<ProjectDeletedEventDataGQL>> {
+        // TODO: Find a way to combine this with ClickHouse data
+        expand_stream_event!(
+            showtimes_events::m::ProjectDeletedEvent,
+            ProjectDeletedEventDataGQL
         )
     }
 }
