@@ -1,4 +1,8 @@
 use async_graphql::Object;
+use collaborations::{
+    CollabAcceptedEventDataGQL, CollabCreatedEventDataGQL, CollabDeletedEventDataGQL,
+    CollabRejectedEventDataGQL, CollabRetractedEventDataGQL,
+};
 use prelude::EventGQL;
 use projects::{
     ProjectCreatedEventDataGQL, ProjectDeletedEventDataGQL, ProjectEpisodeUpdatedEventDataGQL,
@@ -9,6 +13,7 @@ use users::{UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDa
 
 use crate::{expand_query_event, expand_query_event_with_user};
 
+pub mod collaborations;
 pub mod prelude;
 pub mod projects;
 pub mod servers;
@@ -177,6 +182,86 @@ impl QueryEventsRoot {
             ProjectDeletedEventDataGQL,
             showtimes_events::m::ProjectDeletedEvent,
             showtimes_events::m::EventKind::ProjectDeleted
+        );
+    }
+
+    /// The collaboration created event, use `watchCollabCreated` to get a real-time stream instead.
+    #[graphql(name = "collabCreated")]
+    async fn collab_created(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        #[graphql(desc = "The starting ID to query")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<Vec<EventGQL<CollabCreatedEventDataGQL>>> {
+        expand_query_event!(
+            ctx,
+            id,
+            CollabCreatedEventDataGQL,
+            showtimes_events::m::CollabCreatedEvent,
+            showtimes_events::m::EventKind::CollaborationCreated
+        );
+    }
+
+    /// The collaboration acceptance event, use `watchCollabAccepted` to get a real-time stream instead.
+    #[graphql(name = "collabAccepted")]
+    async fn collab_accepted(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        #[graphql(desc = "The starting ID to query")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<Vec<EventGQL<CollabAcceptedEventDataGQL>>> {
+        expand_query_event!(
+            ctx,
+            id,
+            CollabAcceptedEventDataGQL,
+            showtimes_events::m::CollabAcceptedEvent,
+            showtimes_events::m::EventKind::CollaborationAccepted
+        );
+    }
+
+    /// The collaboration rejection event, use `watchCollabRejected` to get a real-time stream instead.
+    #[graphql(name = "collabRejected")]
+    async fn collab_rejected(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        #[graphql(desc = "The starting ID to query")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<Vec<EventGQL<CollabRejectedEventDataGQL>>> {
+        expand_query_event!(
+            ctx,
+            id,
+            CollabRejectedEventDataGQL,
+            showtimes_events::m::CollabRejectedEvent,
+            showtimes_events::m::EventKind::CollaborationRejected
+        );
+    }
+
+    /// The collaboration retraction event, use `watchCollabRetracted` to get a real-time stream instead.
+    #[graphql(name = "collabRetracted")]
+    async fn collab_retracted(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        #[graphql(desc = "The starting ID to query")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<Vec<EventGQL<CollabRetractedEventDataGQL>>> {
+        expand_query_event!(
+            ctx,
+            id,
+            CollabRetractedEventDataGQL,
+            showtimes_events::m::CollabRetractedEvent,
+            showtimes_events::m::EventKind::CollaborationRetracted
+        );
+    }
+
+    /// The collaboration deletion or unlinking event, use `watchCollabDeleted` to get a real-time stream instead.
+    #[graphql(name = "collabDeleted")]
+    async fn collab_deleted(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        #[graphql(desc = "The starting ID to query")] id: crate::models::prelude::UlidGQL,
+    ) -> async_graphql::Result<Vec<EventGQL<CollabDeletedEventDataGQL>>> {
+        expand_query_event!(
+            ctx,
+            id,
+            CollabDeletedEventDataGQL,
+            showtimes_events::m::CollabDeletedEvent,
+            showtimes_events::m::EventKind::CollaborationDeleted
         );
     }
 }

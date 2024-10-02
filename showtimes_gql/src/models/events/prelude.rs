@@ -3,8 +3,13 @@ use async_graphql::{Enum, OutputType, SimpleObject};
 use crate::models::prelude::*;
 
 use super::{
+    collaborations::{
+        CollabAcceptedEventDataGQL, CollabCreatedEventDataGQL, CollabDeletedEventDataGQL,
+        CollabRejectedEventDataGQL, CollabRetractedEventDataGQL,
+    },
     projects::{
-        ProjectCreatedEventDataGQL, ProjectDeletedEventDataGQL, ProjectUpdatedEventDataGQL, ProjectEpisodeUpdatedEventDataGQL,
+        ProjectCreatedEventDataGQL, ProjectDeletedEventDataGQL, ProjectEpisodeUpdatedEventDataGQL,
+        ProjectUpdatedEventDataGQL,
     },
     servers::{ServerCreatedEventDataGQL, ServerDeletedEventDataGQL, ServerUpdatedEventDataGQL},
     users::{UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDataGQL},
@@ -60,8 +65,16 @@ pub enum EventKindGQL {
 #[graphql(concrete(name = "ServerDeletedEventGQL", params(ServerDeletedEventDataGQL)))]
 #[graphql(concrete(name = "ProjectCreatedEventGQL", params(ProjectCreatedEventDataGQL)))]
 #[graphql(concrete(name = "ProjectUpdatedEventGQL", params(ProjectUpdatedEventDataGQL)))]
-#[graphql(concrete(name = "ProjectEpisodeUpdatedEventGQL", params(ProjectEpisodeUpdatedEventDataGQL)))]
+#[graphql(concrete(
+    name = "ProjectEpisodeUpdatedEventGQL",
+    params(ProjectEpisodeUpdatedEventDataGQL)
+))]
 #[graphql(concrete(name = "ProjectDeletedEventGQL", params(ProjectDeletedEventDataGQL)))]
+#[graphql(concrete(name = "CollabCreatedEventGQL", params(CollabCreatedEventDataGQL)))]
+#[graphql(concrete(name = "CollabAcceptedEventGQL", params(CollabAcceptedEventDataGQL)))]
+#[graphql(concrete(name = "CollabRejectedEventGQL", params(CollabRejectedEventDataGQL)))]
+#[graphql(concrete(name = "CollabRetractedEventGQL", params(CollabRetractedEventDataGQL)))]
+#[graphql(concrete(name = "CollabDeletedEventGQL", params(CollabDeletedEventDataGQL)))]
 pub struct EventGQL<T: OutputType> {
     /// The event ID
     id: UlidGQL,

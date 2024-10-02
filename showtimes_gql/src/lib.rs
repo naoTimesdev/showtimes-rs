@@ -11,6 +11,10 @@ use data_loader::{
     find_authenticated_user, ServerAndOwnerId, ServerDataLoader, ServerOwnerId, UserDataLoader,
 };
 use models::collaborations::{CollaborationInviteGQL, CollaborationSyncGQL};
+use models::events::collaborations::{
+    CollabAcceptedEventDataGQL, CollabCreatedEventDataGQL, CollabDeletedEventDataGQL,
+    CollabRejectedEventDataGQL, CollabRetractedEventDataGQL,
+};
 use models::events::prelude::EventGQL;
 use models::events::projects::{
     ProjectCreatedEventDataGQL, ProjectDeletedEventDataGQL, ProjectEpisodeUpdatedEventDataGQL,
@@ -786,6 +790,96 @@ impl SubscriptionRoot {
         expand_stream_event!(
             showtimes_events::m::ProjectDeletedEvent,
             ProjectDeletedEventDataGQL
+        )
+    }
+
+    /// Watch for collaboration created events
+    ///
+    /// Because of limitation in async-graphql, we sadly cannot combine stream of
+    /// our broker with the stream from ClickHouse data if user provided a start IDs.
+    #[graphql(
+        name = "watchCollabCreated",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn watch_collab_created(
+        &self,
+    ) -> impl Stream<Item = EventGQL<CollabCreatedEventDataGQL>> {
+        // TODO: Find a way to combine this with ClickHouse data
+        expand_stream_event!(
+            showtimes_events::m::CollabCreatedEvent,
+            CollabCreatedEventDataGQL
+        )
+    }
+
+    /// Watch for collaboration acceptances events
+    ///
+    /// Because of limitation in async-graphql, we sadly cannot combine stream of
+    /// our broker with the stream from ClickHouse data if user provided a start IDs.
+    #[graphql(
+        name = "watchCollabAccepted",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn watch_collab_accepted(
+        &self,
+    ) -> impl Stream<Item = EventGQL<CollabAcceptedEventDataGQL>> {
+        // TODO: Find a way to combine this with ClickHouse data
+        expand_stream_event!(
+            showtimes_events::m::CollabAcceptedEvent,
+            CollabAcceptedEventDataGQL
+        )
+    }
+
+    /// Watch for collaboration rejection events
+    ///
+    /// Because of limitation in async-graphql, we sadly cannot combine stream of
+    /// our broker with the stream from ClickHouse data if user provided a start IDs.
+    #[graphql(
+        name = "watchCollabRejected",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn watch_collab_rejected(
+        &self,
+    ) -> impl Stream<Item = EventGQL<CollabRejectedEventDataGQL>> {
+        // TODO: Find a way to combine this with ClickHouse data
+        expand_stream_event!(
+            showtimes_events::m::CollabRejectedEvent,
+            CollabRejectedEventDataGQL
+        )
+    }
+
+    /// Watch for collaboration retraction events
+    ///
+    /// Because of limitation in async-graphql, we sadly cannot combine stream of
+    /// our broker with the stream from ClickHouse data if user provided a start IDs.
+    #[graphql(
+        name = "watchCollabRetracted",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn watch_collab_retracted(
+        &self,
+    ) -> impl Stream<Item = EventGQL<CollabRetractedEventDataGQL>> {
+        // TODO: Find a way to combine this with ClickHouse data
+        expand_stream_event!(
+            showtimes_events::m::CollabRetractedEvent,
+            CollabRetractedEventDataGQL
+        )
+    }
+
+    /// Watch for collaboration deleted events
+    ///
+    /// Because of limitation in async-graphql, we sadly cannot combine stream of
+    /// our broker with the stream from ClickHouse data if user provided a start IDs.
+    #[graphql(
+        name = "watchCollabDeleted",
+        guard = "guard::AuthUserMinimumGuard::new(models::users::UserKindGQL::Admin)"
+    )]
+    async fn watch_collab_deleted(
+        &self,
+    ) -> impl Stream<Item = EventGQL<CollabDeletedEventDataGQL>> {
+        // TODO: Find a way to combine this with ClickHouse data
+        expand_stream_event!(
+            showtimes_events::m::CollabDeletedEvent,
+            CollabDeletedEventDataGQL
         )
     }
 }
