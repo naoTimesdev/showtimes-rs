@@ -3,8 +3,8 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 pub type StorageShared = Arc<showtimes_fs::FsPool>;
+pub type SharedShowtimesState = Arc<ShowtimesState>;
 
-#[derive(Clone)]
 pub struct ShowtimesState {
     /// The `showtimes_db` database
     pub db: showtimes_db::DatabaseShared,

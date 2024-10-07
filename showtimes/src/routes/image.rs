@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     extract::{Path, State},
     response::IntoResponse,
@@ -6,7 +8,7 @@ use axum_extra::body::AsyncReadBody;
 use serde::Deserialize;
 use tokio::io::AsyncWriteExt;
 
-use crate::state::{ShowtimesState, StorageShared};
+use crate::state::{SharedShowtimesState, StorageShared};
 
 #[derive(Deserialize, Clone)]
 pub struct ImageQuery {
@@ -114,7 +116,7 @@ async fn common_reader(
 pub async fn image_by_id(
     method: axum::http::Method,
     Path(query): Path<ImageQuery>,
-    State(state): State<ShowtimesState>,
+    State(state): State<SharedShowtimesState>,
 ) -> impl IntoResponse {
-    common_reader(method, query, state.storage).await
+    common_reader(method, query, Arc::clone(&state.storage)).await
 }

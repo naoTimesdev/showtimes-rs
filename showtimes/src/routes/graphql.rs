@@ -13,13 +13,13 @@ use showtimes_gql::{
 use showtimes_session::{manager::SessionKind, oauth2::discord::DiscordClient};
 use showtimes_shared::Config;
 
-use crate::state::ShowtimesState;
+use crate::state::SharedShowtimesState;
 
 pub const GRAPHQL_ROUTE: &str = "/graphql";
 pub const GRAPHQL_WS_ROUTE: &str = "/graphql/ws";
 static DISCORD_CLIENT: OnceLock<Arc<DiscordClient>> = OnceLock::new();
 
-pub async fn graphql_sdl(State(state): State<ShowtimesState>) -> impl IntoResponse {
+pub async fn graphql_sdl(State(state): State<SharedShowtimesState>) -> impl IntoResponse {
     let sdl_data = state.schema.sdl();
 
     // Return the SDL as plain text
@@ -66,7 +66,7 @@ fn get_token_or_bearer(headers: &HeaderMap, config: &Config) -> Option<(SessionK
 ///
 /// This handler will handle all GraphQL requests, it will also handle the authentication
 pub async fn graphql_handler(
-    State(state): State<ShowtimesState>,
+    State(state): State<SharedShowtimesState>,
     headers: HeaderMap,
     req: GraphQLRequest,
 ) -> GraphQLResponse {
@@ -115,7 +115,7 @@ pub async fn graphql_handler(
 /// This Websocket handler use both `graphql-ws` and `graphql-transport-ws` protocols.
 /// The handler will always need a token/session since all request is authenticated only.
 pub async fn graphql_ws_handler(
-    State(state): State<ShowtimesState>,
+    State(state): State<SharedShowtimesState>,
     headers: HeaderMap,
     protocol: GraphQLProtocol,
     websocket: WebSocketUpgrade,
@@ -124,13 +124,13 @@ pub async fn graphql_ws_handler(
         .protocols(ALL_WEBSOCKET_PROTOCOLS)
         .on_upgrade(move |stream| {
             GraphQLWebSocket::new(stream, state.schema.clone(), protocol)
-                .on_connection_init(move |value| on_ws_init(state.clone(), headers, value))
+                .on_connection_init(move |value| on_ws_init(Arc::clone(&state), headers, value))
                 .serve()
         })
 }
 
 async fn on_ws_init(
-    state: ShowtimesState,
+    state: SharedShowtimesState,
     headers: HeaderMap,
     value: serde_json::Value,
 ) -> Result<GQLData, GQLError> {

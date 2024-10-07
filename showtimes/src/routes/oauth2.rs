@@ -4,7 +4,7 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::state::ShowtimesState;
+use crate::state::SharedShowtimesState;
 
 #[derive(Deserialize)]
 pub struct DiscordAuthorizeQuery {
@@ -12,7 +12,7 @@ pub struct DiscordAuthorizeQuery {
 }
 
 pub async fn oauth2_discord_authorize(
-    State(state): State<ShowtimesState>,
+    State(state): State<SharedShowtimesState>,
     Query(DiscordAuthorizeQuery { redirect_url }): Query<DiscordAuthorizeQuery>,
 ) -> impl IntoResponse {
     let decoded_url = urlencoding::decode(&redirect_url).unwrap().to_string();

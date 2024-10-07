@@ -189,9 +189,10 @@ async fn entrypoint() -> anyhow::Result<()> {
         vndb_provider,
         clickhouse: Arc::new(clickhouse_conn),
     };
+    let shared_state = Arc::new(state);
 
     tracing::info!("🚀 Starting server...");
-    let app: Router = Router::new()
+    let app = Router::new()
         .route("/", get(index))
         .route(
             GRAPHQL_ROUTE,
@@ -228,7 +229,7 @@ async fn entrypoint() -> anyhow::Result<()> {
                 ])
                 .allow_headers(tower_http::cors::Any),
         )
-        .with_state(state);
+        .with_state(Arc::clone(&shared_state));
 
     let listener = TcpListener::bind(format!(
         "{}:{}",
