@@ -262,7 +262,7 @@ struct DefaultRolesGQL {
     kind: ProjectKindGQL,
 }
 
-/// Do a search on external source or internal database
+/// The root query for external search to multiple external sources.
 pub struct QuerySearchRoot;
 
 impl QuerySearchRoot {
@@ -271,6 +271,7 @@ impl QuerySearchRoot {
     }
 }
 
+/// The root query for external search to multiple external sources.
 #[Object]
 impl QuerySearchRoot {
     /// Search for media from Anilist

@@ -1,8 +1,15 @@
+//! The models collection for Showtimes Search data.
+//!
+//! Powered by Meilisearch
+
 use serde::{Deserialize, Serialize};
 use showtimes_derive::SearchModel;
 use showtimes_shared::{ulid_list_serializer, ulid_opt_serializer, ulid_serializer};
 use std::ops::Deref;
 
+/// The project model for Showtimes Search data.
+///
+/// This is mapped from [`showtimes_db::m::Project`] and use `nt-projects` as the index name.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-projects",
@@ -27,11 +34,13 @@ pub struct Project {
     /// The parent server or creator
     #[serde(with = "ulid_serializer", default = "ulid_serializer::default")]
     pub parent: showtimes_shared::ulid::Ulid,
+    /// The date and time the project was created
     #[serde(
         with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
     )]
     pub created: chrono::DateTime<chrono::Utc>,
+    /// The date and time the project was last updated
     #[serde(
         with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
@@ -86,6 +95,10 @@ impl From<&mut showtimes_db::m::Project> for Project {
         }
     }
 }
+
+/// The servers model for Showtimes Search data.
+///
+/// This is mapped from [`showtimes_db::m::Server`] and use `nt-servers` as the index name.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-servers",
@@ -108,11 +121,13 @@ pub struct Server {
     /// The list of owners
     #[serde(with = "ulid_list_serializer")]
     pub owners: Vec<showtimes_shared::ulid::Ulid>,
+    /// The date and time the server was created
     #[serde(
         with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
     )]
     pub created: chrono::DateTime<chrono::Utc>,
+    /// The date and time the server was last updated
     #[serde(
         with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
@@ -137,6 +152,9 @@ impl From<showtimes_db::m::Server> for Server {
     }
 }
 
+/// The user model for Showtimes Search data.
+///
+/// This is mapped from [`showtimes_db::m::User`] and use `nt-users` as the index name.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-users",
@@ -164,11 +182,13 @@ pub struct User {
     pub kind: showtimes_db::m::UserKind,
     /// Is the user registered or not
     pub registered: bool,
+    /// The date and time the user was created
     #[serde(
         with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
     )]
     pub created: chrono::DateTime<chrono::Utc>,
+    /// The date and time the user was last updated
     #[serde(
         with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
@@ -226,6 +246,9 @@ impl From<&showtimes_db::m::ServerCollaborationSyncTarget> for ServerCollabTarge
     }
 }
 
+/// The server collab model for Showtimes Search data.
+///
+/// This is mapped from [`showtimes_db::m::ServerCollaborationSync`] and use `nt-collab-sync` as the index name.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-collab-sync",
@@ -241,11 +264,13 @@ pub struct ServerCollabSync {
     pub id: showtimes_shared::ulid::Ulid,
     /// The project being linked together
     pub projects: Vec<ServerCollabTarget>,
+    /// The date and time the server collab was created
     #[serde(
         with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
     )]
     pub created: chrono::DateTime<chrono::Utc>,
+    /// The date and time the server collab was last updated
     #[serde(
         with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
@@ -293,6 +318,9 @@ pub struct ServerCollabInviteTarget {
     pub project: Option<showtimes_shared::ulid::Ulid>,
 }
 
+/// The server collab invite model for Showtimes Search data.
+///
+/// This is mapped from [`showtimes_db::m::ServerCollaborationInvite`] and use `nt-collab-invite` as the index name.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-collab-invite",
@@ -310,11 +338,13 @@ pub struct ServerCollabInvite {
     pub source: ServerCollabInviteSource,
     /// The target server
     pub target: ServerCollabInviteTarget,
+    /// The date and time the server collab invite was created
     #[serde(
         with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"
     )]
     pub created: chrono::DateTime<chrono::Utc>,
+    /// The date and time the server collab invite was last updated
     #[serde(
         with = "showtimes_shared::unix_timestamp_serializer",
         default = "chrono::Utc::now"

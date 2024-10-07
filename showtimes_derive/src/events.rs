@@ -1,3 +1,5 @@
+//! A custom derive collection macro for ClickHouse model data.
+
 use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::{punctuated::Punctuated, Attribute, Expr, Lit, Meta, Token};
@@ -151,8 +153,6 @@ fn expand_option_field(
     if field_ty_name.contains("String") {
         let inner_ty = get_inner_type_of_option(field_ty).unwrap();
         let has_vec = get_inner_type_of_vec(inner_ty).is_some();
-
-        
 
         if has_vec {
             quote::quote! {

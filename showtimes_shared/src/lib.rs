@@ -1,3 +1,4 @@
+#![warn(missing_docs, clippy::empty_docs, rustdoc::broken_intra_doc_links)]
 #![doc = include_str!("../README.md")]
 
 use serde::{ser::SerializeSeq, Deserialize};
@@ -244,6 +245,7 @@ impl TryFrom<&str> for APIKey {
     }
 }
 
+/// A (de)serializer for [`ulid::Ulid`] for serde.
 pub mod ulid_serializer {
     use super::*;
 
@@ -276,6 +278,7 @@ pub mod ulid_serializer {
     }
 }
 
+/// A (de)serializer for [`ulid::Ulid`] for serde with optional support.
 pub mod ulid_opt_serializer {
     use super::*;
 
@@ -309,6 +312,7 @@ pub mod ulid_opt_serializer {
     }
 }
 
+/// A (de)serializer for [`ulid::Ulid`] for serde with list or [`Vec`] support.
 pub mod ulid_list_serializer {
     use super::*;
 
@@ -340,12 +344,16 @@ pub mod ulid_list_serializer {
     }
 }
 
+/// A (de)serializer for [`chrono::Utc`] of [`chrono::DateTime`] to be converted to BSON-compatible data.
 pub mod bson_datetime_opt_serializer {
     use super::*;
     use bson::DateTime;
     use chrono::Utc;
     use serde::Serialize;
 
+    /// De-serialize a BSON-compatible datetime to a [`chrono::Utc`] of [`chrono::DateTime`].
+    ///
+    /// Used for serde deserialization
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<chrono::DateTime<Utc>>, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -359,6 +367,9 @@ pub mod bson_datetime_opt_serializer {
         }
     }
 
+    /// Serialize a [`chrono::Utc`] of [`chrono::DateTime`] to a BSON-compatible datetime.
+    ///
+    /// Used for serde serialization
     pub fn serialize<S>(
         date: &Option<chrono::DateTime<Utc>>,
         serializer: S,
@@ -376,9 +387,13 @@ pub mod bson_datetime_opt_serializer {
     }
 }
 
+/// A (de)serializer for [`chrono::Utc`] of [`chrono::DateTime`] to be converted to UNIX timestamp format.
 pub mod unix_timestamp_serializer {
     use serde::Deserialize;
 
+    /// Serialize a [`chrono::Utc`] of [`chrono::DateTime`] to a UNIX timestamp ([`i64`]).
+    ///
+    /// Used for serde serialization
     pub fn serialize<S>(
         date: &chrono::DateTime<chrono::Utc>,
         serializer: S,
@@ -390,6 +405,9 @@ pub mod unix_timestamp_serializer {
         serializer.serialize_i64(ts)
     }
 
+    /// Deserialize a UNIX timestamp ([`i64`]) to a [`chrono::Utc`] of [`chrono::DateTime`].
+    ///
+    /// Used for serde deserialization
     pub fn deserialize<'de, D>(deserializer: D) -> Result<chrono::DateTime<chrono::Utc>, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -401,9 +419,14 @@ pub mod unix_timestamp_serializer {
     }
 }
 
+/// A (de)serializer for [`chrono::Utc`] of [`chrono::DateTime`]
+/// to be converted to UNIX timestamp with optional support.
 pub mod unix_timestamp_opt_serializer {
     use serde::Deserialize;
 
+    /// Serialize a plausible [`chrono::Utc`] of [`chrono::DateTime`] to a UNIX timestamp ([`i64`]).
+    ///
+    /// Used for serde serialization
     pub fn serialize<S>(
         date: &Option<chrono::DateTime<chrono::Utc>>,
         serializer: S,
@@ -420,6 +443,9 @@ pub mod unix_timestamp_opt_serializer {
         }
     }
 
+    /// Deserialize a plausible UNIX timestamp ([`i64`]) to a [`chrono::Utc`] of [`chrono::DateTime`].
+    ///
+    /// Used for serde deserialization
     pub fn deserialize<'de, D>(
         deserializer: D,
     ) -> Result<Option<chrono::DateTime<chrono::Utc>>, D::Error>

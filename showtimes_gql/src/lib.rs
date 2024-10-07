@@ -1,3 +1,4 @@
+#![warn(missing_docs, clippy::empty_docs, rustdoc::broken_intra_doc_links)]
 #![doc = include_str!("../README.md")]
 
 use std::sync::{Arc, LazyLock};
@@ -46,6 +47,9 @@ mod models;
 mod mutations;
 mod queries;
 
+/// The main schema for our GraphQL server.
+///
+/// Wraps [`QueryRoot`], [`MutationRoot`], and [`SubscriptionRoot`] types.
 pub type ShowtimesGQLSchema = async_graphql::Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
 pub use async_graphql::http::{graphiql_plugin_explorer, GraphiQLSource, ALL_WEBSOCKET_PROTOCOLS};
 pub use async_graphql::{Data, Error};
@@ -58,8 +62,10 @@ static STUBBED_ADMIN: LazyLock<ServerQueryUser> = LazyLock::new(|| {
     )
 });
 
+/// The main Query Root type for the GraphQL schema. This is where all the queries are defined.
 pub struct QueryRoot;
 
+/// The main Query Root type for the GraphQL schema. This is where all the queries are defined.
 #[Object]
 impl QueryRoot {
     /// Get current authenticated user
@@ -270,8 +276,10 @@ impl QueryRoot {
     }
 }
 
+/// The main Mutation Root type for the GraphQL schema. This is where all the mutation are defined.
 pub struct MutationRoot;
 
+/// The main Mutation Root type for the GraphQL schema. This is where all the mutation are defined.
 #[Object]
 impl MutationRoot {
     /// Authorize Discord OAuth2 token and state that was returned from the OAuth2 redirect
@@ -623,8 +631,10 @@ impl MutationRoot {
     }
 }
 
+/// The main Subscription Root type for the GraphQL schema. This is where all the subscription are defined.
 pub struct SubscriptionRoot;
 
+/// The main Subscription Root type for the GraphQL schema. This is where all the subscription are defined.
 #[Subscription]
 impl SubscriptionRoot {
     /// Watch for user created events

@@ -1,3 +1,5 @@
+//! A local disk client for accessing filesystem.
+
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
@@ -5,6 +7,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{make_file_path, FsFileKind, FsFileObject};
 
+/// A local disk client for accessing filesystem.
 #[derive(Debug, Clone)]
 pub struct LocalFs {
     directory: PathBuf,

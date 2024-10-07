@@ -1,3 +1,5 @@
+//! The manager for session, powered via Redis/Valkey
+
 use jsonwebtoken::errors::ErrorKind;
 use redis::cmd;
 use redis::AsyncCommands;
@@ -8,6 +10,9 @@ use super::{
     ShowtimesUserClaims, ShowtimesUserSession,
 };
 
+/// The shared [`SessionManager`] instance for the showtimes service.
+///
+/// Can be used between threads safely.
 pub type SharedSessionManager = std::sync::Arc<tokio::sync::Mutex<SessionManager>>;
 const SESSION_MANAGER: &str = "showtimes:session";
 const SESSION_REFRESH_MANAGER: &str = "showtimes:session:refresh";
@@ -22,8 +27,11 @@ pub struct SessionManager {
 /// The kind of session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SessionKind {
+    /// Bearer type, a.k.a using OAuth2 token
     Bearer,
+    /// API key authentication
     APIKey,
+    /// Master key authentication, set via config file
     MasterKey,
 }
 

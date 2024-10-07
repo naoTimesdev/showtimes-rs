@@ -1,3 +1,5 @@
+//! A custom derive collection macro for Database/MongoDB models
+
 use proc_macro::TokenStream;
 use syn::{spanned::Spanned, Lit};
 

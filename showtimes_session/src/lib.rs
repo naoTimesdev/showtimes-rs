@@ -1,3 +1,4 @@
+#![warn(missing_docs, clippy::empty_docs, rustdoc::broken_intra_doc_links)]
 #![doc = include_str!("../README.md")]
 
 use std::sync::LazyLock;
@@ -101,6 +102,7 @@ impl ShowtimesUserClaims {
         }
     }
 
+    /// Create a new API key claims
     pub fn new_api(api_key: String, aud: ShowtimesAudience) -> Self {
         let iat = chrono::Utc::now();
         Self {
@@ -126,22 +128,27 @@ impl ShowtimesUserClaims {
         }
     }
 
+    /// Get metadata information, usually user ID
     pub fn get_metadata(&self) -> &str {
         &self.metadata
     }
 
+    /// Get the expiry time in UNIX timestamp format
     pub fn get_expires_at(&self) -> i64 {
         self.exp
     }
 
+    /// Get when the claims is issued
     pub fn get_issued_at(&self) -> chrono::DateTime<chrono::Utc> {
         self.iat
     }
 
+    /// Get the issuer, usually showtimes-rs-session/{version}
     pub fn get_issuer(&self) -> &str {
         &self.iss
     }
 
+    /// Get the audience or who is it for this claims is made
     pub fn get_audience(&self) -> ShowtimesAudience {
         self.aud
     }
@@ -162,10 +169,12 @@ impl ShowtimesRefreshClaims {
         }
     }
 
+    /// Get the user associated with this refresh token claims
     pub fn get_user(&self) -> showtimes_shared::ulid::Ulid {
         self.user
     }
 
+    /// Get when the claims is issued
     pub fn get_issued_at(&self) -> chrono::DateTime<chrono::Utc> {
         self.iat
     }

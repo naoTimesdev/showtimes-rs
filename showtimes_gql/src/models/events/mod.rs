@@ -19,10 +19,17 @@ pub mod projects;
 pub mod servers;
 pub mod users;
 
-/// Search
+/// The root query for events queries.
+///
+/// This providers multiple queries that can be used to
+/// get the stored events log for Showtimes API.
 #[derive(Clone, Copy)]
 pub struct QueryEventsRoot;
 
+/// The root query for events queries.
+///
+/// This providers multiple queries that can be used to
+/// get the stored events log for Showtimes API.
 #[Object]
 impl QueryEventsRoot {
     /// The user created event, use `watchUserCreated` to get a real-time stream instead.

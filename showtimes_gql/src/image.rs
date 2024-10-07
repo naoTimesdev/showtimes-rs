@@ -2,7 +2,9 @@
 
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
+/// The maximum image size in bytes
 pub const MAX_IMAGE_SIZE: u64 = 2 * 1024 * 1024;
+/// The maximum image dimension in pixels
 pub const MAX_IMAGE_DIMENSION: u32 = 2048;
 
 /// A simple image/avatar handling format type

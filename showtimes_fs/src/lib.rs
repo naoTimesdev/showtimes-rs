@@ -1,3 +1,4 @@
+#![warn(missing_docs, clippy::empty_docs, rustdoc::broken_intra_doc_links)]
 #![doc = include_str!("../README.md")]
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -9,7 +10,9 @@ pub mod s3;
 ///
 /// Currently only `LocalFs` and `S3Fs` are supported.
 pub enum FsPool {
+    /// A local disk version
     LocalFs(crate::local::LocalFs),
+    /// A S3-compatible version
     S3Fs(crate::s3::S3Fs),
 }
 

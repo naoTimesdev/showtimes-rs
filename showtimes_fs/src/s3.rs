@@ -1,3 +1,5 @@
+//! A S3-compatible client for accessing filesystem.
+
 use std::{sync::Arc, time::Duration};
 
 use crate::{make_file_path, FsFileKind, FsFileObject};
@@ -16,6 +18,7 @@ pub use rusty_s3::{Bucket, Credentials as S3FsCredentials, UrlStyle as S3PathSty
 const MAX_KEYS: usize = 500;
 const ONE_HOUR: Duration = Duration::from_secs(3600);
 
+/// A S3-compatible client for accessing filesystem.
 #[derive(Debug, Clone)]
 pub struct S3Fs {
     /// Shared HTTP client.

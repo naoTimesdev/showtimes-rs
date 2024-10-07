@@ -91,6 +91,7 @@ pub struct StorageLocal {
     pub path: String,
 }
 
+/// The path style used for S3 bucket
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum StorageS3PathStyle {
@@ -217,6 +218,7 @@ impl Config {
         Ok(config)
     }
 
+    /// Verify provided config if it's fullfill some of the preferred requirements
     pub fn verify(&self) -> Result<(), &'static str> {
         // Verify master key
         if self.master_key.is_empty() {
