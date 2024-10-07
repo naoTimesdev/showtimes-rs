@@ -3,10 +3,14 @@ use redis::cmd;
 use redis::AsyncCommands;
 use redis::RedisResult;
 
-use super::{verify_session, ShowtimesAudience, ShowtimesUserClaims, ShowtimesUserSession};
+use super::{
+    verify_refresh_session, verify_session, ShowtimesAudience, ShowtimesRefreshSession,
+    ShowtimesUserClaims, ShowtimesUserSession,
+};
 
 pub type SharedSessionManager = std::sync::Arc<tokio::sync::Mutex<SessionManager>>;
 const SESSION_MANAGER: &str = "showtimes:session";
+const SESSION_REFRESH_MANAGER: &str = "showtimes:session:refresh";
 
 /// Redis-managed session state for the showtimes service.
 #[derive(Debug, Clone)]
@@ -30,8 +34,11 @@ pub enum SessionError {
     InvalidSession,
     /// The session has invalid signature.
     InvalidSignature,
+    /// The session has invalid format
+    InvalidSessionFormat,
     /// The session is expired.
     ExpiredSession,
+    /// Session not found
     SessionNotFound,
     /// An error from redis
     RedisError(redis::RedisError),
@@ -42,6 +49,7 @@ impl std::fmt::Display for SessionError {
         match self {
             Self::InvalidSession => write!(f, "Invalid session"),
             Self::InvalidSignature => write!(f, "Invalid signature"),
+            Self::InvalidSessionFormat => write!(f, "Invalid session format"),
             Self::ExpiredSession => write!(f, "Expired session"),
             Self::SessionNotFound => write!(f, "Session not found"),
             Self::RedisError(e) => write!(f, "Redis error: {}", e),
@@ -82,8 +90,16 @@ impl SessionManager {
         })
     }
 
+    /// Delete a session from the session manager.
     pub async fn remove_session(&mut self, token: impl Into<String>) -> RedisResult<()> {
         self.connection.hdel(SESSION_MANAGER, token.into()).await
+    }
+
+    /// Delete a refresh session from the session manager.
+    pub async fn remove_refresh_session(&mut self, token: impl Into<String>) -> RedisResult<()> {
+        self.connection
+            .hdel(SESSION_REFRESH_MANAGER, token.into())
+            .await
     }
 
     /// Get a session from the session manager.
@@ -161,13 +177,86 @@ impl SessionManager {
     pub async fn set_session(
         &mut self,
         token: impl Into<String>,
-        session: ShowtimesUserClaims,
+        session: &ShowtimesUserClaims,
     ) -> RedisResult<()> {
         let token: String = token.into();
         let session_exp = session.exp;
 
         self.connection
             .hset(SESSION_MANAGER, token, session_exp.to_string())
+            .await
+    }
+
+    /// Get a refresh token information
+    ///
+    /// Returns the refresh token information and the current token saved.
+    pub async fn get_refresh_session(
+        &mut self,
+        token: impl Into<String>,
+    ) -> Result<(ShowtimesRefreshSession, String), SessionError> {
+        let token: String = token.into();
+
+        let token_session: Option<String> = self
+            .connection
+            .hget(SESSION_REFRESH_MANAGER, &token)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to get refresh session: {:?}", e);
+                SessionError::RedisError(e)
+            })?;
+
+        match token_session {
+            None => Err(SessionError::SessionNotFound),
+            Some(token_session) => {
+                let refresh_res = verify_refresh_session(&token, &self.secret).map_err(|e| {
+                    tracing::error!("Failed to verify refresh session: {:?}", e);
+                    match e.kind() {
+                        ErrorKind::ExpiredSignature => SessionError::ExpiredSession,
+                        ErrorKind::InvalidSignature => SessionError::InvalidSignature,
+                        _ => SessionError::InvalidSession,
+                    }
+                });
+
+                match refresh_res {
+                    Ok(refresh_res) => Ok((
+                        ShowtimesRefreshSession::new(&token, refresh_res),
+                        token_session,
+                    )),
+                    Err(SessionError::ExpiredSession) => {
+                        // Delete the session
+                        self.remove_refresh_session(&token).await.map_err(|e| {
+                            tracing::error!("Failed to remove refreshsession: {:?}", e);
+                            SessionError::RedisError(e)
+                        })?;
+                        Err(SessionError::ExpiredSession)
+                    }
+                    Err(e) => Err(e),
+                }
+            }
+        }
+    }
+
+    /// Set a refresh session to the session manager.
+    pub async fn set_refresh_session(
+        &mut self,
+        refresh_token: impl Into<String>,
+        session_token: impl Into<String>,
+    ) -> RedisResult<()> {
+        let refresh_token: String = refresh_token.into();
+        let session_token: String = session_token.into();
+
+        let token_session: Option<String> = self
+            .connection
+            .hget(SESSION_REFRESH_MANAGER, &refresh_token)
+            .await?;
+
+        if let Some(token_session) = token_session {
+            // Remove old session
+            self.remove_session(&token_session).await?;
+        }
+
+        self.connection
+            .hset(SESSION_REFRESH_MANAGER, refresh_token, session_token)
             .await
     }
 }

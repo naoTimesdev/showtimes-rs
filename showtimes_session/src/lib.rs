@@ -16,11 +16,9 @@ pub use jsonwebtoken::errors::Error as SessionError;
 pub use jsonwebtoken::errors::ErrorKind as SessionErrorKind;
 
 // The issuer of the token, we use a LazyLock to ensure it's only created once
-static ISSUER: LazyLock<String> = LazyLock::new(|| {
-    let iss = format!("showtimes-rs-session/{}", env!("CARGO_PKG_VERSION"));
-
-    iss
-});
+static ISSUER: LazyLock<String> =
+    LazyLock::new(|| format!("showtimes-rs-session/{}", env!("CARGO_PKG_VERSION")));
+const REFRESH_AUDIENCE: &str = "refresh-session";
 // The algorithm we use for our tokens
 const ALGORITHM: Algorithm = Algorithm::HS512;
 
@@ -65,6 +63,23 @@ pub struct ShowtimesUserClaims {
     /// Depending on the use case, this will be Ulid if it's a user token
     /// or a final redirect URL if it's a Discord OAuth2 state token
     metadata: String,
+}
+
+/// Our refresh claims struct, it needs to derive `Serialize` and/or `Deserialize`
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShowtimesRefreshClaims {
+    /// When the token expires
+    exp: i64,
+    /// When the token was issued
+    #[serde(with = "unix_timestamp_serializer")]
+    iat: chrono::DateTime<chrono::Utc>,
+    /// Who issued the token, usually `showtimes-rs-session/{version}`
+    iss: String,
+    /// Current user ID
+    #[serde(with = "showtimes_shared::ulid_serializer")]
+    user: showtimes_shared::ulid::Ulid,
+    /// The audience, this is always RefreshTokenAudience
+    aud: String,
 }
 
 impl ShowtimesUserClaims {
@@ -132,6 +147,30 @@ impl ShowtimesUserClaims {
     }
 }
 
+impl ShowtimesRefreshClaims {
+    fn new(user: showtimes_shared::ulid::Ulid) -> Self {
+        let iat = chrono::Utc::now();
+        // Refresh claims last for 90 days
+        let exp = iat + chrono::Duration::days(90);
+
+        Self {
+            exp: exp.timestamp(),
+            iat,
+            user,
+            iss: ISSUER.clone(),
+            aud: REFRESH_AUDIENCE.to_string(),
+        }
+    }
+
+    pub fn get_user(&self) -> showtimes_shared::ulid::Ulid {
+        self.user
+    }
+
+    pub fn get_issued_at(&self) -> chrono::DateTime<chrono::Utc> {
+        self.iat
+    }
+}
+
 /// A wrapper around the encoded token and the claims
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ShowtimesUserSession {
@@ -161,11 +200,45 @@ impl ShowtimesUserSession {
     }
 }
 
+/// A wrapper around the encoded refresh token and the refresh claims
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ShowtimesRefreshSession {
+    /// The encoded refresh token
+    token: String,
+    /// The claims of the refresh token
+    claims: ShowtimesRefreshClaims,
+}
+
+impl ShowtimesRefreshSession {
+    /// Create a new refresh session
+    pub fn new(token: impl Into<String>, claims: ShowtimesRefreshClaims) -> Self {
+        Self {
+            token: token.into(),
+            claims,
+        }
+    }
+
+    /// Get the encoded refresh token
+    pub fn get_token(&self) -> &str {
+        &self.token
+    }
+
+    /// Get the claims of the refresh token
+    pub fn get_claims(&self) -> &ShowtimesRefreshClaims {
+        &self.claims
+    }
+}
+
+/// Create a new session for the given user ID and expiration time.
+///
+/// The session will be signed with the provided secret key.
+///
+/// Returns a tuple containing the session information and the refresh token.
 pub fn create_session(
     user_id: showtimes_shared::ulid::Ulid,
     expires_in: i64,
     secret: impl Into<String>,
-) -> Result<(ShowtimesUserClaims, String), SessionError> {
+) -> Result<(ShowtimesUserSession, String), SessionError> {
     let user = ShowtimesUserClaims::new(user_id, expires_in);
 
     let header = Header::new(ALGORITHM);
@@ -174,9 +247,15 @@ pub fn create_session(
 
     let token = jsonwebtoken::encode(&header, &user, &secret)?;
 
-    Ok((user, token))
+    let session = ShowtimesUserSession::new(&token, user);
+    let refresh_claims = ShowtimesRefreshClaims::new(user_id);
+
+    let refresh_token = jsonwebtoken::encode(&header, &refresh_claims, &secret)?;
+
+    Ok((session, refresh_token))
 }
 
+/// Create a new API key session for the given API key and expiration time.
 pub fn create_api_key_session(
     api_key: impl Into<String>,
     secret: impl Into<String>,
@@ -196,6 +275,7 @@ pub fn create_api_key_session(
     jsonwebtoken::encode(&header, &user, &secret)
 }
 
+/// Create a new Discord session state for the given redirect URL and secret.
 pub fn create_discord_session_state(
     redirect_url: impl Into<String>,
     secret: impl Into<String>,
@@ -209,6 +289,10 @@ pub fn create_discord_session_state(
     jsonwebtoken::encode(&header, &user, &secret)
 }
 
+/// Verify an active JWT session token.
+///
+/// Return the claims if the token is valid and matches the expected audience.
+/// Otherwise, return an error
 pub fn verify_session(
     token: &str,
     secret: impl Into<String>,
@@ -235,6 +319,53 @@ pub fn verify_session(
                 Ok(data.claims)
             }
         }
+        Err(e) => Err(e),
+    }
+}
+
+/// Refresh a JWT session token.
+pub fn refresh_session(
+    token: &str,
+    secret: impl Into<String>,
+    expires_in: i64,
+) -> Result<ShowtimesUserSession, SessionError> {
+    let secret_str: String = secret.into();
+
+    let secret = DecodingKey::from_secret(secret_str.as_bytes());
+    let mut validation = Validation::new(ALGORITHM);
+
+    validation.set_issuer(&[&*ISSUER]);
+    validation.set_audience(&[REFRESH_AUDIENCE]);
+    validation.set_required_spec_claims(&["iat", "iss", "aud"]);
+
+    // First, we verify refresh token
+    match jsonwebtoken::decode::<ShowtimesRefreshClaims>(token, &secret, &validation) {
+        Ok(data) => {
+            // Create session
+            let (session, _) = create_session(data.claims.get_user(), expires_in, secret_str)?;
+            Ok(session)
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Verify a Refresh JWT session token.
+pub(crate) fn verify_refresh_session(
+    token: &str,
+    secret: impl Into<String>,
+) -> Result<ShowtimesRefreshClaims, SessionError> {
+    let secret_str: String = secret.into();
+
+    let secret = DecodingKey::from_secret(secret_str.as_bytes());
+    let mut validation = Validation::new(ALGORITHM);
+
+    validation.set_issuer(&[&*ISSUER]);
+    validation.set_audience(&[REFRESH_AUDIENCE]);
+    validation.set_required_spec_claims(&["iat", "iss", "aud"]);
+
+    // First, we verify refresh token
+    match jsonwebtoken::decode::<ShowtimesRefreshClaims>(token, &secret, &validation) {
+        Ok(data) => Ok(data.claims),
         Err(e) => Err(e),
     }
 }

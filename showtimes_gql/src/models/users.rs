@@ -180,6 +180,12 @@ pub struct UserSessionGQL {
     user: UserGQL,
     /// The user's session token
     token: String,
+    /// Refresh token for the current user session
+    ///
+    /// This will be available when you login or if you provide
+    /// `x-refresh-token` header when you are requesting user information.
+    #[graphql(name = "refreshToken")]
+    refresh_token: Option<String>,
 }
 
 impl UserSessionGQL {
@@ -190,6 +196,13 @@ impl UserSessionGQL {
         UserSessionGQL {
             user: gql_user,
             token: token.into(),
+            refresh_token: None,
         }
+    }
+
+    /// Create a new user session with refresh token
+    pub fn with_refresh_token(mut self, token: impl Into<String>) -> Self {
+        self.refresh_token = Some(token.into());
+        self
     }
 }

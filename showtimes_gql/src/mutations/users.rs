@@ -286,7 +286,7 @@ pub async fn mutate_users_authenticate(
 
             handler.save(&mut user, None).await?;
 
-            let (oauth_user, oauth_token) = showtimes_session::create_session(
+            let (oauth_user, refresh_token) = showtimes_session::create_session(
                 user.id,
                 config.jwt.get_expiration().try_into()?,
                 &config.jwt.secret,
@@ -301,13 +301,20 @@ pub async fn mutate_users_authenticate(
                 )
                 .await?;
 
-            sess_manager
-                .lock()
-                .await
-                .set_session(&oauth_token, oauth_user)
-                .await?;
+            let mut sess_mutex = sess_manager.lock().await;
 
-            Ok(UserSessionGQL::new(user, oauth_token))
+            sess_mutex
+                .set_session(oauth_user.get_token(), oauth_user.get_claims())
+                .await?;
+            sess_mutex
+                .set_refresh_session(&refresh_token, oauth_user.get_token())
+                .await?;
+            drop(sess_mutex);
+
+            Ok(
+                UserSessionGQL::new(user, oauth_user.get_token())
+                    .with_refresh_token(&refresh_token),
+            )
         }
         None => {
             tracing::info!(
@@ -338,18 +345,26 @@ pub async fn mutate_users_authenticate(
                 )
                 .await?;
 
-            let (oauth_user, oauth_token) = showtimes_session::create_session(
+            let (oauth_user, refresh_token) = showtimes_session::create_session(
                 user.id,
                 config.jwt.get_expiration().try_into()?,
                 &config.jwt.secret,
             )?;
 
-            sess_manager
-                .lock()
-                .await
-                .set_session(&oauth_token, oauth_user)
+            let mut sess_mutex = sess_manager.lock().await;
+
+            sess_mutex
+                .set_session(oauth_user.get_token(), oauth_user.get_claims())
                 .await?;
-            Ok(UserSessionGQL::new(user, oauth_token))
+            sess_mutex
+                .set_refresh_session(&refresh_token, oauth_user.get_token())
+                .await?;
+            drop(sess_mutex);
+
+            Ok(
+                UserSessionGQL::new(user, oauth_user.get_token())
+                    .with_refresh_token(&refresh_token),
+            )
         }
     }
 }

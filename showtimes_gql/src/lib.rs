@@ -36,7 +36,7 @@ use models::users::{UserGQL, UserSessionGQL};
 use queries::ServerQueryUser;
 use showtimes_db::{mongodb::bson::doc, DatabaseShared};
 use showtimes_session::manager::SharedSessionManager;
-use showtimes_session::ShowtimesUserSession;
+use showtimes_session::{ShowtimesRefreshSession, ShowtimesUserSession};
 
 mod data_loader;
 mod expand;
@@ -68,7 +68,11 @@ impl QueryRoot {
         let user_session = ctx.data_unchecked::<ShowtimesUserSession>();
         let user = find_authenticated_user(ctx).await?;
 
-        Ok(UserSessionGQL::new(user, user_session.get_token()))
+        match ctx.data_opt::<ShowtimesRefreshSession>() {
+            Some(refresh_session) => Ok(UserSessionGQL::new(user, user_session.get_token())
+                .with_refresh_token(refresh_session.get_token())),
+            None => Ok(UserSessionGQL::new(user, user_session.get_token())),
+        }
     }
 
     /// Get authenticated user associated servers
@@ -599,14 +603,20 @@ impl MutationRoot {
         match user {
             Some(user) => {
                 // Create actual session
-                let (claims, token) = showtimes_session::create_session(
+                let (claims, _) = showtimes_session::create_session(
                     user.id,
                     config.jwt.get_expiration() as i64,
                     &config.jwt.secret,
                 )?;
-                session.lock().await.set_session(&token, claims).await?;
 
-                Ok(UserSessionGQL::new(user, token))
+                // We don't create refresh token session for this custom orchestration.
+                let mut sess_mutex = session.lock().await;
+                sess_mutex
+                    .set_session(claims.get_token(), claims.get_claims())
+                    .await?;
+                drop(sess_mutex);
+
+                Ok(UserSessionGQL::new(user, claims.get_token()))
             }
             None => Err("User not found".into()),
         }
