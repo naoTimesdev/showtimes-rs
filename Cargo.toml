@@ -39,6 +39,8 @@ chrono = "0.4.38"
 time = "0.3.36"
 anyhow = "1"
 futures = "0.3.31"
+tokio-stream = "0.1.16"
+async-stream = "0.3.6"
 tosho-macros = "0.3"
 
 # File server
@@ -63,7 +65,7 @@ tower-layer = "0.3.3"
 # Database
 mongodb = { version = "3.1.0", features = ["rustls-tls", "tracing-unstable"] }
 bson = { version = "2.13.0", features = ["chrono-0_4"] }
-redis = { version = "0.27.3", features = ["tokio-comp"] }
+redis = { version = "0.27.4", features = ["tokio-comp"] }
 clickhouse = { version = "0.13.0", features = ["uuid", "time"] }
 meilisearch-sdk = "0.27.1"
 jsonwebtoken = { version = "9.3.0", default-features = false }

@@ -21,8 +21,8 @@ async-graphql.workspace = true
 reqwest.workspace = true
 image.workspace = true
 
-tokio-stream = "0.1.16"
-async-stream = "0.3.6"
+tokio-stream.workspace = true
+async-stream.workspace = true
 
 # Showtimes related
 showtimes-shared = { path = "../showtimes_shared" }
