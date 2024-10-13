@@ -787,12 +787,16 @@ impl SubscriptionRoot {
     )]
     async fn watch_project_episode_updated(
         &self,
+        ctx: &Context<'_>,
+        id: Option<models::prelude::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<ProjectEpisodeUpdatedEventDataGQL>> {
-        // TODO: Find a way to combine this with ClickHouse data
-        expand_stream_event!(
+        expand_combined_stream_event!(
+            ctx,
+            id,
+            showtimes_events::m::EventKind::ProjectEpisodes,
             showtimes_events::m::ProjectEpisodeUpdatedEvent,
             ProjectEpisodeUpdatedEventDataGQL
-        )
+        );
     }
 
     /// Watch for project deleted events
