@@ -6,16 +6,17 @@ use crate::{make_file_path, FsFileKind, FsFileObject};
 use futures::TryStreamExt;
 use rusty_s3::{
     actions::{
-        CreateBucket, DeleteObjects, HeadBucket, HeadObject, ListObjectsV2, ObjectIdentifier,
-        PutObject,
+        CompleteMultipartUpload, CreateBucket, CreateMultipartUpload, DeleteObjects, HeadBucket,
+        HeadObject, ListObjectsV2, ObjectIdentifier, UploadPart,
     },
     S3Action,
 };
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 pub use rusty_s3::{Bucket, Credentials as S3FsCredentials, UrlStyle as S3PathStyle};
 
 const MAX_KEYS: usize = 500;
+const CHUNK_SIZE: usize = 4_194_304; // 4 * 1024 * 1024 = 4MiB
 const ONE_HOUR: Duration = Duration::from_secs(3600);
 
 /// A S3-compatible client for accessing filesystem.
@@ -189,38 +190,21 @@ impl S3Fs {
         &self,
         base_key: impl Into<String> + std::marker::Send,
         filename: impl Into<String> + std::marker::Send,
-        stream: R,
+        stream: &mut R,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<FsFileObject>
     where
-        R: AsyncReadExt + Send + Unpin + 'static,
+        R: AsyncReadExt + AsyncSeekExt + Send + Unpin + 'static,
     {
-        // TODO: Support multipart upload for file more than 5MB
         let filename: String = filename.into();
         let base_key = base_key.into();
         let key = make_file_path(&base_key, &filename, parent_id, kind.clone());
         let guessed = mime_guess::from_path(&filename);
         let content_type = guessed.first_or_octet_stream().to_string();
 
-        tracing::debug!("Preparing to upload file: {}", &key);
-        let mut action = PutObject::new(&self.bucket, Some(&self.credentials), &key);
-        action.headers_mut().insert("content-type", &content_type);
-        let signed_url = action.sign(ONE_HOUR);
-
-        // POST Body, FramedRead fails because the lifetime of stream ('1) outlives the lifetime of the function
-        let reader =
-            tokio_util::codec::FramedRead::new(stream, tokio_util::codec::BytesCodec::new());
-        let body = reqwest::Body::wrap_stream(reader);
-
-        tracing::debug!("Sending file stream into: {}", &key);
-        self.client
-            .put(signed_url)
-            .header("content-type", &content_type)
-            .body(body)
-            .send()
-            .await?
-            .error_for_status()?;
+        self.file_stream_upload_internal(&key, &content_type, stream)
+            .await?;
 
         tracing::debug!("File uploaded: {}", &key);
         let file_stat = self
@@ -228,6 +212,122 @@ impl S3Fs {
             .await?;
 
         Ok(file_stat)
+    }
+
+    async fn file_stream_upload_internal<R>(
+        &self,
+        key: &str,
+        content_type: &str,
+        stream: &mut R,
+    ) -> anyhow::Result<()>
+    where
+        R: AsyncReadExt + AsyncSeekExt + Send + Unpin + 'static,
+    {
+        // Seek to the end of the file to get its size in bytes
+        stream.seek(std::io::SeekFrom::End(0)).await?;
+        let max_position = stream.stream_position().await?;
+        // Seek to the start of the file again
+        stream.seek(std::io::SeekFrom::Start(0)).await?;
+
+        tracing::debug!("Preparing to upload file: {}", key);
+        // Create a multipart upload request
+        let action_base = CreateMultipartUpload::new(&self.bucket, Some(&self.credentials), key);
+        let start_url = action_base.sign(ONE_HOUR);
+
+        // Send the request and get the response
+        let start_resp = self
+            .client
+            .post(start_url)
+            .header("content-type", content_type)
+            .send()
+            .await?
+            .error_for_status()?;
+        let start_body = start_resp.text().await?;
+
+        // Parse the response to get the upload ID
+        let multipart = CreateMultipartUpload::parse_response(&start_body)?;
+
+        tracing::debug!("Got multipart upload id: {}", multipart.upload_id());
+
+        // Initialize the part number and the array to store the ETags
+        let mut part_number = 1;
+        let mut etag_data: Vec<String> = vec![];
+
+        // Upload the file in chunks of 4MB each
+        while stream.stream_position().await? <= max_position {
+            // Read a chunk of the file
+            let mut chunks_buffer = Vec::with_capacity(CHUNK_SIZE); // 4MB
+            stream.read(&mut chunks_buffer).await?;
+
+            // Upload the chunk
+            let part_upload = UploadPart::new(
+                &self.bucket,
+                Some(&self.credentials),
+                key,
+                part_number,
+                multipart.upload_id(),
+            );
+            let part_url = part_upload.sign(ONE_HOUR);
+
+            tracing::debug!(
+                "Uploading part {} for \"{}\" with {} bytes",
+                part_number,
+                key,
+                chunks_buffer.len()
+            );
+            let part_response = self
+                .client
+                .put(part_url)
+                .body(chunks_buffer)
+                .send()
+                .await?
+                .error_for_status()?;
+
+            // Get the ETag from the response
+            let temp_etag = part_response
+                .headers()
+                .get(reqwest::header::ETAG)
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Failed to get etag from part upload response number {}",
+                        part_number
+                    )
+                })?;
+
+            // Store the ETag
+            etag_data.push(temp_etag.to_str()?.to_string());
+            part_number += 1;
+        }
+
+        // If there are any parts, complete the multipart upload
+        if !etag_data.is_empty() {
+            tracing::debug!(
+                "Completing multipart upload for \"{}\" with total {} parts",
+                key,
+                etag_data.len()
+            );
+            // Create the complete request
+            let deref_etag_data = etag_data.iter().map(|v| v.as_str()).collect::<Vec<&str>>();
+            let complete_action = CompleteMultipartUpload::new(
+                &self.bucket,
+                Some(&self.credentials),
+                key,
+                multipart.upload_id(),
+                deref_etag_data.into_iter(),
+            );
+
+            let complete_url = complete_action.sign(ONE_HOUR);
+
+            // Send the complete request
+            self.client
+                .post(complete_url)
+                .body(complete_action.body())
+                .send()
+                .await?
+                .error_for_status()?;
+        }
+
+        Ok(())
     }
 
     pub(crate) async fn file_stream_download<'wlife, W: AsyncWriteExt + Unpin + Send>(

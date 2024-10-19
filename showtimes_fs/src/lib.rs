@@ -1,7 +1,7 @@
 #![warn(missing_docs, clippy::empty_docs, rustdoc::broken_intra_doc_links)]
 #![doc = include_str!("../README.md")]
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
 pub mod local;
 pub mod s3;
@@ -118,7 +118,7 @@ impl FsPool {
         kind: Option<FsFileKind>,
     ) -> anyhow::Result<FsFileObject>
     where
-        R: AsyncReadExt + Send + Unpin + 'static,
+        R: AsyncReadExt + AsyncSeekExt + Send + Unpin + 'static,
     {
         match self {
             Self::LocalFs(fs) => {
@@ -126,7 +126,7 @@ impl FsPool {
                     .await
             }
             Self::S3Fs(fs) => {
-                fs.file_stream_upload(base_key, filename, stream, parent_id, kind)
+                fs.file_stream_upload(base_key, filename, &mut stream, parent_id, kind)
                     .await
             }
         }

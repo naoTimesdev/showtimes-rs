@@ -20,4 +20,3 @@ tracing.workspace = true
 mime_guess.workspace = true
 rusty-s3.workspace = true
 reqwest.workspace = true
-tokio-util.workspace = true
