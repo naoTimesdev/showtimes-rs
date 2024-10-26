@@ -13,7 +13,7 @@ use std::ops::Deref;
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-projects",
-    filterable = ["id", "parent", "created", "title", "aliases", "status", "integrations.id", "integrations.kind"],
+    filterable = ["id", "parent", "created", "title", "aliases", "kind", "status", "integrations.id", "integrations.kind"],
     searchable = ["id", "title", "aliases", "parent", "integrations.id"],
     sortable = ["id", "created", "updated"],
     distinct = "id",
@@ -36,6 +36,8 @@ pub struct Project {
     pub parent: showtimes_shared::ulid::Ulid,
     /// The status of the project
     pub status: showtimes_db::m::ProjectStatus,
+    /// The type of the project
+    pub kind: showtimes_db::m::ProjectType,
     /// The date and time the project was created
     #[serde(
         with = "showtimes_shared::unix_timestamp_serializer",
@@ -61,6 +63,7 @@ impl From<showtimes_db::m::Project> for Project {
             aliases: value.aliases,
             parent: value.creator,
             status: value.status,
+            kind: value.kind,
             created: value.created,
             updated: value.updated,
         }
@@ -78,6 +81,7 @@ impl From<&showtimes_db::m::Project> for Project {
             aliases: value.aliases.clone(),
             parent: value.creator,
             status: value.status,
+            kind: value.kind,
             created: value.created,
             updated: value.updated,
         }
@@ -95,6 +99,7 @@ impl From<&mut showtimes_db::m::Project> for Project {
             aliases: value.aliases.clone(),
             parent: value.creator,
             status: value.status,
+            kind: value.kind,
             created: value.created,
             updated: value.updated,
         }
