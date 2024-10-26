@@ -64,6 +64,21 @@ impl DiscordUser {
             expires_at: -1,
         }
     }
+
+    /// Stub a discord user with specific ID
+    ///
+    /// # Note
+    /// This only be used when orchestrating as a specific user and it doens't registered
+    pub fn stub_with_id(id: impl Into<String>) -> Self {
+        DiscordUser {
+            id: id.into(),
+            username: String::new(),
+            avatar: None,
+            access_token: String::new(),
+            refresh_token: String::new(),
+            expires_at: -1,
+        }
+    }
 }
 
 /// A model to hold user authentication information
@@ -165,6 +180,37 @@ impl User {
             _id: None,
             created: now,
             updated: now,
+        }
+    }
+
+    /// Stub a user
+    pub fn stub() -> Self {
+        let now = chrono::Utc::now();
+
+        Self {
+            id: ulid_serializer::default(),
+            username: "Showtimes User".to_string(),
+            avatar: None,
+            api_key: showtimes_shared::APIKey::new(),
+            kind: UserKind::User,
+            registered: true,
+            discord_meta: DiscordUser::stub(),
+            _id: None,
+            created: now,
+            updated: now,
+        }
+    }
+
+    /// Stub a user with specific ID
+    pub fn stub_with_id(id: showtimes_shared::ulid::Ulid) -> Self {
+        Self { id, ..Self::stub() }
+    }
+
+    /// Stub a user with specific Discord ID
+    pub fn stub_with_discord_id(id: impl Into<String>) -> Self {
+        Self {
+            discord_meta: DiscordUser::stub_with_id(id),
+            ..Self::stub()
         }
     }
 

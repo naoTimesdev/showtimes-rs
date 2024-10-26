@@ -54,6 +54,7 @@ pub type ShowtimesGQLSchema = async_graphql::Schema<QueryRoot, MutationRoot, Sub
 pub use async_graphql::http::{graphiql_plugin_explorer, GraphiQLSource, ALL_WEBSOCKET_PROTOCOLS};
 pub use async_graphql::{Data, Error};
 pub use image::MAX_IMAGE_SIZE;
+pub use models::Orchestrator;
 
 static STUBBED_ADMIN: LazyLock<ServerQueryUser> = LazyLock::new(|| {
     ServerQueryUser::new(
