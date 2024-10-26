@@ -62,6 +62,16 @@ fn get_token_or_bearer(headers: &HeaderMap, config: &Config) -> Option<(SessionK
     })
 }
 
+fn get_orchestrator(headers: &HeaderMap) -> showtimes_gql::Orchestrator {
+    match headers.get("x-orchestrator") {
+        None => showtimes_gql::Orchestrator::Standalone,
+        Some(value) => match value.to_str() {
+            Ok(header) => showtimes_gql::Orchestrator::from_header(Some(header)),
+            Err(_) => showtimes_gql::Orchestrator::Standalone,
+        },
+    }
+}
+
 /// The main GraphQL handler
 ///
 /// This handler will handle all GraphQL requests, it will also handle the authentication
@@ -106,6 +116,9 @@ pub async fn graphql_handler(
             }
         }
     };
+
+    // Set orchestrator
+    req = req.data(get_orchestrator(&headers));
 
     // Check for x-refresh-token header
     let mut active_refresh = None;

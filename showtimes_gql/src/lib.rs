@@ -412,8 +412,20 @@ impl MutationRoot {
         input: mutations::projects::ProjectUpdateInputGQL,
     ) -> async_graphql::Result<ProjectGQL> {
         let user = find_authenticated_user(ctx).await?;
+        let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
+            Orchestrator::Standalone => None,
+            other => {
+                // Only allow if the user is type is Admin or greater
+                if user.kind >= showtimes_db::m::UserKind::Admin {
+                    other.to_user(ctx).await?
+                } else {
+                    None
+                }
+            }
+        };
 
-        mutations::projects::mutate_projects_update(ctx, user, id, input).await
+        mutations::projects::mutate_projects_update(ctx, user_behalf.unwrap_or(user), id, input)
+            .await
     }
 
     /// Add new episode automatically to a project
@@ -434,8 +446,25 @@ impl MutationRoot {
         total: u32,
     ) -> async_graphql::Result<ProjectGQL> {
         let user = find_authenticated_user(ctx).await?;
+        let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
+            Orchestrator::Standalone => None,
+            other => {
+                // Only allow if the user is type is Admin or greater
+                if user.kind >= showtimes_db::m::UserKind::Admin {
+                    other.to_user(ctx).await?
+                } else {
+                    None
+                }
+            }
+        };
 
-        mutations::projects::mutate_projects_episode_add_auto(ctx, user, id, total.into()).await
+        mutations::projects::mutate_projects_episode_add_auto(
+            ctx,
+            user_behalf.unwrap_or(user),
+            id,
+            total.into(),
+        )
+        .await
     }
 
     /// Add new episode manually to a project
@@ -456,8 +485,25 @@ impl MutationRoot {
         episodes: Vec<mutations::projects::ProgressCreateInputGQL>,
     ) -> async_graphql::Result<ProjectGQL> {
         let user = find_authenticated_user(ctx).await?;
+        let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
+            Orchestrator::Standalone => None,
+            other => {
+                // Only allow if the user is type is Admin or greater
+                if user.kind >= showtimes_db::m::UserKind::Admin {
+                    other.to_user(ctx).await?
+                } else {
+                    None
+                }
+            }
+        };
 
-        mutations::projects::mutate_projects_episode_add_manual(ctx, user, id, &episodes).await
+        mutations::projects::mutate_projects_episode_add_manual(
+            ctx,
+            user_behalf.unwrap_or(user),
+            id,
+            &episodes,
+        )
+        .await
     }
 
     /// Add new episode automatically to a project
@@ -478,8 +524,25 @@ impl MutationRoot {
         episodes: Vec<u64>,
     ) -> async_graphql::Result<ProjectGQL> {
         let user = find_authenticated_user(ctx).await?;
+        let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
+            Orchestrator::Standalone => None,
+            other => {
+                // Only allow if the user is type is Admin or greater
+                if user.kind >= showtimes_db::m::UserKind::Admin {
+                    other.to_user(ctx).await?
+                } else {
+                    None
+                }
+            }
+        };
 
-        mutations::projects::mutate_projects_episode_remove(ctx, user, id, &episodes).await
+        mutations::projects::mutate_projects_episode_remove(
+            ctx,
+            user_behalf.unwrap_or(user),
+            id,
+            &episodes,
+        )
+        .await
     }
 
     /// Initiate a collaboration between projects
@@ -494,8 +557,24 @@ impl MutationRoot {
         input: mutations::collaborations::CollaborationRequestInputGQL,
     ) -> async_graphql::Result<CollaborationInviteGQL> {
         let user = find_authenticated_user(ctx).await?;
+        let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
+            Orchestrator::Standalone => None,
+            other => {
+                // Only allow if the user is type is Admin or greater
+                if user.kind >= showtimes_db::m::UserKind::Admin {
+                    other.to_user(ctx).await?
+                } else {
+                    None
+                }
+            }
+        };
 
-        mutations::collaborations::mutate_collaborations_initiate(ctx, user, input).await
+        mutations::collaborations::mutate_collaborations_initiate(
+            ctx,
+            user_behalf.unwrap_or(user),
+            input,
+        )
+        .await
     }
 
     /// Accept a collaboration request between projects
@@ -509,8 +588,24 @@ impl MutationRoot {
         #[graphql(desc = "The collaboration ID to accept")] id: crate::models::prelude::UlidGQL,
     ) -> async_graphql::Result<CollaborationSyncGQL> {
         let user = find_authenticated_user(ctx).await?;
+        let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
+            Orchestrator::Standalone => None,
+            other => {
+                // Only allow if the user is type is Admin or greater
+                if user.kind >= showtimes_db::m::UserKind::Admin {
+                    other.to_user(ctx).await?
+                } else {
+                    None
+                }
+            }
+        };
 
-        mutations::collaborations::mutate_collaborations_accept(ctx, user, id).await
+        mutations::collaborations::mutate_collaborations_accept(
+            ctx,
+            user_behalf.unwrap_or(user),
+            id,
+        )
+        .await
     }
 
     /// Deny a collaboration request between projects
@@ -524,8 +619,25 @@ impl MutationRoot {
         #[graphql(desc = "The collaboration ID to deny")] id: crate::models::prelude::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
         let user = find_authenticated_user(ctx).await?;
+        let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
+            Orchestrator::Standalone => None,
+            other => {
+                // Only allow if the user is type is Admin or greater
+                if user.kind >= showtimes_db::m::UserKind::Admin {
+                    other.to_user(ctx).await?
+                } else {
+                    None
+                }
+            }
+        };
 
-        mutations::collaborations::mutate_collaborations_cancel(ctx, user, id, true).await
+        mutations::collaborations::mutate_collaborations_cancel(
+            ctx,
+            user_behalf.unwrap_or(user),
+            id,
+            true,
+        )
+        .await
     }
 
     /// Retract a collaboration request between projects
@@ -539,8 +651,25 @@ impl MutationRoot {
         #[graphql(desc = "The collaboration ID to retract")] id: crate::models::prelude::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
         let user = find_authenticated_user(ctx).await?;
+        let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
+            Orchestrator::Standalone => None,
+            other => {
+                // Only allow if the user is type is Admin or greater
+                if user.kind >= showtimes_db::m::UserKind::Admin {
+                    other.to_user(ctx).await?
+                } else {
+                    None
+                }
+            }
+        };
 
-        mutations::collaborations::mutate_collaborations_cancel(ctx, user, id, false).await
+        mutations::collaborations::mutate_collaborations_cancel(
+            ctx,
+            user_behalf.unwrap_or(user),
+            id,
+            false,
+        )
+        .await
     }
 
     /// Delete or unlink a collaboration between projects
@@ -556,8 +685,25 @@ impl MutationRoot {
         target: crate::models::prelude::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
         let user = find_authenticated_user(ctx).await?;
+        let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
+            Orchestrator::Standalone => None,
+            other => {
+                // Only allow if the user is type is Admin or greater
+                if user.kind >= showtimes_db::m::UserKind::Admin {
+                    other.to_user(ctx).await?
+                } else {
+                    None
+                }
+            }
+        };
 
-        mutations::collaborations::mutate_collaborations_unlink(ctx, user, id, target).await
+        mutations::collaborations::mutate_collaborations_unlink(
+            ctx,
+            user_behalf.unwrap_or(user),
+            id,
+            target,
+        )
+        .await
     }
 
     /// Delete a project from Showtimes
@@ -571,8 +717,19 @@ impl MutationRoot {
         #[graphql(desc = "The project ID to delete")] id: crate::models::prelude::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
         let user = find_authenticated_user(ctx).await?;
+        let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
+            Orchestrator::Standalone => None,
+            other => {
+                // Only allow if the user is type is Admin or greater
+                if user.kind >= showtimes_db::m::UserKind::Admin {
+                    other.to_user(ctx).await?
+                } else {
+                    None
+                }
+            }
+        };
 
-        mutations::projects::mutate_projects_delete(ctx, user, id).await
+        mutations::projects::mutate_projects_delete(ctx, user_behalf.unwrap_or(user), id).await
     }
 
     /// Delete a server from Showtimes

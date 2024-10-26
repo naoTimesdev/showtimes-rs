@@ -13,7 +13,7 @@ pub mod users;
 
 /// An orchestrator (or "on behalf-of") request information.
 pub enum Orchestrator {
-    /// A standalone request
+    /// A standalone request, means it's done by the current user
     Standalone,
     /// A request on behalf of a user via ID
     UserId(showtimes_shared::ulid::Ulid),
