@@ -7,13 +7,14 @@ members = [
     "showtimes_gql",
     "showtimes_metadata",
     "showtimes_search",
+    "showtimes_events",
     "showtimes_session",
     "showtimes_shared",
     "showtimes_derive",
 
     # Binary
     "showtimes_migrate",
-    "showtimes", "showtimes_events",
+    "showtimes",
 ]
 
 [workspace.package]

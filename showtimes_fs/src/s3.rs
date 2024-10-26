@@ -257,7 +257,22 @@ impl S3Fs {
         while stream.stream_position().await? <= max_position {
             // Read a chunk of the file
             let mut chunks_buffer = Vec::with_capacity(CHUNK_SIZE); // 4MB
-            stream.read(&mut chunks_buffer).await?;
+            match stream.read_exact(&mut chunks_buffer).await {
+                Ok(_) => (),
+                Err(e) => {
+                    // Depending on the error, we silently ignore it.
+                    if e.kind() != std::io::ErrorKind::UnexpectedEof {
+                        return Err(e.into());
+                    }
+                }
+            }
+
+            let position = stream.stream_position().await?;
+
+            if chunks_buffer.is_empty() && position >= max_position {
+                // We reached the end of the file and no data was read
+                break;
+            }
 
             // Upload the chunk
             let part_upload = UploadPart::new(

@@ -38,14 +38,14 @@ impl Orchestrator {
                     // Split ID <XXXXXXXXXXXX>, the parse as ULID
                     match header.get(3..) {
                         Some(id) => match showtimes_shared::ulid::Ulid::from_string(id) {
-                            Ok(id) => return Orchestrator::UserId(id),
+                            Ok(id) => Orchestrator::UserId(id),
                             Err(_) => Orchestrator::Standalone,
                         },
                         None => Orchestrator::Standalone,
                     }
                 } else if header.starts_with("Discord ") {
                     match header.get(7..) {
-                        Some(id) => return Orchestrator::UserDiscord(id.to_string()),
+                        Some(id) => Orchestrator::UserDiscord(id.to_string()),
                         None => Orchestrator::Standalone,
                     }
                 } else {
