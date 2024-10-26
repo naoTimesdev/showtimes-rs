@@ -110,6 +110,8 @@ pub struct ProjectUpdatedDataEvent {
     poster_image: Option<showtimes_db::m::ImageMetadata>,
     #[serde(skip_serializing_if = "Option::is_none")]
     aliases: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status: Option<showtimes_db::m::ProjectStatus>,
     progress: Option<Vec<ProjectUpdatedEpisodeDataEvent>>,
 }
 
@@ -128,6 +130,7 @@ impl ProjectUpdatedDataEvent {
             || self.roles.is_some()
             || self.poster_image.is_some()
             || self.aliases.is_some()
+            || self.status.is_some()
             || (self.progress.is_some() && !self.progress.as_ref().unwrap().is_empty())
     }
 }

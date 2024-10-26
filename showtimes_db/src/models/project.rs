@@ -616,6 +616,34 @@ impl Ord for EpisodeProgress {
     }
 }
 
+/// The project status information.
+///
+/// This is only used for marking information for the project.
+///
+/// If you want to check if the project is finished or not, please check the `progress` field.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ProjectStatus {
+    /// The project is currently ongoing or active.
+    ///
+    /// User can do any changes in the project.
+    #[default]
+    Active,
+    /// The project is currently paused or in hiatus.
+    ///
+    /// User can do any changes in the project.
+    /// This will give better user experience, when project is stalled.
+    Paused,
+    /// The current project is dropped or archived.
+    ///
+    /// Determining archive or dropped status:
+    /// - When all episodes/chapters in the project are finished and released, the project is archived.
+    /// - Otherwise, the project is dropped.
+    ///
+    /// User can't do any changes in the project.
+    Archived,
+}
+
 /// The model holding project information.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, showtimes_derive::ShowModelHandler)]
 #[col_name("ShowtimesProjects")]
@@ -642,6 +670,8 @@ pub struct Project {
     /// The server ID creator of the project.
     #[serde(with = "ulid_serializer", default = "ulid_serializer::default")]
     pub creator: showtimes_shared::ulid::Ulid,
+    /// The status of the project.
+    pub status: ProjectStatus,
     /// The type of the project.
     pub kind: ProjectType,
     #[serde(skip_serializing_if = "Option::is_none")]
