@@ -2843,6 +2843,7 @@ dependencies = [
 name = "showtimes-derive"
 version = "0.1.0"
 dependencies = [
+ "convert_case 0.6.0",
  "mongodb",
  "proc-macro2",
  "quote",
@@ -2895,6 +2896,7 @@ dependencies = [
  "image",
  "reqwest",
  "showtimes-db",
+ "showtimes-derive",
  "showtimes-events",
  "showtimes-fs",
  "showtimes-metadata",

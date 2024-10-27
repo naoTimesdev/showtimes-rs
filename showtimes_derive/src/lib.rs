@@ -3,6 +3,7 @@
 
 use proc_macro::TokenStream;
 
+mod enums;
 mod events;
 mod search;
 mod shows;
@@ -85,4 +86,23 @@ pub fn derive_event_model(input: TokenStream) -> TokenStream {
 
     // Generate the implementation of the trait
     events::expand_eventmodel(&input)
+}
+
+/// Derive the `EnumName` trait for an enum
+///
+/// # Examples
+/// ```
+/// #[derive(EnumName)]
+/// pub enum ProjectStatus {
+///     Active,
+///     Completed,
+/// }
+/// ```
+#[proc_macro_derive(EnumName, attributes(enum_name))]
+pub fn derive_enum_name(input: TokenStream) -> TokenStream {
+    // Parse the input tokens into a syntax tree
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+
+    // Generate the implementation of the trait
+    enums::expand_enumname(&input)
 }
