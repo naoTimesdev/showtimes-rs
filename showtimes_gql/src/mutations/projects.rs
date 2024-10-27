@@ -18,6 +18,7 @@ use crate::{
         ProjectDataLoader, ServerDataLoader, ServerSyncIds, ServerSyncLoader, UserDataLoader,
     },
     models::{
+        errors::GQLError,
         prelude::{DateTimeGQL, OkResponse, UlidGQL},
         projects::{ProjectGQL, ProjectStatusGQL},
         search::ExternalSearchSource,
@@ -920,9 +921,36 @@ pub async fn mutate_projects_create(
             let mut file_target = tokio::fs::File::from_std(info_up.content);
 
             // Get format
-            let format = crate::image::detect_upload_data(&mut file_target).await?;
+            let format = crate::image::detect_upload_data(&mut file_target)
+                .await
+                .map_err(|err| {
+                    Error::new(format!("Failed to detect image format: {err}")).extend_with(
+                        |_, e| {
+                            e.set("id", project.id.to_string());
+                            e.set("where", "project");
+                            e.set("reason", GQLError::IOError);
+                            e.set("code", GQLError::IOError.code());
+                            e.set("original", format!("{err}"));
+                            e.set("original_code", format!("{}", err.kind()));
+                        },
+                    )
+                })?;
             // Seek back to the start of the file
-            file_target.seek(std::io::SeekFrom::Start(0)).await?;
+            file_target
+                .seek(std::io::SeekFrom::Start(0))
+                .await
+                .map_err(|err| {
+                    Error::new(format!("Failed to seek to image to start: {err}")).extend_with(
+                        |_, e| {
+                            e.set("id", project.id.to_string());
+                            e.set("where", "project");
+                            e.set("reason", GQLError::IOError);
+                            e.set("code", GQLError::IOError.code());
+                            e.set("original", format!("{err}"));
+                            e.set("original_code", format!("{}", err.kind()));
+                        },
+                    )
+                })?;
 
             let filename = format!("cover.{}", format.as_extension());
 
@@ -934,7 +962,16 @@ pub async fn mutate_projects_create(
                     Some(&srv.id.to_string()),
                     Some(showtimes_fs::FsFileKind::Images),
                 )
-                .await?;
+                .await
+                .map_err(|err| {
+                    Error::new(format!("Failed to upload image: {err}")).extend_with(|_, e| {
+                        e.set("id", project.id.to_string());
+                        e.set("where", "project");
+                        e.set("reason", GQLError::ImageUploadError);
+                        e.set("code", GQLError::ImageUploadError.code());
+                        e.set("original", format!("{err}"));
+                    })
+                })?;
 
             showtimes_db::m::ImageMetadata::new(
                 showtimes_fs::FsFileKind::Images.as_path_name(),
@@ -1562,9 +1599,36 @@ async fn update_single_project(
             let mut file_target = tokio::fs::File::from_std(info_up.content);
 
             // Get format
-            let format = crate::image::detect_upload_data(&mut file_target).await?;
+            let format = crate::image::detect_upload_data(&mut file_target)
+                .await
+                .map_err(|err| {
+                    Error::new(format!("Failed to detect image format: {err}")).extend_with(
+                        |_, e| {
+                            e.set("id", project.id.to_string());
+                            e.set("where", "project");
+                            e.set("reason", GQLError::IOError);
+                            e.set("code", GQLError::IOError.code());
+                            e.set("original", format!("{err}"));
+                            e.set("original_code", format!("{}", err.kind()));
+                        },
+                    )
+                })?;
             // Seek back to the start of the file
-            file_target.seek(std::io::SeekFrom::Start(0)).await?;
+            file_target
+                .seek(std::io::SeekFrom::Start(0))
+                .await
+                .map_err(|err| {
+                    Error::new(format!("Failed to seek to image to start: {err}")).extend_with(
+                        |_, e| {
+                            e.set("id", project.id.to_string());
+                            e.set("where", "project");
+                            e.set("reason", GQLError::IOError);
+                            e.set("code", GQLError::IOError.code());
+                            e.set("original", format!("{err}"));
+                            e.set("original_code", format!("{}", err.kind()));
+                        },
+                    )
+                })?;
 
             let filename = format!("cover.{}", format.as_extension());
 
@@ -1576,7 +1640,16 @@ async fn update_single_project(
                     Some(&project.creator.to_string()),
                     Some(showtimes_fs::FsFileKind::Images),
                 )
-                .await?;
+                .await
+                .map_err(|err| {
+                    Error::new(format!("Failed to upload image: {err}")).extend_with(|_, e| {
+                        e.set("id", project.id.to_string());
+                        e.set("where", "project");
+                        e.set("reason", GQLError::ImageUploadError);
+                        e.set("code", GQLError::ImageUploadError.code());
+                        e.set("original", format!("{err}"));
+                    })
+                })?;
 
             let image_meta = showtimes_db::m::ImageMetadata::new(
                 showtimes_fs::FsFileKind::Images.as_path_name(),

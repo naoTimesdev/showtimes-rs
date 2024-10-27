@@ -9,6 +9,8 @@ pub enum GQLError {
     Unauthorized = 101,
     InvalidRequest = 102,
     MissingRequiredField = 103,
+    IOError = 110,
+    ImageUploadError = 120,
 
     // Event related
     EventAdvanceFailure = 200,

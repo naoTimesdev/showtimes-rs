@@ -9,7 +9,10 @@ use tokio::io::AsyncSeekExt;
 
 use crate::{
     data_loader::{DiscordIdLoad, UserDataLoader},
-    models::users::{UserGQL, UserKindGQL, UserSessionGQL},
+    models::{
+        errors::GQLError,
+        users::{UserGQL, UserKindGQL, UserSessionGQL},
+    },
 };
 
 use super::execute_search_events;
@@ -161,9 +164,34 @@ pub async fn mutate_users_update(
         let mut file_target = tokio::fs::File::from_std(info_up.content);
 
         // Get format
-        let format = crate::image::detect_upload_data(&mut file_target).await?;
+        let format = crate::image::detect_upload_data(&mut file_target)
+            .await
+            .map_err(|err| {
+                Error::new(format!("Failed to detect image format: {err}")).extend_with(|_, e| {
+                    e.set("id", user_info.id.to_string());
+                    e.set("where", "user");
+                    e.set("reason", GQLError::IOError);
+                    e.set("code", GQLError::IOError.code());
+                    e.set("original", format!("{err}"));
+                    e.set("original_code", format!("{}", err.kind()));
+                })
+            })?;
         // Seek back to the start of the file
-        file_target.seek(std::io::SeekFrom::Start(0)).await?;
+        file_target
+            .seek(std::io::SeekFrom::Start(0))
+            .await
+            .map_err(|err| {
+                Error::new(format!("Failed to seek to image to start: {err}")).extend_with(
+                    |_, e| {
+                        e.set("id", user_info.id.to_string());
+                        e.set("where", "user");
+                        e.set("reason", GQLError::IOError);
+                        e.set("code", GQLError::IOError.code());
+                        e.set("original", format!("{err}"));
+                        e.set("original_code", format!("{}", err.kind()));
+                    },
+                )
+            })?;
 
         let filename = format!("avatar.{}", format.as_extension());
 
@@ -175,7 +203,16 @@ pub async fn mutate_users_update(
                 None,
                 Some(showtimes_fs::FsFileKind::Images),
             )
-            .await?;
+            .await
+            .map_err(|err| {
+                Error::new(format!("Failed to upload image: {err}")).extend_with(|_, e| {
+                    e.set("id", user_info.id.to_string());
+                    e.set("where", "user");
+                    e.set("reason", GQLError::ImageUploadError);
+                    e.set("code", GQLError::ImageUploadError.code());
+                    e.set("original", format!("{err}"));
+                })
+            })?;
 
         let image_meta = showtimes_db::m::ImageMetadata::new(
             showtimes_fs::FsFileKind::Images.as_path_name(),
