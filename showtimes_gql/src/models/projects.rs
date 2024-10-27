@@ -36,6 +36,32 @@ pub enum ProjectTypeGQL {
     Unknown,
 }
 
+/// Enum to hold project status.
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[graphql(
+    remote = "showtimes_db::m::ProjectStatus",
+    rename_items = "SCREAMING_SNAKE_CASE"
+)]
+pub enum ProjectStatusGQL {
+    /// The project is currently ongoing or active.
+    ///
+    /// User can do any changes in the project.
+    Active,
+    /// The project is currently paused or in hiatus.
+    ///
+    /// User can do any changes in the project.
+    /// This will give better user experience, when project is stalled.
+    Paused,
+    /// The current project is dropped or archived.
+    ///
+    /// Determining archive or dropped status:
+    /// - When all episodes/chapters in the project are finished and released, the project is archived.
+    /// - Otherwise, the project is dropped.
+    ///
+    /// User can't do any changes in the project.
+    Archived,
+}
+
 /// The project poster information
 #[derive(SimpleObject)]
 pub struct PosterGQL {
@@ -164,6 +190,7 @@ pub struct ProjectGQL {
     integrations: Vec<showtimes_db::m::IntegrationId>,
     creator: showtimes_shared::ulid::Ulid,
     kind: showtimes_db::m::ProjectType,
+    status: showtimes_db::m::ProjectStatus,
     created: chrono::DateTime<chrono::Utc>,
     updated: chrono::DateTime<chrono::Utc>,
     disable_server_fetch: bool,
@@ -307,6 +334,11 @@ impl ProjectGQL {
         self.kind.into()
     }
 
+    /// The project status
+    async fn status(&self) -> ProjectStatusGQL {
+        self.status.into()
+    }
+
     /// The project collaboration information
     async fn collaboration(
         &self,
@@ -423,6 +455,7 @@ impl From<showtimes_db::m::Project> for ProjectGQL {
             integrations: project.integrations,
             creator: project.creator,
             kind: project.kind,
+            status: project.status,
             created: project.created,
             updated: project.updated,
             disable_server_fetch: false,
@@ -443,6 +476,7 @@ impl From<&showtimes_db::m::Project> for ProjectGQL {
             integrations: project.integrations.clone(),
             creator: project.creator,
             kind: project.kind,
+            status: project.status,
             created: project.created,
             updated: project.updated,
             disable_server_fetch: false,

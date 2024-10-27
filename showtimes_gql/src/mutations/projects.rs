@@ -19,7 +19,7 @@ use crate::{
     },
     models::{
         prelude::{DateTimeGQL, OkResponse, UlidGQL},
-        projects::ProjectGQL,
+        projects::{ProjectGQL, ProjectStatusGQL},
         search::ExternalSearchSource,
     },
 };
@@ -169,7 +169,10 @@ pub struct ProjectProgressUpdateInputGQL {
     /// This will only update the status for the role that is provided
     /// in the list, to not update the status, just do not include the list
     statuses: Option<Vec<ProjectProgressStatusUpdateInputGQL>>,
-    /// Do a silent update, this will not broadcast the event for status change
+    /// Do a silent update, this will not broadcast the event for status change.
+    ///
+    /// This will be overridden when it's updating other synchronized project and
+    /// that project status is currently set to `ARCHIVED`.
     #[graphql(default = false)]
     silent: bool,
 }
@@ -246,6 +249,12 @@ pub struct ProjectUpdateInputGQL {
     poster: Option<Upload>,
     /// The poster color (rgb color in integer format)
     poster_color: Option<u32>,
+    /// The status of the project.
+    ///
+    /// The only thing that can be modified when project is "ARCHIVED" is this field.
+    ///
+    /// When you're providing this, all other fields will be ignored.
+    status: Option<ProjectStatusGQL>,
     /// Synchronize the project with external metadata
     ///
     /// This will update the progress count.
@@ -275,6 +284,7 @@ impl ProjectUpdateInputGQL {
             || self.poster_color.is_some()
             || self.sync_metadata
             || self.progress.is_some()
+            || self.status.is_some()
     }
 }
 
@@ -1046,16 +1056,13 @@ pub async fn mutate_projects_delete(
     let storages = ctx.data_unchecked::<Arc<FsPool>>();
     let meili = ctx.data_unchecked::<SearchClientShared>();
 
-    let prj_info = prj_loader.load_one(*id).await?;
-
-    if prj_info.is_none() {
+    // Fetch project
+    let Some(prj_info) = prj_loader.load_one(*id).await? else {
         return Err(Error::new("Project not found").extend_with(|_, e| {
             e.set("id", id.to_string());
             e.set("reason", "invalid_project");
         }));
-    }
-
-    let prj_info = prj_info.unwrap();
+    };
 
     let srv = srv_loader.load_one(prj_info.creator).await?;
 
@@ -1476,6 +1483,8 @@ async fn update_single_project(
     // Update progress
     let mut progress_event: Vec<showtimes_events::m::ProjectEpisodeUpdatedEvent> = vec![];
 
+    let is_archived = project.status == showtimes_db::m::ProjectStatus::Archived;
+
     if let Some(progress) = &input.progress {
         for episode in progress {
             if !episode.is_any_set() {
@@ -1484,10 +1493,11 @@ async fn update_single_project(
 
             let find_episode = project.find_episode_mut(episode.number);
             if let Some(db_ep) = find_episode {
+                let is_archived_silent = !is_main && is_archived;
                 let mut ep_event = showtimes_events::m::ProjectEpisodeUpdatedEvent::new(
                     prj_id,
                     db_ep.number,
-                    episode.silent,
+                    episode.silent || is_archived_silent,
                 );
 
                 let mut before_episode =
@@ -1612,19 +1622,155 @@ pub async fn mutate_projects_update(
     let prj_handler = ProjectHandler::new(db);
 
     // Fetch project
-    let prj_info = prj_loader.load_one(*id).await?;
-
-    if prj_info.is_none() {
+    let Some(mut prj_info) = prj_loader.load_one(*id).await? else {
         return Err(Error::new("Project not found").extend_with(|_, e| {
             e.set("id", id.to_string());
             e.set("reason", "invalid_project");
         }));
-    }
-
-    let mut prj_info = prj_info.unwrap();
+    };
 
     // Check perms
     check_permissions(ctx, prj_info.creator, &user, Some(prj_info.id)).await?;
+
+    // Check if we can update project
+    match (prj_info.status, input.status) {
+        (showtimes_db::m::ProjectStatus::Archived, None) => {
+            // Missing status update and in archived mode, error!
+            return Err(Error::new("Project is archived").extend_with(|_, e| {
+                e.set("id", id.to_string());
+                e.set("reason", "project_archived");
+            }));
+        }
+        (showtimes_db::m::ProjectStatus::Archived, Some(new_status)) => {
+            if new_status == ProjectStatusGQL::Archived {
+                return Err(Error::new("Project is archived").extend_with(|_, e| {
+                    e.set("id", id.to_string());
+                    e.set("reason", "project_archived");
+                }));
+            }
+
+            let mut before_update = showtimes_events::m::ProjectUpdatedDataEvent::default();
+            let mut after_update = showtimes_events::m::ProjectUpdatedDataEvent::default();
+
+            before_update.set_status(prj_info.status);
+            prj_info.status = new_status.into();
+            after_update.set_status(prj_info.status);
+
+            // Save the project
+            prj_handler.save(&mut prj_info, None).await?;
+
+            // Save search results
+            let meili = ctx.data_unchecked::<SearchClientShared>().clone();
+            let proj_search = vec![showtimes_search::models::Project::from(&prj_info)];
+            let o_project_index = meili.index(showtimes_search::models::Project::index_name());
+            let task_search = tokio::task::spawn(async move {
+                match o_project_index
+                    .add_or_update(
+                        &proj_search,
+                        Some(showtimes_search::models::Project::primary_key()),
+                    )
+                    .await
+                {
+                    Ok(o_project_task) => {
+                        match o_project_task.wait_for_completion(&meili, None, None).await {
+                            Ok(_) => Ok(()),
+                            Err(e) => Err(e),
+                        }
+                    }
+                    Err(e) => Err(e),
+                }
+            });
+
+            // Save the project update event
+            let task_events = ctx
+                .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+                .create_event_async(
+                    showtimes_events::m::EventKind::ProjectUpdated,
+                    showtimes_events::m::ProjectUpdatedEvent::new(
+                        prj_info.id,
+                        before_update,
+                        after_update,
+                    ),
+                    if user.kind == UserKind::Owner {
+                        None
+                    } else {
+                        Some(user.id.to_string())
+                    },
+                );
+
+            // Wait for all tasks
+            execute_search_events(task_search, task_events).await?;
+
+            // Return the updated project
+            let prj_gql = ProjectGQL::from(&prj_info);
+            return Ok(prj_gql);
+        }
+        (_, Some(new_status)) => {
+            let new_status_db: showtimes_db::m::ProjectStatus = new_status.into();
+            if prj_info.status != new_status_db {
+                // STOP!
+                let mut before_update = showtimes_events::m::ProjectUpdatedDataEvent::default();
+                let mut after_update = showtimes_events::m::ProjectUpdatedDataEvent::default();
+
+                before_update.set_status(prj_info.status);
+                prj_info.status = new_status_db;
+                after_update.set_status(prj_info.status);
+
+                // Save the project
+                prj_handler.save(&mut prj_info, None).await?;
+
+                // Save search results
+                let meili = ctx.data_unchecked::<SearchClientShared>().clone();
+                let proj_search = vec![showtimes_search::models::Project::from(&prj_info)];
+                let o_project_index = meili.index(showtimes_search::models::Project::index_name());
+                let task_search = tokio::task::spawn(async move {
+                    match o_project_index
+                        .add_or_update(
+                            &proj_search,
+                            Some(showtimes_search::models::Project::primary_key()),
+                        )
+                        .await
+                    {
+                        Ok(o_project_task) => {
+                            match o_project_task.wait_for_completion(&meili, None, None).await {
+                                Ok(_) => Ok(()),
+                                Err(e) => Err(e),
+                            }
+                        }
+                        Err(e) => Err(e),
+                    }
+                });
+
+                // Save the project update event
+                let task_events = ctx
+                    .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+                    .create_event_async(
+                        showtimes_events::m::EventKind::ProjectUpdated,
+                        showtimes_events::m::ProjectUpdatedEvent::new(
+                            prj_info.id,
+                            before_update,
+                            after_update,
+                        ),
+                        if user.kind == UserKind::Owner {
+                            None
+                        } else {
+                            Some(user.id.to_string())
+                        },
+                    );
+
+                // Wait for all tasks
+                execute_search_events(task_search, task_events).await?;
+
+                // Return the updated project
+                let prj_gql = ProjectGQL::from(&prj_info);
+                return Ok(prj_gql);
+            }
+
+            // Ignore since it's the same
+        }
+        // Ignore since the rest should be None
+        _ => {}
+    };
 
     // Preload all user if we need to update assignees
     let mut loaded_users: HashMap<showtimes_shared::ulid::Ulid, showtimes_db::m::User> =
@@ -1813,19 +1959,22 @@ pub async fn mutate_projects_episode_add_auto(
     let prj_handler = ProjectHandler::new(db);
 
     // Fetch project
-    let prj_info = prj_loader.load_one(*id).await?;
-
-    if prj_info.is_none() {
+    let Some(mut prj_info) = prj_loader.load_one(*id).await? else {
         return Err(Error::new("Project not found").extend_with(|_, e| {
             e.set("id", id.to_string());
             e.set("reason", "invalid_project");
         }));
-    }
-
-    let mut prj_info = prj_info.unwrap();
+    };
 
     // Check perms
     check_permissions(ctx, prj_info.creator, &user, Some(prj_info.id)).await?;
+
+    if prj_info.status == showtimes_db::m::ProjectStatus::Archived {
+        return Err(Error::new("Project is archived").extend_with(|_, e| {
+            e.set("id", id.to_string());
+            e.set("reason", "project_archived");
+        }));
+    }
 
     fn update_project_inner(
         project: &mut showtimes_db::m::Project,
@@ -1948,19 +2097,22 @@ pub async fn mutate_projects_episode_add_manual(
     let prj_handler = ProjectHandler::new(db);
 
     // Fetch project
-    let prj_info = prj_loader.load_one(*id).await?;
-
-    if prj_info.is_none() {
+    let Some(mut prj_info) = prj_loader.load_one(*id).await? else {
         return Err(Error::new("Project not found").extend_with(|_, e| {
             e.set("id", id.to_string());
             e.set("reason", "invalid_project");
         }));
-    }
-
-    let mut prj_info = prj_info.unwrap();
+    };
 
     // Check perms
     check_permissions(ctx, prj_info.creator, &user, Some(prj_info.id)).await?;
+
+    if prj_info.status == showtimes_db::m::ProjectStatus::Archived {
+        return Err(Error::new("Project is archived").extend_with(|_, e| {
+            e.set("id", id.to_string());
+            e.set("reason", "project_archived");
+        }));
+    }
 
     fn update_project_inner(
         project: &mut showtimes_db::m::Project,
@@ -2088,19 +2240,22 @@ pub async fn mutate_projects_episode_remove(
     let db = ctx.data_unchecked::<DatabaseShared>();
 
     // Fetch project
-    let prj_info = prj_loader.load_one(*id).await?;
-
-    if prj_info.is_none() {
+    let Some(mut prj_info) = prj_loader.load_one(*id).await? else {
         return Err(Error::new("Project not found").extend_with(|_, e| {
             e.set("id", id.to_string());
             e.set("reason", "invalid_project");
         }));
-    }
-
-    let mut prj_info = prj_info.unwrap();
+    };
 
     // Check perms
     check_permissions(ctx, prj_info.creator, &user, Some(prj_info.id)).await?;
+
+    if prj_info.status == showtimes_db::m::ProjectStatus::Archived {
+        return Err(Error::new("Project is archived").extend_with(|_, e| {
+            e.set("id", id.to_string());
+            e.set("reason", "project_archived");
+        }));
+    }
 
     fn update_project_inner(
         project: &mut showtimes_db::m::Project,

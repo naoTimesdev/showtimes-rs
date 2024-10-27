@@ -4,7 +4,7 @@ use crate::{
     data_loader::{ProjectDataLoader, UserDataLoader},
     models::{
         prelude::*,
-        projects::{ProjectGQL, RoleGQL},
+        projects::{ProjectGQL, ProjectStatusGQL, RoleGQL},
         users::UserGQL,
     },
 };
@@ -136,6 +136,8 @@ pub struct ProjectUpdatedEventDataContentGQL {
     aliases: Option<Vec<String>>,
     /// The change in the project progress
     progress: Option<Vec<ProjectUpdatedEpisodeDataEventGQL>>,
+    /// The change in project status
+    status: Option<ProjectStatusGQL>,
 }
 
 /// A project updated event
@@ -338,6 +340,7 @@ impl From<showtimes_events::m::ProjectUpdatedDataEvent> for ProjectUpdatedEventD
             progress: value
                 .progress()
                 .map(|v| v.iter().map(|v| v.into()).collect()),
+            status: value.status().map(|v| v.into()),
         }
     }
 }
@@ -358,6 +361,7 @@ impl From<&showtimes_events::m::ProjectUpdatedDataEvent> for ProjectUpdatedEvent
             progress: value
                 .progress()
                 .map(|v| v.iter().map(|v| v.into()).collect()),
+            status: value.status().map(|v| v.into()),
         }
     }
 }

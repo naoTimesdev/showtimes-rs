@@ -111,6 +111,7 @@ pub struct ProjectUpdatedDataEvent {
     #[serde(skip_serializing_if = "Option::is_none")]
     aliases: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[event_copy]
     status: Option<showtimes_db::m::ProjectStatus>,
     progress: Option<Vec<ProjectUpdatedEpisodeDataEvent>>,
 }

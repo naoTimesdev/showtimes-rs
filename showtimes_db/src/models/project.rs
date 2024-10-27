@@ -621,6 +621,10 @@ impl Ord for EpisodeProgress {
 /// This is only used for marking information for the project.
 ///
 /// If you want to check if the project is finished or not, please check the `progress` field.
+///
+/// When in archived mode, if this project is synchronized it will not propagate the status.
+/// When the other server is syncing project with archived status it will silently update the information
+/// without announcing it to the public.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ProjectStatus {
