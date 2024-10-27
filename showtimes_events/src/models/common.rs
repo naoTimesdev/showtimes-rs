@@ -1,10 +1,11 @@
 use clickhouse::Row;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use showtimes_derive::EnumName;
 use std::fmt::Debug;
 
 /// [`EventKind`] represents the kind of event that can be published
-#[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy)]
+#[derive(Serialize_repr, Deserialize_repr, Debug, Clone, Copy, EnumName)]
 #[repr(u8)]
 #[serde(rename_all = "snake_case")]
 pub enum EventKind {

@@ -1,4 +1,4 @@
-use async_graphql::Object;
+use async_graphql::{ErrorExtensions, Object};
 use collaborations::{
     CollabAcceptedEventDataGQL, CollabCreatedEventDataGQL, CollabDeletedEventDataGQL,
     CollabRejectedEventDataGQL, CollabRetractedEventDataGQL,
@@ -45,7 +45,7 @@ impl QueryEventsRoot {
             UserCreatedEventDataGQL,
             showtimes_events::m::UserCreatedEvent,
             showtimes_events::m::EventKind::UserCreated
-        );
+        )
     }
 
     /// The user updated event, use `watchUserUpdated` to get a real-time stream instead.
@@ -61,7 +61,7 @@ impl QueryEventsRoot {
             UserUpdatedEventDataGQL,
             showtimes_events::m::UserUpdatedEvent,
             showtimes_events::m::EventKind::UserUpdated
-        );
+        )
     }
 
     /// The user deleted event, use `watchUserDeleted` to get a real-time stream instead.
@@ -77,7 +77,7 @@ impl QueryEventsRoot {
             UserDeletedEventDataGQL,
             showtimes_events::m::UserDeletedEvent,
             showtimes_events::m::EventKind::UserDeleted
-        );
+        )
     }
 
     /// The server created event, use `watchServerCreated` to get a real-time stream instead.
@@ -93,7 +93,7 @@ impl QueryEventsRoot {
             ServerCreatedEventDataGQL,
             showtimes_events::m::ServerCreatedEvent,
             showtimes_events::m::EventKind::ServerCreated
-        );
+        )
     }
 
     /// The server updated event, use `watchServerUpdated` to get a real-time stream instead.
@@ -109,7 +109,7 @@ impl QueryEventsRoot {
             ServerUpdatedEventDataGQL,
             showtimes_events::m::ServerUpdatedEvent,
             showtimes_events::m::EventKind::ServerUpdated
-        );
+        )
     }
 
     /// The server deleted event, use `watchServerDeleted` to get a real-time stream instead.
@@ -125,7 +125,7 @@ impl QueryEventsRoot {
             ServerDeletedEventDataGQL,
             showtimes_events::m::ServerDeletedEvent,
             showtimes_events::m::EventKind::ServerDeleted
-        );
+        )
     }
 
     /// The project created event, use `watchProjectCreated` to get a real-time stream instead.
@@ -141,7 +141,7 @@ impl QueryEventsRoot {
             ProjectCreatedEventDataGQL,
             showtimes_events::m::ProjectCreatedEvent,
             showtimes_events::m::EventKind::ProjectCreated
-        );
+        )
     }
 
     /// The project updated event, use `watchProjectUpdated` to get a real-time stream instead.
@@ -157,7 +157,7 @@ impl QueryEventsRoot {
             ProjectUpdatedEventDataGQL,
             showtimes_events::m::ProjectUpdatedEvent,
             showtimes_events::m::EventKind::ProjectUpdated
-        );
+        )
     }
 
     /// The project episode updated event, use `watchProjectEpisodeUpdated` to get a real-time stream instead.
@@ -173,7 +173,7 @@ impl QueryEventsRoot {
             ProjectEpisodeUpdatedEventDataGQL,
             showtimes_events::m::ProjectEpisodeUpdatedEvent,
             showtimes_events::m::EventKind::ProjectEpisodes
-        );
+        )
     }
 
     /// The project deleted event, use `watchProjectDeleted` to get a real-time stream instead.
@@ -189,7 +189,7 @@ impl QueryEventsRoot {
             ProjectDeletedEventDataGQL,
             showtimes_events::m::ProjectDeletedEvent,
             showtimes_events::m::EventKind::ProjectDeleted
-        );
+        )
     }
 
     /// The collaboration created event, use `watchCollabCreated` to get a real-time stream instead.
@@ -205,7 +205,7 @@ impl QueryEventsRoot {
             CollabCreatedEventDataGQL,
             showtimes_events::m::CollabCreatedEvent,
             showtimes_events::m::EventKind::CollaborationCreated
-        );
+        )
     }
 
     /// The collaboration acceptance event, use `watchCollabAccepted` to get a real-time stream instead.
@@ -221,7 +221,7 @@ impl QueryEventsRoot {
             CollabAcceptedEventDataGQL,
             showtimes_events::m::CollabAcceptedEvent,
             showtimes_events::m::EventKind::CollaborationAccepted
-        );
+        )
     }
 
     /// The collaboration rejection event, use `watchCollabRejected` to get a real-time stream instead.
@@ -237,7 +237,7 @@ impl QueryEventsRoot {
             CollabRejectedEventDataGQL,
             showtimes_events::m::CollabRejectedEvent,
             showtimes_events::m::EventKind::CollaborationRejected
-        );
+        )
     }
 
     /// The collaboration retraction event, use `watchCollabRetracted` to get a real-time stream instead.
@@ -253,7 +253,7 @@ impl QueryEventsRoot {
             CollabRetractedEventDataGQL,
             showtimes_events::m::CollabRetractedEvent,
             showtimes_events::m::EventKind::CollaborationRetracted
-        );
+        )
     }
 
     /// The collaboration deletion or unlinking event, use `watchCollabDeleted` to get a real-time stream instead.
@@ -269,6 +269,6 @@ impl QueryEventsRoot {
             CollabDeletedEventDataGQL,
             showtimes_events::m::CollabDeletedEvent,
             showtimes_events::m::EventKind::CollaborationDeleted
-        );
+        )
     }
 }

@@ -10,6 +10,9 @@ pub enum GQLError {
     InvalidRequest = 102,
     MissingRequiredField = 103,
 
+    // Event related
+    EventAdvanceFailure = 200,
+
     // User related
     UserRequestFails = 1000,
     UserNotFound = 1001,
@@ -22,16 +25,21 @@ pub enum GQLError {
     ServerRequestFails = 2000,
     ServerNotFound = 2001,
     ServerAlreadyExists = 2002,
-    ProjectRequestFails = 3000,
 
     // Project related
+    ProjectRequestFails = 3000,
     ProjectNotFound = 3001,
     ProjectAlreadyExists = 3002,
-    ServerSyncRequestFails = 4000,
 
-    // Server sync collab related
+    // Server collab sync related
+    ServerSyncRequestFails = 4000,
     ServerSyncNotFound = 4001,
     ServerSyncAlreadyExists = 4002,
+
+    // Server collab ivite related
+    ServerInviteRequestFails = 5000,
+    ServerInviteNotFound = 5001,
+    ServerInviteAlreadyExists = 5002,
 }
 
 impl GQLError {

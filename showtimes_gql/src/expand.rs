@@ -3,9 +3,8 @@
 /// Convert internal ClickHouse event types to GraphQL types, then return
 /// all the data starting from the provided ID. This macro is designed to
 /// helps handle all of that easily since it's the same format for all events.
-#[macro_export]
 macro_rules! expand_query_event {
-    ($ctx:expr, $id:expr, $gql_type:ty, $event_type:ty, $event_kind:expr) => {
+    ($ctx:expr, $id:expr, $gql_type:ty, $event_type:ty, $event_kind:expr) => {{
         let query_stream = $ctx.data_unchecked::<showtimes_events::SharedSHClickHouse>();
 
         let mut stream = query_stream
@@ -14,7 +13,25 @@ macro_rules! expand_query_event {
 
         let mut results = Vec::new();
         while !stream.is_exhausted() {
-            let event_batch = stream.advance().await?;
+            let event_batch = stream.advance().await.map_err(|err| {
+                async_graphql::Error::new(format!(
+                    "Failed querying data from query stream: {}",
+                    $event_kind.to_name(),
+                ))
+                .extend_with(|_, e| {
+                    e.set("id", $id.to_string());
+                    e.set("kind", $event_kind.to_name());
+                    e.set("original", format!("{}", err));
+                    e.set(
+                        "reason",
+                        $crate::models::errors::GQLError::EventAdvanceFailure,
+                    );
+                    e.set(
+                        "code",
+                        $crate::models::errors::GQLError::EventAdvanceFailure.code(),
+                    );
+                })
+            })?;
             results.extend(event_batch.into_iter().map(|event| {
                 let inner = <$gql_type>::from(event.data());
                 $crate::models::events::prelude::EventGQL::new(
@@ -27,17 +44,16 @@ macro_rules! expand_query_event {
             }));
         }
 
-        return Ok(results);
-    };
+        Ok(results)
+    }};
 }
 
 /// Domain expansion: Query Events Processor WITH USER
 ///
 /// Similar to [`expand_query_event`], this version of macro is designed
 /// for use if we want to pass a [`crate::ServerQueryUser`] to the GraphQL type.
-#[macro_export]
 macro_rules! expand_query_event_with_user {
-    ($ctx:expr, $id:expr, $gql_type:ty, $event_type:ty, $event_kind:expr) => {
+    ($ctx:expr, $id:expr, $gql_type:ty, $event_type:ty, $event_kind:expr) => {{
         let user = $crate::data_loader::find_authenticated_user($ctx).await?;
         let query_stream = $ctx.data_unchecked::<showtimes_events::SharedSHClickHouse>();
 
@@ -49,7 +65,26 @@ macro_rules! expand_query_event_with_user {
 
         let mut results = Vec::new();
         while !stream.is_exhausted() {
-            let event_batch = stream.advance().await?;
+            let event_batch = stream.advance().await.map_err(|err| {
+                async_graphql::Error::new(format!(
+                    "Failed querying data from query stream: {}",
+                    $event_kind.to_name(),
+                ))
+                .extend_with(|_, e| {
+                    e.set("id", $id.to_string());
+                    e.set("kind", $event_kind.to_name());
+                    e.set("requester", user_query.id().to_string());
+                    e.set("original", format!("{}", err));
+                    e.set(
+                        "reason",
+                        $crate::models::errors::GQLError::EventAdvanceFailure,
+                    );
+                    e.set(
+                        "code",
+                        $crate::models::errors::GQLError::EventAdvanceFailure.code(),
+                    );
+                })
+            })?;
             results.extend(event_batch.into_iter().map(|event| {
                 let inner = <$gql_type>::new(event.data(), user_query);
                 $crate::models::events::prelude::EventGQL::new(
@@ -62,15 +97,14 @@ macro_rules! expand_query_event_with_user {
             }));
         }
 
-        return Ok(results);
-    };
+        Ok(results)
+    }};
 }
 
 /// Domain expansion: Stream Events Processor
 ///
 /// Convert internal ClickHouse event types to GraphQL types, then return
 /// a stream of all the data from the in-memory broker.
-#[macro_export]
 macro_rules! expand_stream_event {
     ($kind:ty, $gql:ty) => {
         showtimes_events::MemoryBroker::<$kind>::subscribe().map(move |event| {
@@ -103,9 +137,8 @@ macro_rules! expand_stream_event {
 ///
 /// Merge query stream format and broker stream format into
 /// a single request that can be done from any Subscription
-#[macro_export]
 macro_rules! expand_combined_stream_event {
-    ($ctx:expr, $id:expr, $kind:expr, $event:ty, $gql:ty) => {
+    ($ctx:expr, $id:expr, $kind:expr, $event:ty, $gql:ty) => {{
         let (tx_mem, rx_mem) = tokio::sync::mpsc::channel(100);
 
         // Spawn the memory broker
@@ -187,9 +220,9 @@ macro_rules! expand_combined_stream_event {
             );
         }
 
-        return stream_map.map(|(_, item)| item)
-    };
-    ($ctx:expr, $id:expr, $kind:expr, $event:ty, $gql:ty, $user_stub:expr) => {
+        stream_map.map(|(_, item)| item)
+    }};
+    ($ctx:expr, $id:expr, $kind:expr, $event:ty, $gql:ty, $user_stub:expr) => {{
         let (tx_mem, rx_mem) = tokio::sync::mpsc::channel(100);
 
         // Spawn the memory broker
@@ -271,6 +304,11 @@ macro_rules! expand_combined_stream_event {
             );
         }
 
-        return stream_map.map(|(_, item)| item)
-    };
+        stream_map.map(|(_, item)| item)
+    }};
 }
+
+pub(crate) use expand_combined_stream_event;
+pub(crate) use expand_query_event;
+pub(crate) use expand_query_event_with_user;
+pub(crate) use expand_stream_event;

@@ -53,6 +53,10 @@ mod queries;
 pub type ShowtimesGQLSchema = async_graphql::Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
 pub use async_graphql::http::{graphiql_plugin_explorer, GraphiQLSource, ALL_WEBSOCKET_PROTOCOLS};
 pub use async_graphql::{Data, Error};
+pub(crate) use expand::{
+    expand_combined_stream_event, expand_query_event, expand_query_event_with_user,
+    expand_stream_event,
+};
 pub use image::MAX_IMAGE_SIZE;
 pub use models::Orchestrator;
 
@@ -954,7 +958,7 @@ impl SubscriptionRoot {
             showtimes_events::m::EventKind::ProjectEpisodes,
             showtimes_events::m::ProjectEpisodeUpdatedEvent,
             ProjectEpisodeUpdatedEventDataGQL
-        );
+        )
     }
 
     /// Watch for project deleted events
