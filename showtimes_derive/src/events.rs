@@ -4,6 +4,11 @@ use proc_macro::TokenStream;
 use quote::ToTokens;
 use syn::{punctuated::Punctuated, Attribute, Expr, Lit, Meta, Token};
 
+static KNOWN_COPYABLE_FIELD: &[&str; 16] = &[
+    "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", "f32", "f64", "f128",
+    "bool", "char", "usize",
+];
+
 #[derive(Default, Clone, Copy)]
 struct EventModelAttr {
     unref: bool,
@@ -112,10 +117,9 @@ pub(crate) fn expand_eventmodel(ast: &syn::DeriveInput) -> TokenStream {
     for field in fields.named.iter() {
         let field_name = field.ident.as_ref().unwrap();
         let field_ty = &field.ty;
-        let field_ty_name = field_ty.clone().into_token_stream().to_string();
 
-        let field = if field_ty_name.starts_with("Option") {
-            expand_option_field(field, field_name, attrs_config)
+        let field = if let Some(inner_ty) = get_inner_type_of_option(field_ty) {
+            expand_option_field(field, field_name, inner_ty, attrs_config)
         } else {
             expand_regular_field(field, field_name, attrs_config)
         };
@@ -135,11 +139,9 @@ pub(crate) fn expand_eventmodel(ast: &syn::DeriveInput) -> TokenStream {
 fn expand_option_field(
     field: &syn::Field,
     field_name: &syn::Ident,
+    main_type: &syn::Type,
     attrs_config: EventModelAttr,
 ) -> proc_macro2::TokenStream {
-    let field_ty = &field.ty;
-    let field_ty_name = field_ty.clone().into_token_stream().to_string();
-
     let set_field_name = format!("set_{}", field_name);
     let set_field_ident = syn::Ident::new(&set_field_name, field_name.span());
 
@@ -150,9 +152,8 @@ fn expand_option_field(
     let doc_clear = format!("Clear the value of `{}` to [`None`]", field_name);
 
     // If string, we can use as_deref
-    if field_ty_name.contains("String") {
-        let inner_ty = get_inner_type_of_option(field_ty).unwrap();
-        let has_vec = get_inner_type_of_vec(inner_ty).is_some();
+    if is_string_field(main_type) {
+        let has_vec = get_inner_type_of_vec(main_type).is_some();
 
         if has_vec {
             quote::quote! {
@@ -191,8 +192,7 @@ fn expand_option_field(
         }
     } else {
         // Modify the field type to be a reference
-        let main_type = get_inner_type_of_option(field_ty).unwrap();
-        let event_copy = has_event_copy_ident(field);
+        let event_copy = has_event_copy_ident(field) || is_copy_able_field(main_type);
 
         let get_field = if event_copy {
             quote::quote! {
@@ -285,7 +285,7 @@ fn expand_regular_field(
 
         getter
     } else {
-        let event_copy = has_event_copy_ident(field);
+        let event_copy = has_event_copy_ident(field) || is_copy_able_field(field_ty);
 
         let get_field = if event_copy {
             quote::quote! {
@@ -346,11 +346,10 @@ fn expand_regular_field(
 fn get_inner_type_of_x<'a>(ty: &'a syn::Type, x: &'a str) -> Option<&'a syn::Type> {
     if let syn::Type::Path(type_path) = ty {
         // Check if it's a path type, and the first segment of the path is "x"
-        if let Some(segment) = type_path.path.segments.first() {
+        for segment in &type_path.path.segments {
+            // If we found "x", ensure that the argument is "AngleBracketed"
             if segment.ident == x {
-                // Check if the segment has generic arguments (i.e., x<T>)
                 if let syn::PathArguments::AngleBracketed(angle_bracketed) = &segment.arguments {
-                    // Get the first generic argument (T in x<T>)
                     if let Some(syn::GenericArgument::Type(inner_type)) =
                         angle_bracketed.args.first()
                     {
@@ -369,6 +368,24 @@ fn get_inner_type_of_option(ty: &syn::Type) -> Option<&syn::Type> {
 
 fn get_inner_type_of_vec(ty: &syn::Type) -> Option<&syn::Type> {
     get_inner_type_of_x(ty, "Vec")
+}
+
+fn is_string_field(ty: &syn::Type) -> bool {
+    // If Path, get the last segment and check if the Ident is "String"
+    if let syn::Type::Path(type_path) = ty {
+        if let Some(last_segment) = type_path.path.segments.last() {
+            last_segment.ident == "String"
+        } else {
+            false
+        }
+    } else {
+        false
+    }
+}
+
+fn is_copy_able_field(ty: &syn::Type) -> bool {
+    let ty_str = ty.clone().into_token_stream().to_string();
+    KNOWN_COPYABLE_FIELD.contains(&ty_str.as_str())
 }
 
 fn has_event_copy_ident(field: &syn::Field) -> bool {
