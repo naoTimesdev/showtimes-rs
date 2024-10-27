@@ -1,6 +1,6 @@
 use crate::{data_loader::UserDataLoader, queries::projects::MinimalServerUsers};
 
-use super::{prelude::*, projects::ProjectGQL, users::UserGQL};
+use super::{errors::GQLError, prelude::*, projects::ProjectGQL, users::UserGQL};
 use async_graphql::{dataloader::DataLoader, Enum, ErrorExtensions, Object};
 use showtimes_db::{m::ServerUser, mongodb::bson::doc};
 
@@ -55,7 +55,14 @@ impl ServerUserGQL {
     /// The complete user information
     async fn user(&self, ctx: &async_graphql::Context<'_>) -> async_graphql::Result<UserGQL> {
         let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
-        let user = loader.load_one(self.id).await?;
+        let user = loader.load_one(self.id).await.map_err(|e| {
+            e.extend_with(|_, e| {
+                e.set("id", self.id.to_string());
+                e.set("server_id", self.top_server.to_string());
+                e.set("reason", GQLError::UserRequestFails);
+                e.set("code", GQLError::UserRequestFails.code());
+            })
+        })?;
 
         match user {
             Some(user) => {
@@ -65,9 +72,10 @@ impl ServerUserGQL {
             None => Err(
                 async_graphql::Error::new(format!("User {} not found", self.id)).extend_with(
                     |_, e| {
-                        e.set("reason", "not_found");
                         e.set("id", self.id.to_string());
                         e.set("server_id", self.top_server.to_string());
+                        e.set("reason", GQLError::UserRequestFails);
+                        e.set("code", GQLError::UserRequestFails.code());
                     },
                 ),
             ),

@@ -3,6 +3,7 @@ use async_graphql::dataloader::DataLoader;
 use crate::data_loader::{DiscordIdLoad, UserDataLoader};
 
 pub mod collaborations;
+pub(crate) mod errors;
 pub mod events;
 pub mod prelude;
 pub mod projects;

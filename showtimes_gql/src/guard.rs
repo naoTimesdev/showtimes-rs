@@ -1,7 +1,10 @@
-use async_graphql::Guard;
+use async_graphql::{ErrorExtensions, Guard};
 use showtimes_session::ShowtimesUserSession;
 
-use crate::{data_loader::find_authenticated_user, models::users::UserKindGQL};
+use crate::{
+    data_loader::find_authenticated_user,
+    models::{errors::GQLError, users::UserKindGQL},
+};
 
 /// A guard to check if the user is at least a certain level
 pub struct AuthUserMinimumGuard {
@@ -31,7 +34,15 @@ impl Guard for AuthUserMinimumGuard {
                             if UserKindGQL::from(user.kind) >= self.level {
                                 Ok(())
                             } else {
-                                Err("User level not authorized".into())
+                                Err(async_graphql::Error::new("Missing privilege").extend_with(
+                                    |_, e| {
+                                        e.set("id", user.id.to_string());
+                                        e.set("required", self.level.to_name());
+                                        e.set("current", user.kind.to_name());
+                                        e.set("reason", GQLError::UserInsufficientPrivilege);
+                                        e.set("code", GQLError::UserInsufficientPrivilege.code());
+                                    },
+                                ))
                             }
                         }
                         Err(e) => Err(e),
@@ -41,7 +52,12 @@ impl Guard for AuthUserMinimumGuard {
                     Ok(())
                 }
             }
-            None => Err("Unauthorized".into()),
+            None => Err(
+                async_graphql::Error::new("Unauthorized").extend_with(|_, e| {
+                    e.set("reason", GQLError::Unauthorized);
+                    e.set("code", GQLError::Unauthorized.code());
+                }),
+            ),
         }
     }
 }

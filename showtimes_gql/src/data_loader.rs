@@ -2,7 +2,7 @@ use std::{collections::HashMap, ops::Deref, sync::OnceLock};
 
 use async_graphql::{
     dataloader::{DataLoader, Loader},
-    Context, FieldError,
+    Context, ErrorExtensions, FieldError,
 };
 use futures::TryStreamExt;
 use showtimes_db::{
@@ -11,6 +11,8 @@ use showtimes_db::{
 };
 use showtimes_session::ShowtimesUserSession;
 use showtimes_shared::ulid::Ulid;
+
+use crate::models::errors::{GQLDataLoaderWhere, GQLError};
 
 static STUBBED_OWNER: OnceLock<showtimes_db::m::User> = OnceLock::new();
 
@@ -45,12 +47,31 @@ impl Loader<Ulid> for UserDataLoader {
             .col
             .get_collection()
             .find(doc! {
-                "id": { "$in": keys_to_string }
+                "id": { "$in": keys_to_string.clone() }
             })
             .limit(keys.len() as i64)
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::UserLoaderId);
+                    e.set("reason", GQLError::UserRequestFails);
+                    e.set("code", GQLError::UserRequestFails.code());
+                })
+            })?;
 
-        let all_results = result.try_collect::<Vec<showtimes_db::m::User>>().await?;
+        let all_results = result
+            .try_collect::<Vec<showtimes_db::m::User>>()
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::UserLoaderCollect);
+                    e.set("where_req", GQLDataLoaderWhere::UserLoaderId);
+                    e.set("reason", GQLError::UserRequestFails);
+                    e.set("code", GQLError::UserRequestFails.code());
+                })
+            })?;
         let mapped_res: HashMap<Ulid, showtimes_db::m::User> =
             all_results.iter().map(|u| (u.id, u.clone())).collect();
 
@@ -71,12 +92,31 @@ impl Loader<DiscordIdLoad> for UserDataLoader {
             .col
             .get_collection()
             .find(doc! {
-                "discord_meta.id": { "$in": keys_to_string }
+                "discord_meta.id": { "$in": keys_to_string.clone() }
             })
             .limit(keys.len() as i64)
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::UserLoaderDiscordId);
+                    e.set("reason", GQLError::UserRequestFails);
+                    e.set("code", GQLError::UserRequestFails.code());
+                })
+            })?;
 
-        let all_results = result.try_collect::<Vec<showtimes_db::m::User>>().await?;
+        let all_results = result
+            .try_collect::<Vec<showtimes_db::m::User>>()
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::UserLoaderCollect);
+                    e.set("where_req", GQLDataLoaderWhere::UserLoaderDiscordId);
+                    e.set("reason", GQLError::UserRequestFails);
+                    e.set("code", GQLError::UserRequestFails.code());
+                })
+            })?;
         let mapped_res: HashMap<DiscordIdLoad, showtimes_db::m::User> = all_results
             .iter()
             .map(|u| (DiscordIdLoad(u.discord_meta.id.clone()), u.clone()))
@@ -99,12 +139,31 @@ impl Loader<showtimes_shared::APIKey> for UserDataLoader {
             .col
             .get_collection()
             .find(doc! {
-                "api_key": { "$in": keys_to_string }
+                "api_key": { "$in": keys_to_string.clone() }
             })
             .limit(keys.len() as i64)
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::UserLoaderAPIKey);
+                    e.set("reason", GQLError::UserRequestFails);
+                    e.set("code", GQLError::UserRequestFails.code());
+                })
+            })?;
 
-        let all_results = result.try_collect::<Vec<showtimes_db::m::User>>().await?;
+        let all_results = result
+            .try_collect::<Vec<showtimes_db::m::User>>()
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::UserLoaderCollect);
+                    e.set("where_req", GQLDataLoaderWhere::UserLoaderAPIKey);
+                    e.set("reason", GQLError::UserRequestFails);
+                    e.set("code", GQLError::UserRequestFails.code());
+                })
+            })?;
         let mapped_res: HashMap<showtimes_shared::APIKey, showtimes_db::m::User> =
             all_results.iter().map(|u| (u.api_key, u.clone())).collect();
 
@@ -138,13 +197,30 @@ impl Loader<ServerOwnerId> for ProjectDataLoader {
             .col
             .get_collection()
             .find(doc! {
-                "creator": { "$in": keys_to_string }
+                "creator": { "$in": keys_to_string.clone() }
             })
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::ProjectLoaderOwnerId);
+                    e.set("reason", GQLError::ProjectRequestFails);
+                    e.set("code", GQLError::ProjectRequestFails.code());
+                })
+            })?;
 
         let all_results = result
             .try_collect::<Vec<showtimes_db::m::Project>>()
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::ProjectLoaderCollect);
+                    e.set("where_req", GQLDataLoaderWhere::ProjectLoaderOwnerId);
+                    e.set("reason", GQLError::ProjectRequestFails);
+                    e.set("code", GQLError::ProjectRequestFails.code());
+                })
+            })?;
         let mapped_res: HashMap<ServerOwnerId, Vec<showtimes_db::m::Project>> = keys
             .iter()
             .map(|k| {
@@ -172,13 +248,30 @@ impl Loader<Ulid> for ProjectDataLoader {
             .col
             .get_collection()
             .find(doc! {
-                "id": { "$in": keys_to_string }
+                "id": { "$in": keys_to_string.clone() }
             })
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::ProjectLoaderId);
+                    e.set("reason", GQLError::ProjectRequestFails);
+                    e.set("code", GQLError::ProjectRequestFails.code());
+                })
+            })?;
 
         let all_results = result
             .try_collect::<Vec<showtimes_db::m::Project>>()
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::ProjectLoaderCollect);
+                    e.set("where_req", GQLDataLoaderWhere::ProjectLoaderId);
+                    e.set("reason", GQLError::ProjectRequestFails);
+                    e.set("code", GQLError::ProjectRequestFails.code());
+                })
+            })?;
         let mapped_res: HashMap<Ulid, showtimes_db::m::Project> = all_results
             .iter()
             .map(|proj| (proj.id, proj.clone()))
@@ -244,12 +337,31 @@ impl Loader<Ulid> for ServerDataLoader {
             .col
             .get_collection()
             .find(doc! {
-                "id": { "$in": keys_to_string }
+                "id": { "$in": keys_to_string.clone() }
             })
             .limit(keys.len() as i64)
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::ServerLoaderId);
+                    e.set("reason", GQLError::ServerRequestFails);
+                    e.set("code", GQLError::ServerRequestFails.code());
+                })
+            })?;
 
-        let all_results = result.try_collect::<Vec<showtimes_db::m::Server>>().await?;
+        let all_results = result
+            .try_collect::<Vec<showtimes_db::m::Server>>()
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::ServerLoaderCollect);
+                    e.set("where_req", GQLDataLoaderWhere::ServerLoaderId);
+                    e.set("reason", GQLError::ServerRequestFails);
+                    e.set("code", GQLError::ServerRequestFails.code());
+                })
+            })?;
         let mapped_res: HashMap<Ulid, showtimes_db::m::Server> =
             all_results.iter().map(|u| (u.id, u.clone())).collect();
 
@@ -270,12 +382,31 @@ impl Loader<ServerOwnerId> for ServerDataLoader {
             .col
             .get_collection()
             .find(doc! {
-                "owners.id": { "$in": keys_to_string }
+                "owners.id": { "$in": keys_to_string.clone() }
             })
             .limit(keys.len() as i64)
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::ServerLoaderOwnerId);
+                    e.set("reason", GQLError::ServerRequestFails);
+                    e.set("code", GQLError::ServerRequestFails.code());
+                })
+            })?;
 
-        let all_results = result.try_collect::<Vec<showtimes_db::m::Server>>().await?;
+        let all_results = result
+            .try_collect::<Vec<showtimes_db::m::Server>>()
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::ServerLoaderCollect);
+                    e.set("where_req", GQLDataLoaderWhere::ServerLoaderOwnerId);
+                    e.set("reason", GQLError::ServerRequestFails);
+                    e.set("code", GQLError::ServerRequestFails.code());
+                })
+            })?;
         let mapped_res: HashMap<ServerOwnerId, Vec<showtimes_db::m::Server>> = keys
             .iter()
             .map(|k| {
@@ -318,9 +449,26 @@ impl Loader<ServerAndOwnerId> for ServerDataLoader {
                 "$or": all_keys_mappings
             })
             .limit(keys.len() as i64)
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("where", GQLDataLoaderWhere::ServerLoaderIdOrOwnerId);
+                    e.set("reason", GQLError::ServerRequestFails);
+                    e.set("code", GQLError::ServerRequestFails.code());
+                })
+            })?;
 
-        let all_results = result.try_collect::<Vec<showtimes_db::m::Server>>().await?;
+        let all_results = result
+            .try_collect::<Vec<showtimes_db::m::Server>>()
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("where", GQLDataLoaderWhere::ServerLoaderCollect);
+                    e.set("where_req", GQLDataLoaderWhere::ServerLoaderIdOrOwnerId);
+                    e.set("reason", GQLError::ServerRequestFails);
+                    e.set("code", GQLError::ServerRequestFails.code());
+                })
+            })?;
         let mapped_res: HashMap<ServerAndOwnerId, showtimes_db::m::Server> = keys
             .iter()
             .filter_map(|k| {
@@ -392,14 +540,31 @@ impl Loader<Ulid> for ServerSyncLoader {
             .col
             .get_collection()
             .find(doc! {
-                "id": { "$in": keys_to_string }
+                "id": { "$in": keys_to_string.clone() }
             })
             .limit(keys.len() as i64)
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::ServerSyncLoaderId);
+                    e.set("reason", GQLError::ServerSyncRequestFails);
+                    e.set("code", GQLError::ServerSyncRequestFails.code());
+                })
+            })?;
 
         let all_results = result
             .try_collect::<Vec<showtimes_db::m::ServerCollaborationSync>>()
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::ServerSyncLoaderCollect);
+                    e.set("where_req", GQLDataLoaderWhere::ServerSyncLoaderId);
+                    e.set("reason", GQLError::ServerSyncRequestFails);
+                    e.set("code", GQLError::ServerSyncRequestFails.code());
+                })
+            })?;
 
         let mapped_res: HashMap<Ulid, showtimes_db::m::ServerCollaborationSync> =
             all_results.iter().map(|u| (u.id, u.clone())).collect();
@@ -422,14 +587,31 @@ impl Loader<ServerSyncServerId> for ServerSyncLoader {
             .col
             .get_collection()
             .find(doc! {
-                "projects.server": { "$in": keys_to_string }
+                "projects.server": { "$in": keys_to_string.clone() }
             })
             .limit(keys.len() as i64)
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::ServerSyncLoaderServerId);
+                    e.set("reason", GQLError::ServerSyncRequestFails);
+                    e.set("code", GQLError::ServerSyncRequestFails.code());
+                })
+            })?;
 
         let all_results = result
             .try_collect::<Vec<showtimes_db::m::ServerCollaborationSync>>()
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("ids", keys_to_string.clone());
+                    e.set("where", GQLDataLoaderWhere::ServerSyncLoaderCollect);
+                    e.set("where_req", GQLDataLoaderWhere::ServerSyncLoaderServerId);
+                    e.set("reason", GQLError::ServerSyncRequestFails);
+                    e.set("code", GQLError::ServerSyncRequestFails.code());
+                })
+            })?;
         let mapped_res: HashMap<ServerSyncServerId, Vec<showtimes_db::m::ServerCollaborationSync>> =
             keys.iter()
                 .map(|k| {
@@ -476,11 +658,32 @@ impl Loader<ServerSyncIds> for ServerSyncLoader {
                 "$or": all_keys_mappings
             })
             .limit(keys.len() as i64)
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set(
+                        "where",
+                        GQLDataLoaderWhere::ServerSyncLoaderServerAndProjectId,
+                    );
+                    e.set("reason", GQLError::ServerSyncRequestFails);
+                    e.set("code", GQLError::ServerSyncRequestFails.code());
+                })
+            })?;
 
         let all_results = result
             .try_collect::<Vec<showtimes_db::m::ServerCollaborationSync>>()
-            .await?;
+            .await
+            .map_err(|err| {
+                err.extend_with(|_, e| {
+                    e.set("where", GQLDataLoaderWhere::ServerSyncLoaderCollect);
+                    e.set(
+                        "where_req",
+                        GQLDataLoaderWhere::ServerSyncLoaderServerAndProjectId,
+                    );
+                    e.set("reason", GQLError::ServerSyncRequestFails);
+                    e.set("code", GQLError::ServerSyncRequestFails.code());
+                })
+            })?;
         let mapped_res: HashMap<ServerSyncIds, showtimes_db::m::ServerCollaborationSync> = keys
             .iter()
             .filter_map(|k| {
@@ -527,13 +730,26 @@ pub(crate) async fn find_authenticated_user(
             Ok(Some(result.clone()))
         }
         _ => {
-            return Err(FieldError::new("Invalid audience type for this session"));
+            return Err(
+                async_graphql::Error::new("Invalid audience type for this session").extend_with(
+                    |_, e| {
+                        e.set("metadata", session.get_claims().get_metadata());
+                        e.set("reason", GQLError::UserInvalidAudience);
+                        e.set("code", GQLError::UserInvalidAudience.code());
+                    },
+                ),
+            );
         }
     };
 
     match load_method {
         Ok(Some(user)) => Ok(user),
-        Ok(None) => Err(FieldError::new("User not found")),
+        Ok(None) => Err(
+            async_graphql::Error::new("User not found").extend_with(|_, e| {
+                e.set("reason", GQLError::UserUnauthorized);
+                e.set("code", GQLError::UserUnauthorized.code());
+            }),
+        ),
         Err(e) => Err(e),
     }
 }
