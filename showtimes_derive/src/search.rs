@@ -194,7 +194,13 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
     // Get the field type of the primary key
     let pk_field_type = pk_field.ty.clone();
 
+    let name_str_upper = name.to_string().to_uppercase();
+    let static_lock_name_str = format!("{}_INDEX_LOCK", name_str_upper);
+    let static_lock_ident = syn::Ident::new(&static_lock_name_str, name.span());
+
     let expanded = quote::quote! {
+        static #static_lock_ident: std::sync::OnceLock<meilisearch_sdk::indexes::Index> = std::sync::OnceLock::new();
+
         impl #name {
             /// Get the index name of the model
             pub fn index_name() -> &'static str {
@@ -314,9 +320,18 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
             /// - `client`: The MeiliSearch client
             pub async fn get_index(client: &std::sync::Arc<meilisearch_sdk::client::Client>) -> Result<meilisearch_sdk::indexes::Index, meilisearch_sdk::errors::Error> {
                 tracing::debug!("Getting index: {}", #model_attr_name);
+                if let Some(index_lock) = #static_lock_ident.get() {
+                    return Ok(index_lock.clone());
+                }
+
                 let index = client.get_index(#model_attr_name).await;
                 match index {
-                    Ok(index) => Ok(index),
+                    Ok(index) => {
+                        if let Err(_) = #static_lock_ident.set(index.clone()) {
+                            tracing::debug!("Index \"{}\" already set into OnceLock, ignoring...", #model_attr_name);
+                        }
+                        Ok(index)
+                    },
                     Err(meilisearch_sdk::errors::Error::Meilisearch(error)) => {
                         if error.error_code == meilisearch_sdk::errors::ErrorCode::IndexNotFound {
                             tracing::debug!("Index \"{}\" not found, creating...", #model_attr_name);
@@ -325,6 +340,10 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
                             task.wait_for_completion(client, None, None).await?;
                             tracing::debug!("Index \"{}\" created, getting the index...", #model_attr_name);
                             let index = client.get_index(#model_attr_name).await?;
+                            // If not set, set it. If already set ignore!
+                            if let Err(_) = #static_lock_ident.set(index.clone()) {
+                                tracing::debug!("Index \"{}\" already set into OnceLock, ignoring...", #model_attr_name);
+                            }
                             Ok(index)
                         } else {
                             // trickle down the error
