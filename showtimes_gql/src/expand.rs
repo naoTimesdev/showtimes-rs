@@ -101,38 +101,6 @@ macro_rules! expand_query_event_with_user {
     }};
 }
 
-/// Domain expansion: Stream Events Processor
-///
-/// Convert internal ClickHouse event types to GraphQL types, then return
-/// a stream of all the data from the in-memory broker.
-macro_rules! expand_stream_event {
-    ($kind:ty, $gql:ty) => {
-        showtimes_events::MemoryBroker::<$kind>::subscribe().map(move |event| {
-            let inner = <$gql>::from(event.data());
-            $crate::models::events::prelude::EventGQL::new(
-                event.id(),
-                inner,
-                event.kind().into(),
-                event.actor().map(|a| a.to_string()),
-                event.timestamp(),
-            )
-        })
-    };
-
-    ($kind:ty, $gql:ty, $stub:expr) => {
-        showtimes_events::MemoryBroker::<$kind>::subscribe().map(move |event| {
-            let inner = <$gql>::new(event.data(), *$stub);
-            $crate::models::events::prelude::EventGQL::new(
-                event.id(),
-                inner,
-                event.kind().into(),
-                event.actor().map(|a| a.to_string()),
-                event.timestamp(),
-            )
-        })
-    };
-}
-
 /// Domain expansion: Combined Stream Events Processor
 ///
 /// Merge query stream format and broker stream format into
@@ -311,4 +279,3 @@ macro_rules! expand_combined_stream_event {
 pub(crate) use expand_combined_stream_event;
 pub(crate) use expand_query_event;
 pub(crate) use expand_query_event_with_user;
-pub(crate) use expand_stream_event;
