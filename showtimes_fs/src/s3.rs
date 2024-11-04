@@ -253,21 +253,35 @@ impl S3Fs {
         let multipart = CreateMultipartUpload::parse_response(&start_body)?;
 
         tracing::debug!("Got multipart upload id: {}", multipart.upload_id());
+        tracing::debug!(
+            "File size is: {}, chunk size is: {}",
+            max_position,
+            CHUNK_SIZE
+        );
 
         // Initialize the part number and the array to store the ETags
         let mut part_number = 1;
         let mut etag_data: Vec<String> = vec![];
 
+        // Check if max_position is smaller than the CHUNK_SIZE
+        let is_small_file = max_position <= CHUNK_SIZE as u64;
+
         // Upload the file in chunks of 4MB each
         while stream.stream_position().await? <= max_position {
             // Read a chunk of the file
             let mut chunks_buffer = Vec::with_capacity(CHUNK_SIZE); // 4MB
-            match stream.read_exact(&mut chunks_buffer).await {
-                Ok(_) => (),
-                Err(e) => {
-                    // Depending on the error, we silently ignore it.
-                    if e.kind() != std::io::ErrorKind::UnexpectedEof {
-                        return Err(e.into());
+
+            if is_small_file {
+                // We have to read until the end
+                stream.read_to_end(&mut chunks_buffer).await?;
+            } else {
+                match stream.read_exact(&mut chunks_buffer).await {
+                    Ok(_) => (),
+                    Err(e) => {
+                        // Depending on the error, we silently ignore it.
+                        if e.kind() != std::io::ErrorKind::UnexpectedEof {
+                            return Err(e.into());
+                        }
                     }
                 }
             }
