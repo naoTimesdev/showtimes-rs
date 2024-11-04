@@ -42,6 +42,12 @@ pub enum EventKind {
     CollaborationRetracted = 44,
 }
 
+impl std::fmt::Display for EventKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EventKind::{}", self.to_name())
+    }
+}
+
 /// The event structure that is broadcasted and stored
 #[derive(Clone, Debug, Row, Serialize, Deserialize)]
 pub struct SHEvent<T: Send + Sync + Clone> {

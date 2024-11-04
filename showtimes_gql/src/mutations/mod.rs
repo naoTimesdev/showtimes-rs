@@ -249,9 +249,26 @@ pub(super) async fn execute_search_events(
     task_search: tokio::task::JoinHandle<Result<(), showtimes_search::MeiliError>>,
     task_events: tokio::task::JoinHandle<Result<(), showtimes_events::ClickHouseError>>,
 ) -> async_graphql::Result<()> {
+    tracing::debug!("Waiting for tasks to finish...");
     let (r_search, r_events) = tokio::try_join!(task_search, task_events)?;
-    r_search?;
-    r_events?;
-
-    Ok(())
+    match (r_search, r_events) {
+        (Ok(_), Ok(_)) => Ok(()),
+        (Err(e1), Err(e2)) => {
+            tracing::debug!("Search task failed: {}", e1);
+            tracing::debug!("Events task failed: {}", e2);
+            // Combine
+            Err(async_graphql::Error::new(format!(
+                "Search task failed: {}\nEvents task failed: {}",
+                e1, e2
+            )))
+        }
+        (Err(e), _) => {
+            tracing::debug!("Search task failed: {}", e);
+            Err(async_graphql::Error::new(e.to_string()))
+        }
+        (_, Err(e)) => {
+            tracing::debug!("Events task failed: {}", e);
+            Err(async_graphql::Error::new(e.to_string()))
+        }
+    }
 }

@@ -98,7 +98,7 @@ impl From<&showtimes_shared::APIKey> for APIKeyGQL {
 }
 
 /// A wrapper around DateTime<Utc> to allow it to be used in GraphQL
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct DateTimeGQL(
     /// A datetime timestamp format in UTC timezone, follows RFC3339 format
     chrono::DateTime<chrono::Utc>,
