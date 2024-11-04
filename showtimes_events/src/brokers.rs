@@ -13,10 +13,8 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    Stream, StreamExt,
-};
+use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures_util::{Stream, StreamExt};
 use slab::Slab;
 
 use crate::models::SHEvent;
@@ -82,7 +80,7 @@ impl<T: Sync + Send + Clone + 'static> MemoryBroker<T> {
     /// Subscribe to the message of the specified type and returns a `Stream`.
     pub fn subscribe() -> impl Stream<Item = SHEvent<T>> {
         with_senders::<T, _, _>(|senders| {
-            let (tx, rx) = futures::channel::mpsc::unbounded();
+            let (tx, rx) = futures_channel::mpsc::unbounded();
             let id = senders.0.insert(tx);
             tracing::trace!(
                 "Subscribing for message type {:?} with ID {}",

@@ -4,7 +4,7 @@ use async_graphql::{
     dataloader::{DataLoader, Loader},
     Context, ErrorExtensions, FieldError,
 };
-use futures::TryStreamExt;
+use futures_util::TryStreamExt;
 use showtimes_db::{
     mongodb::bson::{doc, Document},
     DatabaseShared,

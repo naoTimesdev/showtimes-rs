@@ -3,7 +3,7 @@
 use std::{sync::Arc, time::Duration};
 
 use crate::{make_file_path, FsFileKind, FsFileObject};
-use futures::TryStreamExt;
+use futures_util::TryStreamExt;
 use rusty_s3::{
     actions::{
         CompleteMultipartUpload, CreateBucket, CreateMultipartUpload, DeleteObjects, HeadBucket,

@@ -17,7 +17,7 @@ quote = "1.0"
 convert_case = "0.6.0"
 
 [dev-dependencies]
-mongodb.workspace = true
+bson.workspace = true
 
 [lib]
 proc-macro = true

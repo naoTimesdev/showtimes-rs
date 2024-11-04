@@ -1,4 +1,4 @@
-use futures::TryStreamExt;
+use futures_util::TryStreamExt;
 use showtimes_db::{
     m::UserKind,
     mongodb::bson::{doc, Document},

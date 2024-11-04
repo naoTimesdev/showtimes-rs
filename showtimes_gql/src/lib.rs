@@ -3,7 +3,7 @@
 
 use std::sync::{Arc, LazyLock};
 
-use futures::{Stream, StreamExt};
+use futures_util::{Stream, StreamExt};
 
 use async_graphql::dataloader::DataLoader;
 use async_graphql::extensions::Tracing;

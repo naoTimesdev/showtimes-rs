@@ -15,14 +15,13 @@ anyhow.workspace = true
 chrono.workspace = true
 time.workspace = true
 tracing.workspace = true
-futures.workspace = true
+futures-util.workspace = true
 
 async-graphql.workspace = true
 reqwest.workspace = true
 image.workspace = true
 
 tokio-stream.workspace = true
-async-stream.workspace = true
 
 # Showtimes related
 showtimes-shared = { path = "../showtimes_shared" }

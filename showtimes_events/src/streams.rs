@@ -204,7 +204,7 @@ where
     }
 }
 
-// impl<T> futures::TryStream for SHClickStream<T>
+// impl<T> futures_util::TryStream for SHClickStream<T>
 // where
 //     T: serde::de::DeserializeOwned + Send + Sync + Clone + Debug + Unpin + 'static,
 // {

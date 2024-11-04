@@ -15,7 +15,7 @@ mod shows;
 /// #[derive(ShowModelHandler)]
 /// #[col_name = "ShowtimesProject"]
 /// pub struct Project {
-///     _id: Option<mongodb::bson::oid::ObjectId>,
+///     _id: Option<bson::oid::ObjectId>,
 ///     name: String,
 /// }
 /// ```
@@ -35,7 +35,7 @@ pub fn derive_show_model_handler(input: TokenStream) -> TokenStream {
 /// #[derive(ShowModelHandler)]
 /// #[col_name("ShowtimesProject")]
 /// pub struct Project {
-///     _id: Option<mongodb::bson::oid::ObjectId>,
+///     _id: Option<bson::oid::ObjectId>,
 /// }
 /// create_handler!(m::Project, ProjectHandler);
 /// ```

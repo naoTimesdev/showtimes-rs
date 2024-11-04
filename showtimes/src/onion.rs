@@ -6,7 +6,7 @@ use axum::{
     http::{Method, StatusCode},
     response::Response,
 };
-use futures::future::BoxFuture;
+use futures_util::future::BoxFuture;
 use serde_json::json;
 use showtimes_gql::MAX_IMAGE_SIZE;
 use tower_layer::Layer;

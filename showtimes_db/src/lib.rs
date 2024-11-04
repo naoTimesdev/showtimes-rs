@@ -6,7 +6,7 @@ use bson::doc;
 use std::sync::Arc;
 
 use crate::models::ShowModelHandler;
-use futures::stream::TryStreamExt;
+use futures_util::stream::TryStreamExt;
 /// A shorthand for the models module
 pub use models as m;
 /// Re-export the mongodb crate

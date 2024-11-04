@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use futures::TryStreamExt;
+use futures_util::TryStreamExt;
 use showtimes_db::{
     m::UserPrivilege,
     mongodb::bson::{doc, Document},

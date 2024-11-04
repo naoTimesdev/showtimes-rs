@@ -13,7 +13,7 @@ description = "File storage handler for Showtimes API"
 tokio.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
-futures.workspace = true
+futures-util.workspace = true
 tosho-macros.workspace = true
 tracing.workspace = true
 

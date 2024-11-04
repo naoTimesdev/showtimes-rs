@@ -5,7 +5,7 @@ use std::{
 
 use bson::doc;
 use chrono::TimeZone;
-use futures::TryStreamExt;
+use futures_util::TryStreamExt;
 use showtimes_db::{
     m::{
         DiscordUser, EpisodeProgress, ImageMetadata, IntegrationId, RoleAssignee, RoleStatus, User,
