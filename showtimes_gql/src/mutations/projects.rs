@@ -427,7 +427,7 @@ async fn fetch_metadata_via_anilist(
             .unwrap_or_else(|| input.episode.unwrap_or(0)),
     };
 
-    let start_time = match (anilist_info.start_date, input.start_date.clone()) {
+    let start_time = match (anilist_info.start_date, input.start_date) {
         (_, Some(start_date)) => *start_date,
         (Some(fuzzy_start), _) => fuzzy_start.into_chrono().ok_or_else(|| {
             Error::new("Invalid fuzzy date from Anilist, please provide override").extend_with(
@@ -1541,7 +1541,7 @@ async fn update_single_project(
                     showtimes_events::m::ProjectUpdatedEpisodeDataEvent::updated(db_ep.number);
                 let mut after_episode = before_episode.clone();
 
-                let aired_at = episode.aired.clone().map(|a| *a);
+                let aired_at = episode.aired.map(|a| *a);
                 if let Some(original) = db_ep.aired {
                     before_episode.set_aired(original.timestamp());
                 }
