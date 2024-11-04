@@ -10,13 +10,16 @@ rust-version.workspace = true
 description = "File storage handler for Showtimes API"
 
 [dependencies]
-tokio.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
-futures-util.workspace = true
-tosho-macros.workspace = true
+
 tracing.workspace = true
+
+tokio.workspace = true
+futures-util.workspace = true
 
 mime_guess.workspace = true
 rusty-s3.workspace = true
 reqwest.workspace = true
+
+tosho-macros.workspace = true

@@ -10,18 +10,19 @@ rust-version.workspace = true
 description = "Library for GraphQL definitions of Showtimes API"
 
 [dependencies]
-tokio.workspace = true
 anyhow.workspace = true
 chrono.workspace = true
 time.workspace = true
-tracing.workspace = true
+
+tokio.workspace = true
+tokio-stream.workspace = true
 futures-util.workspace = true
+
+tracing.workspace = true
 
 async-graphql.workspace = true
 reqwest.workspace = true
 image.workspace = true
-
-tokio-stream.workspace = true
 
 # Showtimes related
 showtimes-shared = { path = "../showtimes_shared" }
