@@ -38,7 +38,12 @@ impl S3Fs {
     /// * `credentials`: The credentials provider.
     pub fn new(bucket: Bucket, credentials: S3FsCredentials) -> Self {
         let ua = format!("showtimes-fs-rs/{}", env!("CARGO_PKG_VERSION"));
-        let client = reqwest::Client::builder().user_agent(ua).build().unwrap();
+        let client = reqwest::ClientBuilder::new()
+            .user_agent(ua)
+            .http2_adaptive_window(true)
+            .use_rustls_tls()
+            .build()
+            .unwrap();
 
         Self {
             client: Arc::new(client),

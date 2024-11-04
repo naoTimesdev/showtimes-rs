@@ -131,6 +131,7 @@ impl Migration for M20240726055250UpdateCovers {
         let client = reqwest::ClientBuilder::new()
             .http2_adaptive_window(true)
             .default_headers(header_maps)
+            .use_rustls_tls()
             .build()?;
 
         // Update bit-by-bit so we don't lose progress if this crash

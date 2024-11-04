@@ -34,10 +34,10 @@ impl VndbProvider {
 
         let client = reqwest::ClientBuilder::new()
             .http2_adaptive_window(true)
-            .use_rustls_tls()
             .default_headers(headers)
+            .use_rustls_tls()
             .build()
-            .unwrap();
+            .expect("Failed to build reqwest client for VNDB API");
 
         VndbProvider { client }
     }

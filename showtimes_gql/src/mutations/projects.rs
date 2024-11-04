@@ -1069,6 +1069,7 @@ async fn download_cover(url: &str) -> anyhow::Result<Vec<u8>> {
     let client = reqwest::ClientBuilder::new()
         .http2_adaptive_window(true)
         .default_headers(header_maps)
+        .use_rustls_tls()
         .build()?;
 
     let resp = client.get(url).send().await?;

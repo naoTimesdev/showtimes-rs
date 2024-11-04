@@ -113,6 +113,8 @@ impl DiscordClient {
                 "showtimes-rs-session/{} (+https://github.com/naoTimesdev/showtimes-rs)",
                 env!("CARGO_PKG_VERSION")
             ))
+            .http2_adaptive_window(true)
+            .use_rustls_tls()
             .build()
             .expect("Failed to build reqwest client for Discord OAuth2");
 
