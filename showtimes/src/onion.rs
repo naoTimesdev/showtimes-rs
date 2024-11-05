@@ -8,7 +8,7 @@ use axum::{
 };
 use futures_util::future::BoxFuture;
 use serde_json::json;
-use showtimes_gql::MAX_IMAGE_SIZE;
+use showtimes_gql_common::MAX_IMAGE_SIZE;
 use tower_layer::Layer;
 use tower_service::Service;
 

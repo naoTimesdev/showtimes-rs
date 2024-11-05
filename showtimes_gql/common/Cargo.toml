@@ -1,0 +1,27 @@
+[package]
+name = "showtimes-gql-common"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license = "AGPL-3.0-only"
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Common library for GraphQL definitions of Showtimes API"
+
+[dependencies]
+chrono.workspace = true
+
+tokio.workspace = true
+futures-util.workspace = true
+
+tracing.workspace = true
+
+async-graphql.workspace = true
+image.workspace = true
+
+# Showtimes related
+showtimes-shared = { path = "../../showtimes_shared" }
+showtimes-derive = { path = "../../showtimes_derive" }
+showtimes-db = { path = "../../showtimes_db" }
+showtimes-session = { path = "../../showtimes_session" }

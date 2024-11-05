@@ -1,0 +1,35 @@
+[package]
+name = "showtimes-gql-mutations"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license = "AGPL-3.0-only"
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Mutations library for GraphQL definitions of Showtimes API"
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+
+tokio.workspace = true
+
+tracing.workspace = true
+
+async-graphql.workspace = true
+reqwest.workspace = true
+image.workspace = true
+
+# Showtimes related
+showtimes-shared = { path = "../../showtimes_shared" }
+showtimes-db = { path = "../../showtimes_db" }
+showtimes-events = { path = "../../showtimes_events" }
+showtimes-fs = { path = "../../showtimes_fs" }
+showtimes-metadata = { path = "../../showtimes_metadata" }
+showtimes-search = { path = "../../showtimes_search" }
+showtimes-session = { path = "../../showtimes_session" }
+
+# GQL related
+showtimes-gql-common = { path = "../common" }
+showtimes-gql-models = { path = "../models" }

@@ -15,7 +15,7 @@ pub struct ShowtimesState {
     /// Configuration
     pub config: Arc<showtimes_shared::Config>,
     /// The GraphQL request schema
-    pub schema: showtimes_gql::ShowtimesGQLSchema,
+    pub schema: crate::routes::graphql::ShowtimesGQLSchema,
     /// The redis session handler
     pub session: showtimes_session::manager::SharedSessionManager,
     /// External metadata providers (Anilist)

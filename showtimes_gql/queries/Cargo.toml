@@ -1,0 +1,24 @@
+[package]
+name = "showtimes-gql-queries"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license = "AGPL-3.0-only"
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Queries library for GraphQL definitions of Showtimes API"
+
+[dependencies]
+async-graphql.workspace = true
+
+# Showtimes related
+showtimes-shared = { path = "../../showtimes_shared" }
+showtimes-db = { path = "../../showtimes_db" }
+showtimes-session = { path = "../../showtimes_session" }
+
+# GQL related
+showtimes-gql-common = { path = "../common" }
+showtimes-gql-models = { path = "../models" }
+showtimes-gql-paginator = { path = "../paginator" }
+showtimes-gql-events = { path = "../events" }

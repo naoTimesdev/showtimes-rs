@@ -38,7 +38,10 @@ showtimes-shared = { path = "../showtimes_shared" }
 showtimes-db = { path = "../showtimes_db" }
 showtimes-events = { path = "../showtimes_events" }
 showtimes-fs = { path = "../showtimes_fs" }
-showtimes-gql = { path = "../showtimes_gql" }
+showtimes-gql-common = { path = "../showtimes_gql/common" }
+showtimes-gql-queries = { path = "../showtimes_gql/queries" }
+showtimes-gql-mutations = { path = "../showtimes_gql/mutations" }
+showtimes-gql-subscriptions = { path = "../showtimes_gql/subscriptions" }
 showtimes-metadata = { path = "../showtimes_metadata" }
 showtimes-search = { path = "../showtimes_search" }
 showtimes-session = { path = "../showtimes_session" }

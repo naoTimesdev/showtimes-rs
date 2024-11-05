@@ -2681,7 +2681,10 @@ dependencies = [
  "showtimes-db",
  "showtimes-events",
  "showtimes-fs",
- "showtimes-gql",
+ "showtimes-gql-common",
+ "showtimes-gql-mutations",
+ "showtimes-gql-queries",
+ "showtimes-gql-subscriptions",
  "showtimes-metadata",
  "showtimes-search",
  "showtimes-session",
@@ -2758,27 +2761,110 @@ dependencies = [
 ]
 
 [[package]]
-name = "showtimes-gql"
+name = "showtimes-gql-common"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "chrono",
+ "futures-util",
+ "image",
+ "showtimes-db",
+ "showtimes-derive",
+ "showtimes-session",
+ "showtimes-shared",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "showtimes-gql-events"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "chrono",
+ "showtimes-db",
+ "showtimes-events",
+ "showtimes-gql-common",
+ "showtimes-gql-models",
+ "showtimes-shared",
+ "time",
+]
+
+[[package]]
+name = "showtimes-gql-models"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "chrono",
+ "showtimes-db",
+ "showtimes-gql-common",
+ "showtimes-gql-paginator",
+ "showtimes-metadata",
+ "showtimes-shared",
+ "tokio",
+]
+
+[[package]]
+name = "showtimes-gql-mutations"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-graphql",
  "chrono",
- "futures-util",
  "image",
  "reqwest",
  "showtimes-db",
- "showtimes-derive",
  "showtimes-events",
  "showtimes-fs",
+ "showtimes-gql-common",
+ "showtimes-gql-models",
  "showtimes-metadata",
  "showtimes-search",
  "showtimes-session",
  "showtimes-shared",
- "time",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "showtimes-gql-paginator"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "futures-util",
+ "serde",
+ "showtimes-db",
+ "showtimes-gql-common",
+ "showtimes-shared",
+]
+
+[[package]]
+name = "showtimes-gql-queries"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "showtimes-db",
+ "showtimes-gql-common",
+ "showtimes-gql-events",
+ "showtimes-gql-models",
+ "showtimes-gql-paginator",
+ "showtimes-session",
+ "showtimes-shared",
+]
+
+[[package]]
+name = "showtimes-gql-subscriptions"
+version = "0.1.0"
+dependencies = [
+ "async-graphql",
+ "futures-util",
+ "showtimes-db",
+ "showtimes-events",
+ "showtimes-gql-common",
+ "showtimes-gql-events",
+ "showtimes-shared",
  "tokio",
  "tokio-stream",
- "tosho-macros",
  "tracing",
 ]
 

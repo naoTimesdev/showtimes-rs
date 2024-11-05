@@ -174,7 +174,7 @@ async fn entrypoint() -> anyhow::Result<()> {
         .map(|api_key| Arc::new(showtimes_metadata::VndbProvider::new(api_key)));
 
     tracing::info!("🔌🚀 Loading GraphQL schema...");
-    let schema = showtimes_gql::create_schema(&mongo_conn.db);
+    let schema = crate::routes::graphql::create_schema(&mongo_conn.db);
 
     tracing::info!("🔌 Initializing state...");
     let state = state::ShowtimesState {

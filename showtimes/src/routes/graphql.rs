@@ -6,18 +6,50 @@ use axum::{
     http::HeaderMap,
     response::{Html, IntoResponse, Response},
 };
-use showtimes_gql::{
-    graphiql_plugin_explorer, Data as GQLData, Error as GQLError, GraphiQLSource,
+use showtimes_db::DatabaseShared;
+use showtimes_gql_common::{
+    data_loader, graphiql_plugin_explorer, Data as GQLData, Error as GQLError, GraphiQLSource,
     ALL_WEBSOCKET_PROTOCOLS,
 };
+use showtimes_gql_mutations::MutationRoot;
+use showtimes_gql_queries::QueryRoot;
+use showtimes_gql_subscriptions::SubscriptionRoot;
 use showtimes_session::{manager::SessionKind, oauth2::discord::DiscordClient};
 use showtimes_shared::Config;
 
 use crate::state::SharedShowtimesState;
 
+/// The main schema for our GraphQL server.
+///
+/// Wraps [`QueryRoot`], [`MutationRoot`], and [`SubscriptionRoot`] types.
+pub type ShowtimesGQLSchema =
+    showtimes_gql_common::Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
 pub const GRAPHQL_ROUTE: &str = "/graphql";
 pub const GRAPHQL_WS_ROUTE: &str = "/graphql/ws";
 static DISCORD_CLIENT: OnceLock<Arc<DiscordClient>> = OnceLock::new();
+
+/// Create the GraphQL schema
+pub fn create_schema(db_pool: &DatabaseShared) -> ShowtimesGQLSchema {
+    showtimes_gql_common::Schema::build(QueryRoot, MutationRoot, SubscriptionRoot)
+        .extension(showtimes_gql_common::Tracing)
+        .data(showtimes_gql_common::DataLoader::new(
+            data_loader::UserDataLoader::new(db_pool),
+            tokio::spawn,
+        ))
+        .data(showtimes_gql_common::DataLoader::new(
+            data_loader::ProjectDataLoader::new(db_pool),
+            tokio::spawn,
+        ))
+        .data(showtimes_gql_common::DataLoader::new(
+            data_loader::ServerDataLoader::new(db_pool),
+            tokio::spawn,
+        ))
+        .data(showtimes_gql_common::DataLoader::new(
+            data_loader::ServerSyncLoader::new(db_pool),
+            tokio::spawn,
+        ))
+        .finish()
+}
 
 pub async fn graphql_sdl(State(state): State<SharedShowtimesState>) -> impl IntoResponse {
     let sdl_data = state.schema.sdl();
@@ -62,12 +94,12 @@ fn get_token_or_bearer(headers: &HeaderMap, config: &Config) -> Option<(SessionK
     })
 }
 
-fn get_orchestrator(headers: &HeaderMap) -> showtimes_gql::Orchestrator {
+fn get_orchestrator(headers: &HeaderMap) -> showtimes_gql_common::Orchestrator {
     match headers.get("x-orchestrator") {
-        None => showtimes_gql::Orchestrator::Standalone,
+        None => showtimes_gql_common::Orchestrator::Standalone,
         Some(value) => match value.to_str() {
-            Ok(header) => showtimes_gql::Orchestrator::from_header(Some(header)),
-            Err(_) => showtimes_gql::Orchestrator::Standalone,
+            Ok(header) => showtimes_gql_common::Orchestrator::from_header(Some(header)),
+            Err(_) => showtimes_gql_common::Orchestrator::Standalone,
         },
     }
 }

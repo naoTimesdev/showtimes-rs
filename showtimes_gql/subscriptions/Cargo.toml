@@ -1,0 +1,28 @@
+[package]
+name = "showtimes-gql-subscriptions"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license = "AGPL-3.0-only"
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Subscriptions library for GraphQL definitions of Showtimes API"
+
+[dependencies]
+tokio.workspace = true
+tokio-stream.workspace = true
+futures-util.workspace = true
+
+tracing.workspace = true
+
+async-graphql.workspace = true
+
+# Showtimes related
+showtimes-shared = { path = "../../showtimes_shared" }
+showtimes-db = { path = "../../showtimes_db" }
+showtimes-events = { path = "../../showtimes_events" }
+
+# GQL related
+showtimes-gql-common = { path = "../common" }
+showtimes-gql-events = { path = "../events" }
