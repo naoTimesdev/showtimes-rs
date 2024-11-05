@@ -3,7 +3,7 @@ use collaborations::{
     CollabAcceptedEventDataGQL, CollabCreatedEventDataGQL, CollabDeletedEventDataGQL,
     CollabRejectedEventDataGQL, CollabRetractedEventDataGQL,
 };
-use prelude::EventGQL;
+use prelude::{EventGQL, QueryNew};
 use projects::{
     ProjectCreatedEventDataGQL, ProjectDeletedEventDataGQL, ProjectEpisodeUpdatedEventDataGQL,
     ProjectUpdatedEventDataGQL,

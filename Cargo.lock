@@ -2782,6 +2782,7 @@ version = "0.1.0"
 dependencies = [
  "async-graphql",
  "chrono",
+ "serde",
  "showtimes-db",
  "showtimes-events",
  "showtimes-gql-common",
@@ -2858,6 +2859,7 @@ version = "0.1.0"
 dependencies = [
  "async-graphql",
  "futures-util",
+ "serde",
  "showtimes-db",
  "showtimes-events",
  "showtimes-gql-common",

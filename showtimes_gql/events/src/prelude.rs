@@ -1,5 +1,6 @@
 use async_graphql::{Enum, OutputType, SimpleObject};
-use showtimes_gql_common::{DateTimeGQL, UlidGQL};
+use serde::{de::DeserializeOwned, Serialize};
+use showtimes_gql_common::{queries::ServerQueryUser, DateTimeGQL, UlidGQL};
 
 use super::{
     collaborations::{
@@ -13,6 +14,14 @@ use super::{
     servers::{ServerCreatedEventDataGQL, ServerDeletedEventDataGQL, ServerUpdatedEventDataGQL},
     users::{UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDataGQL},
 };
+
+/// Implement the [`QueryNew`] trait for a type
+pub trait QueryNew<
+    O: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + std::fmt::Debug + 'static,
+>
+{
+    fn new(data: &O, user: ServerQueryUser) -> Self;
+}
 
 /// Represents the kind of event that can be published
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]

@@ -3,6 +3,8 @@ use async_graphql::{dataloader::DataLoader, ErrorExtensions, Object, SimpleObjec
 use showtimes_gql_common::{data_loader::UserDataLoader, queries::ServerQueryUser, *};
 use showtimes_gql_models::users::UserGQL;
 
+use crate::prelude::QueryNew;
+
 /// A user created event
 pub struct UserCreatedEventDataGQL {
     id: showtimes_shared::ulid::Ulid,
@@ -127,22 +129,22 @@ pub struct UserDeletedEventDataGQL {
     id: UlidGQL,
 }
 
-impl UserCreatedEventDataGQL {
-    pub fn new(event: &showtimes_events::m::UserCreatedEvent, requester: ServerQueryUser) -> Self {
+impl QueryNew<showtimes_events::m::UserCreatedEvent> for UserCreatedEventDataGQL {
+    fn new(data: &showtimes_events::m::UserCreatedEvent, user: ServerQueryUser) -> Self {
         Self {
-            id: event.id(),
-            requester,
+            id: data.id(),
+            requester: user,
         }
     }
 }
 
-impl UserUpdatedEventDataGQL {
-    pub fn new(event: &showtimes_events::m::UserUpdatedEvent, requester: ServerQueryUser) -> Self {
+impl QueryNew<showtimes_events::m::UserUpdatedEvent> for UserUpdatedEventDataGQL {
+    fn new(data: &showtimes_events::m::UserUpdatedEvent, user: ServerQueryUser) -> Self {
         Self {
-            id: event.id(),
-            before: event.before().clone(),
-            after: event.after().clone(),
-            requester,
+            id: data.id(),
+            before: data.before().clone(),
+            after: data.after().clone(),
+            requester: user,
         }
     }
 }

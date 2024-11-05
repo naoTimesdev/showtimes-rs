@@ -3,7 +3,8 @@
 
 use std::sync::LazyLock;
 
-use futures_util::{Stream, StreamExt};
+use executor::{EventWatcher, EventWatcherWithUser};
+use futures_util::Stream;
 
 use async_graphql::{Context, Subscription};
 
@@ -24,8 +25,7 @@ use showtimes_gql_events::users::{
     UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDataGQL,
 };
 
-mod expand;
-pub(crate) use expand::expand_combined_stream_event;
+mod executor;
 
 static STUBBED_ADMIN: LazyLock<ServerQueryUser> = LazyLock::new(|| {
     ServerQueryUser::new(
@@ -50,14 +50,11 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<UserCreatedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
+        EventWatcherWithUser::<showtimes_events::m::UserCreatedEvent, UserCreatedEventDataGQL>::new(
             showtimes_events::m::EventKind::UserCreated,
-            showtimes_events::m::UserCreatedEvent,
-            UserCreatedEventDataGQL,
-            *STUBBED_ADMIN
+            *STUBBED_ADMIN,
         )
+        .stream(ctx, id)
     }
 
     /// Watch for user updates events
@@ -70,14 +67,11 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<UserUpdatedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
+        EventWatcherWithUser::<showtimes_events::m::UserUpdatedEvent, UserUpdatedEventDataGQL>::new(
             showtimes_events::m::EventKind::UserUpdated,
-            showtimes_events::m::UserUpdatedEvent,
-            UserUpdatedEventDataGQL,
-            *STUBBED_ADMIN
+            *STUBBED_ADMIN,
         )
+        .stream(ctx, id)
     }
 
     /// Watch for user deleted events
@@ -90,13 +84,10 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<UserDeletedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
+        EventWatcher::<showtimes_events::m::UserDeletedEvent, UserDeletedEventDataGQL>::new(
             showtimes_events::m::EventKind::UserDeleted,
-            showtimes_events::m::UserDeletedEvent,
-            UserDeletedEventDataGQL
         )
+        .stream(ctx, id)
     }
 
     /// Watch for server created events
@@ -109,13 +100,10 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<ServerCreatedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
+        EventWatcher::<showtimes_events::m::ServerCreatedEvent, ServerCreatedEventDataGQL>::new(
             showtimes_events::m::EventKind::ServerCreated,
-            showtimes_events::m::ServerCreatedEvent,
-            ServerCreatedEventDataGQL
         )
+        .stream(ctx, id)
     }
 
     /// Watch for server updates events
@@ -128,13 +116,10 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<ServerUpdatedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
+        EventWatcher::<showtimes_events::m::ServerUpdatedEvent, ServerUpdatedEventDataGQL>::new(
             showtimes_events::m::EventKind::ServerUpdated,
-            showtimes_events::m::ServerUpdatedEvent,
-            ServerUpdatedEventDataGQL
         )
+        .stream(ctx, id)
     }
 
     /// Watch for server deleted events
@@ -147,13 +132,10 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<ServerDeletedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
+        EventWatcher::<showtimes_events::m::ServerDeletedEvent, ServerDeletedEventDataGQL>::new(
             showtimes_events::m::EventKind::ServerDeleted,
-            showtimes_events::m::ServerDeletedEvent,
-            ServerDeletedEventDataGQL
         )
+        .stream(ctx, id)
     }
 
     /// Watch for project created events
@@ -166,13 +148,10 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<ProjectCreatedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
+        EventWatcher::<showtimes_events::m::ProjectCreatedEvent, ProjectCreatedEventDataGQL>::new(
             showtimes_events::m::EventKind::ProjectCreated,
-            showtimes_events::m::ProjectCreatedEvent,
-            ProjectCreatedEventDataGQL
         )
+        .stream(ctx, id)
     }
 
     /// Watch for project updates events
@@ -185,13 +164,10 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<ProjectUpdatedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
+        EventWatcher::<showtimes_events::m::ProjectUpdatedEvent, ProjectUpdatedEventDataGQL>::new(
             showtimes_events::m::EventKind::ProjectUpdated,
-            showtimes_events::m::ProjectUpdatedEvent,
-            ProjectUpdatedEventDataGQL
         )
+        .stream(ctx, id)
     }
 
     /// Watch for project episodes update events
@@ -204,13 +180,11 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<ProjectEpisodeUpdatedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
-            showtimes_events::m::EventKind::ProjectEpisodes,
+        EventWatcher::<
             showtimes_events::m::ProjectEpisodeUpdatedEvent,
-            ProjectEpisodeUpdatedEventDataGQL
-        )
+            ProjectEpisodeUpdatedEventDataGQL,
+        >::new(showtimes_events::m::EventKind::ProjectEpisodes)
+        .stream(ctx, id)
     }
 
     /// Watch for project deleted events
@@ -223,13 +197,10 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<ProjectDeletedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
+        EventWatcher::<showtimes_events::m::ProjectDeletedEvent, ProjectDeletedEventDataGQL>::new(
             showtimes_events::m::EventKind::ProjectDeleted,
-            showtimes_events::m::ProjectDeletedEvent,
-            ProjectDeletedEventDataGQL
         )
+        .stream(ctx, id)
     }
 
     /// Watch for collaboration created events
@@ -242,13 +213,10 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<CollabCreatedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
+        EventWatcher::<showtimes_events::m::CollabCreatedEvent, CollabCreatedEventDataGQL>::new(
             showtimes_events::m::EventKind::CollaborationCreated,
-            showtimes_events::m::CollabCreatedEvent,
-            CollabCreatedEventDataGQL
         )
+        .stream(ctx, id)
     }
 
     /// Watch for collaboration acceptances events
@@ -261,13 +229,10 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<CollabAcceptedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
+        EventWatcher::<showtimes_events::m::CollabAcceptedEvent, CollabAcceptedEventDataGQL>::new(
             showtimes_events::m::EventKind::CollaborationAccepted,
-            showtimes_events::m::CollabAcceptedEvent,
-            CollabAcceptedEventDataGQL
         )
+        .stream(ctx, id)
     }
 
     /// Watch for collaboration rejection events
@@ -280,13 +245,10 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<CollabRejectedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
+        EventWatcher::<showtimes_events::m::CollabRejectedEvent, CollabRejectedEventDataGQL>::new(
             showtimes_events::m::EventKind::CollaborationRejected,
-            showtimes_events::m::CollabRejectedEvent,
-            CollabRejectedEventDataGQL
         )
+        .stream(ctx, id)
     }
 
     /// Watch for collaboration retraction events
@@ -299,13 +261,10 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<CollabRetractedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
+        EventWatcher::<showtimes_events::m::CollabRetractedEvent, CollabRetractedEventDataGQL>::new(
             showtimes_events::m::EventKind::CollaborationRetracted,
-            showtimes_events::m::CollabRetractedEvent,
-            CollabRetractedEventDataGQL
         )
+        .stream(ctx, id)
     }
 
     /// Watch for collaboration deleted events
@@ -318,12 +277,9 @@ impl SubscriptionRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
     ) -> impl Stream<Item = EventGQL<CollabDeletedEventDataGQL>> {
-        expand_combined_stream_event!(
-            ctx,
-            id,
+        EventWatcher::<showtimes_events::m::CollabDeletedEvent, CollabDeletedEventDataGQL>::new(
             showtimes_events::m::EventKind::CollaborationDeleted,
-            showtimes_events::m::CollabDeletedEvent,
-            CollabDeletedEventDataGQL
         )
+        .stream(ctx, id)
     }
 }

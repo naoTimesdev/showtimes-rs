@@ -12,6 +12,7 @@ description = "Events models library for GraphQL definitions of Showtimes API"
 [dependencies]
 chrono.workspace = true
 time.workspace = true
+serde.workspace = true
 
 async-graphql.workspace = true
 

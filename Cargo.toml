@@ -145,7 +145,31 @@ opt-level = "s"
 codegen-units = 1
 
 ## Showtimes GraphQL
-[profile.release.package.showtimes-gql]
+[profile.release.package.showtimes-gql-common]
+opt-level = "s"
+codegen-units = 1
+
+[profile.release.package.showtimes-gql-models]
+opt-level = "s"
+codegen-units = 1
+
+[profile.release.package.showtimes-gql-events]
+opt-level = "s"
+codegen-units = 1
+
+[profile.release.package.showtimes-gql-paginator]
+opt-level = "s"
+codegen-units = 1
+
+[profile.release.package.showtimes-gql-queries]
+opt-level = "s"
+codegen-units = 1
+
+[profile.release.package.showtimes-gql-mutations]
+opt-level = "s"
+codegen-units = 1
+
+[profile.release.package.showtimes-gql-subscriptions]
 opt-level = "s"
 codegen-units = 1
 
