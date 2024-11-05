@@ -8,7 +8,7 @@ use showtimes_gql_events::prelude::{EventGQL, QueryNew};
 
 pub(crate) struct EventWatcher<
     O: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + Debug + 'static,
-    T: From<O> + OutputType + 'static,
+    T: for<'target> From<&'target O> + OutputType + 'static,
 > {
     kind: showtimes_events::m::EventKind,
     _pin_o: PhantomData<O>,
@@ -27,7 +27,7 @@ pub(crate) struct EventWatcherWithUser<
 
 impl<
         O: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + Debug + 'static,
-        T: From<O> + OutputType + 'static,
+        T: for<'target> From<&'target O> + OutputType + 'static,
     > EventWatcher<O, T>
 {
     pub(crate) fn new(kind: showtimes_events::m::EventKind) -> Self {
@@ -49,7 +49,7 @@ impl<
         tokio::spawn(async move {
             let mut subscribers = showtimes_events::MemoryBroker::<O>::subscribe();
             while let Some(event) = subscribers.next().await {
-                let inner = T::from(event.data().clone());
+                let inner = T::from(event.data());
                 let parsed_data = EventGQL::new(
                     event.id(),
                     inner,
@@ -84,7 +84,7 @@ impl<
                     match event_batch {
                         Ok(event_batch) => {
                             for event in event_batch.iter() {
-                                let inner = T::from(event.data().clone());
+                                let inner = T::from(event.data());
                                 let parsed_data = EventGQL::new(
                                     event.id(),
                                     inner,
