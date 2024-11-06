@@ -75,6 +75,9 @@ pub struct Storages {
     /// S3 storage configuration
     #[serde(default)]
     pub s3: Option<StorageS3>,
+    /// Enable or disable the image proxy feature
+    #[serde(default)]
+    pub disable_proxy: Option<bool>,
 }
 
 impl Storages {

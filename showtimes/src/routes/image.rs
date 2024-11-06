@@ -21,10 +21,23 @@ async fn common_reader(
     method: axum::http::Method,
     query: ImageQuery,
     fs_pool: StorageShared,
+    config: Arc<showtimes_shared::config::Config>,
 ) -> impl IntoResponse {
     let (mut tx, rx) = tokio::io::duplex(65_536);
-
     let body = AsyncReadBody::new(rx);
+
+    if let Some(true) = config.storages.disable_proxy {
+        // Write something to tx so we can have same type
+        tx.write_all(b"Route disabled by host").await.unwrap();
+
+        // Return an error 404
+        return axum::http::Response::builder()
+            .status(axum::http::StatusCode::FORBIDDEN)
+            .header(axum::http::header::CONTENT_TYPE, "text/plain")
+            .body(body)
+            .unwrap();
+    }
+
     let file = fs_pool
         .file_stat(
             &query.id,
@@ -81,6 +94,7 @@ async fn common_reader(
             // Return an error 404
             return axum::http::Response::builder()
                 .status(axum::http::StatusCode::NOT_FOUND)
+                .header(axum::http::header::CONTENT_TYPE, "text/plain")
                 .body(body)
                 .unwrap();
         }
@@ -118,5 +132,11 @@ pub async fn image_by_id(
     Path(query): Path<ImageQuery>,
     State(state): State<SharedShowtimesState>,
 ) -> impl IntoResponse {
-    common_reader(method, query, Arc::clone(&state.storage)).await
+    common_reader(
+        method,
+        query,
+        Arc::clone(&state.storage),
+        Arc::clone(&state.config),
+    )
+    .await
 }

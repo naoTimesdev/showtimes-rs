@@ -49,6 +49,10 @@ vndb = "your-valid-token-for-vndb"
 # TMDB Token
 tmdb = "your-valid-access-token-for-tmdb"
 
+[storages]
+# Disable the proxy that can mirror S3 data, not recommended if you use local
+# disable_proxy = false
+
 # Local storage path
 [storages.local]
 path = "./storages"
