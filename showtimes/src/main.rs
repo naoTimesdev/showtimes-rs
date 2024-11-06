@@ -15,6 +15,8 @@ mod onion;
 mod routes;
 mod state;
 
+const ASSET_ICON: &[u8] = include_bytes!("../assets/icon.ico");
+
 #[tokio::main]
 async fn main() {
     // Call our entrypoint function
@@ -194,6 +196,7 @@ async fn entrypoint() -> anyhow::Result<()> {
     tracing::info!("🚀 Starting server...");
     let app = Router::new()
         .route("/", get(index))
+        .route("/favicon.ico", get(index_favicons))
         .route(
             GRAPHQL_ROUTE,
             get(routes::graphql::graphql_playground)
@@ -256,6 +259,22 @@ async fn index() -> impl IntoResponse {
     axum::Json(
         json!({ "success": true, "version": env!("CARGO_PKG_VERSION"), "commit": env!("GIT_COMMIT") }),
     )
+}
+
+async fn index_favicons() -> impl IntoResponse {
+    let etag = format!("sh-favicons-{}", env!("CARGO_PKG_VERSION"));
+    let builder = axum::http::Response::builder()
+        .status(axum::http::StatusCode::OK)
+        .header(axum::http::header::CONTENT_TYPE, "image/x-icon")
+        .header(
+            axum::http::header::CACHE_CONTROL,
+            "public, max-age=604800, immutable",
+        )
+        .header(axum::http::header::ETAG, etag)
+        .body(axum::body::Body::from(ASSET_ICON))
+        .unwrap();
+
+    builder
 }
 
 async fn shutdown_signal() {
