@@ -85,7 +85,7 @@ impl QueryRoot {
             })
             .collect();
 
-        Ok(PaginatedGQL::new(mapped_nodes, results.page_info().clone()))
+        Ok(PaginatedGQL::new(mapped_nodes, *results.page_info()))
     }
 
     /// Get authenticated user associated projects
@@ -153,7 +153,7 @@ impl QueryRoot {
 
         let mapped_nodes: Vec<ProjectGQL> = results.nodes().iter().map(ProjectGQL::from).collect();
 
-        Ok(PaginatedGQL::new(mapped_nodes, results.page_info().clone()))
+        Ok(PaginatedGQL::new(mapped_nodes, *results.page_info()))
     }
 
     /// Get all available users, you need a minimum of admin role to access this
@@ -195,7 +195,7 @@ impl QueryRoot {
 
         let mapped_nodes: Vec<UserGQL> = results.nodes().iter().map(UserGQL::from).collect();
 
-        Ok(PaginatedGQL::new(mapped_nodes, results.page_info().clone()))
+        Ok(PaginatedGQL::new(mapped_nodes, *results.page_info()))
     }
 
     /// Get server statistics
@@ -227,7 +227,7 @@ impl QueryRoot {
     #[graphql(guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)")]
     async fn search(&self) -> QuerySearchRoot {
         // This is just an empty root which has dynamic fields
-        QuerySearchRoot::new()
+        QuerySearchRoot
     }
 
     /// Query events updates from specific IDs

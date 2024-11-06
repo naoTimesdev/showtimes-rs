@@ -273,13 +273,6 @@ struct DefaultRolesGQL {
 /// The root query for external search to multiple external sources.
 pub struct QuerySearchRoot;
 
-impl QuerySearchRoot {
-    /// Create a new search root
-    pub fn new() -> Self {
-        Self
-    }
-}
-
 /// The root query for external search to multiple external sources.
 #[Object]
 impl QuerySearchRoot {

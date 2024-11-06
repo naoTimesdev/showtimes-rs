@@ -4,11 +4,13 @@ GraphQL models, interactor, and many more.
 
 ## Structure
 The gql crates is split into more parts to make it easier to be compiled and managed:
-- common/prelude (contains the common model, and some gql re-export)
-- queries (including the main model)
-- mutations (changes)
-- subscriptions (events)
-- events (model and interactor)
+- `common` — contains some more common model and some helpers like data loader and other
+- `models` — contains the model itself that is mapped from the database
+  - `events` — event log specific model from ClickHouse
+- `paginator` — the paginator action that handles the pagination logic for some queries action
+- `queries` — the actual queries model
+- `mutations` — the actual mutations model
+- `subscriptions` — the actual subscriptions/watch model
 
 ## License
 

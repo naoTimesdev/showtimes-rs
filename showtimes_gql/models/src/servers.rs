@@ -213,7 +213,7 @@ impl ServerGQL {
 
         let mapped_nodes: Vec<ProjectGQL> = results.nodes().iter().map(ProjectGQL::from).collect();
 
-        Ok(PaginatedGQL::new(mapped_nodes, results.page_info().clone()))
+        Ok(PaginatedGQL::new(mapped_nodes, *results.page_info()))
     }
 }
 

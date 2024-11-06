@@ -120,7 +120,7 @@ impl UserGQL {
             })
             .collect();
 
-        Ok(PaginatedGQL::new(mapped_nodes, results.page_info().clone()))
+        Ok(PaginatedGQL::new(mapped_nodes, *results.page_info()))
     }
 }
 
