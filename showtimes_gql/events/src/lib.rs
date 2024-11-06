@@ -1,9 +1,10 @@
-use async_graphql::{ErrorExtensions, Object};
+use async_graphql::Object;
 use collaborations::{
     CollabAcceptedEventDataGQL, CollabCreatedEventDataGQL, CollabDeletedEventDataGQL,
     CollabRejectedEventDataGQL, CollabRetractedEventDataGQL,
 };
-use prelude::{EventGQL, QueryNew};
+use executor::{query_events, query_events_with_user};
+use prelude::EventGQL;
 use projects::{
     ProjectCreatedEventDataGQL, ProjectDeletedEventDataGQL, ProjectEpisodeUpdatedEventDataGQL,
     ProjectUpdatedEventDataGQL,
@@ -11,9 +12,7 @@ use projects::{
 use servers::{ServerCreatedEventDataGQL, ServerDeletedEventDataGQL, ServerUpdatedEventDataGQL};
 use users::{UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDataGQL};
 
-use expand::{expand_query_event, expand_query_event_with_user};
-
-mod expand;
+mod executor;
 
 pub mod collaborations;
 pub mod prelude;
@@ -41,13 +40,12 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<UserCreatedEventDataGQL>>> {
-        expand_query_event_with_user!(
+        query_events_with_user::<showtimes_events::m::UserCreatedEvent, UserCreatedEventDataGQL>(
             ctx,
             id,
-            UserCreatedEventDataGQL,
-            showtimes_events::m::UserCreatedEvent,
-            showtimes_events::m::EventKind::UserCreated
+            showtimes_events::m::EventKind::UserCreated,
         )
+        .await
     }
 
     /// The user updated event, use `watchUserUpdated` to get a real-time stream instead.
@@ -57,13 +55,12 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<UserUpdatedEventDataGQL>>> {
-        expand_query_event_with_user!(
+        query_events_with_user::<showtimes_events::m::UserUpdatedEvent, UserUpdatedEventDataGQL>(
             ctx,
             id,
-            UserUpdatedEventDataGQL,
-            showtimes_events::m::UserUpdatedEvent,
-            showtimes_events::m::EventKind::UserUpdated
+            showtimes_events::m::EventKind::UserUpdated,
         )
+        .await
     }
 
     /// The user deleted event, use `watchUserDeleted` to get a real-time stream instead.
@@ -73,13 +70,12 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<UserDeletedEventDataGQL>>> {
-        expand_query_event!(
+        query_events::<showtimes_events::m::UserDeletedEvent, UserDeletedEventDataGQL>(
             ctx,
             id,
-            UserDeletedEventDataGQL,
-            showtimes_events::m::UserDeletedEvent,
-            showtimes_events::m::EventKind::UserDeleted
+            showtimes_events::m::EventKind::UserDeleted,
         )
+        .await
     }
 
     /// The server created event, use `watchServerCreated` to get a real-time stream instead.
@@ -89,13 +85,12 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<ServerCreatedEventDataGQL>>> {
-        expand_query_event!(
+        query_events::<showtimes_events::m::ServerCreatedEvent, ServerCreatedEventDataGQL>(
             ctx,
             id,
-            ServerCreatedEventDataGQL,
-            showtimes_events::m::ServerCreatedEvent,
-            showtimes_events::m::EventKind::ServerCreated
+            showtimes_events::m::EventKind::ServerCreated,
         )
+        .await
     }
 
     /// The server updated event, use `watchServerUpdated` to get a real-time stream instead.
@@ -105,13 +100,12 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<ServerUpdatedEventDataGQL>>> {
-        expand_query_event!(
+        query_events::<showtimes_events::m::ServerUpdatedEvent, ServerUpdatedEventDataGQL>(
             ctx,
             id,
-            ServerUpdatedEventDataGQL,
-            showtimes_events::m::ServerUpdatedEvent,
-            showtimes_events::m::EventKind::ServerUpdated
+            showtimes_events::m::EventKind::ServerUpdated,
         )
+        .await
     }
 
     /// The server deleted event, use `watchServerDeleted` to get a real-time stream instead.
@@ -121,13 +115,12 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<ServerDeletedEventDataGQL>>> {
-        expand_query_event!(
+        query_events::<showtimes_events::m::ServerDeletedEvent, ServerDeletedEventDataGQL>(
             ctx,
             id,
-            ServerDeletedEventDataGQL,
-            showtimes_events::m::ServerDeletedEvent,
-            showtimes_events::m::EventKind::ServerDeleted
+            showtimes_events::m::EventKind::ServerDeleted,
         )
+        .await
     }
 
     /// The project created event, use `watchProjectCreated` to get a real-time stream instead.
@@ -137,13 +130,12 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<ProjectCreatedEventDataGQL>>> {
-        expand_query_event!(
+        query_events::<showtimes_events::m::ProjectCreatedEvent, ProjectCreatedEventDataGQL>(
             ctx,
             id,
-            ProjectCreatedEventDataGQL,
-            showtimes_events::m::ProjectCreatedEvent,
-            showtimes_events::m::EventKind::ProjectCreated
+            showtimes_events::m::EventKind::ProjectCreated,
         )
+        .await
     }
 
     /// The project updated event, use `watchProjectUpdated` to get a real-time stream instead.
@@ -153,13 +145,12 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<ProjectUpdatedEventDataGQL>>> {
-        expand_query_event!(
+        query_events::<showtimes_events::m::ProjectUpdatedEvent, ProjectUpdatedEventDataGQL>(
             ctx,
             id,
-            ProjectUpdatedEventDataGQL,
-            showtimes_events::m::ProjectUpdatedEvent,
-            showtimes_events::m::EventKind::ProjectUpdated
+            showtimes_events::m::EventKind::ProjectUpdated,
         )
+        .await
     }
 
     /// The project episode updated event, use `watchProjectEpisodeUpdated` to get a real-time stream instead.
@@ -169,13 +160,11 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<ProjectEpisodeUpdatedEventDataGQL>>> {
-        expand_query_event!(
-            ctx,
-            id,
-            ProjectEpisodeUpdatedEventDataGQL,
+        query_events::<
             showtimes_events::m::ProjectEpisodeUpdatedEvent,
-            showtimes_events::m::EventKind::ProjectEpisodes
-        )
+            ProjectEpisodeUpdatedEventDataGQL,
+        >(ctx, id, showtimes_events::m::EventKind::ProjectEpisodes)
+        .await
     }
 
     /// The project deleted event, use `watchProjectDeleted` to get a real-time stream instead.
@@ -185,13 +174,12 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<ProjectDeletedEventDataGQL>>> {
-        expand_query_event!(
+        query_events::<showtimes_events::m::ProjectDeletedEvent, ProjectDeletedEventDataGQL>(
             ctx,
             id,
-            ProjectDeletedEventDataGQL,
-            showtimes_events::m::ProjectDeletedEvent,
-            showtimes_events::m::EventKind::ProjectDeleted
+            showtimes_events::m::EventKind::ProjectDeleted,
         )
+        .await
     }
 
     /// The collaboration created event, use `watchCollabCreated` to get a real-time stream instead.
@@ -201,13 +189,12 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<CollabCreatedEventDataGQL>>> {
-        expand_query_event!(
+        query_events::<showtimes_events::m::CollabCreatedEvent, CollabCreatedEventDataGQL>(
             ctx,
             id,
-            CollabCreatedEventDataGQL,
-            showtimes_events::m::CollabCreatedEvent,
-            showtimes_events::m::EventKind::CollaborationCreated
+            showtimes_events::m::EventKind::CollaborationCreated,
         )
+        .await
     }
 
     /// The collaboration acceptance event, use `watchCollabAccepted` to get a real-time stream instead.
@@ -217,13 +204,12 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<CollabAcceptedEventDataGQL>>> {
-        expand_query_event!(
+        query_events::<showtimes_events::m::CollabAcceptedEvent, CollabAcceptedEventDataGQL>(
             ctx,
             id,
-            CollabAcceptedEventDataGQL,
-            showtimes_events::m::CollabAcceptedEvent,
-            showtimes_events::m::EventKind::CollaborationAccepted
+            showtimes_events::m::EventKind::CollaborationAccepted,
         )
+        .await
     }
 
     /// The collaboration rejection event, use `watchCollabRejected` to get a real-time stream instead.
@@ -233,13 +219,12 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<CollabRejectedEventDataGQL>>> {
-        expand_query_event!(
+        query_events::<showtimes_events::m::CollabRejectedEvent, CollabRejectedEventDataGQL>(
             ctx,
             id,
-            CollabRejectedEventDataGQL,
-            showtimes_events::m::CollabRejectedEvent,
-            showtimes_events::m::EventKind::CollaborationRejected
+            showtimes_events::m::EventKind::CollaborationRejected,
         )
+        .await
     }
 
     /// The collaboration retraction event, use `watchCollabRetracted` to get a real-time stream instead.
@@ -249,13 +234,12 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<CollabRetractedEventDataGQL>>> {
-        expand_query_event!(
+        query_events::<showtimes_events::m::CollabRetractedEvent, CollabRetractedEventDataGQL>(
             ctx,
             id,
-            CollabRetractedEventDataGQL,
-            showtimes_events::m::CollabRetractedEvent,
-            showtimes_events::m::EventKind::CollaborationRetracted
+            showtimes_events::m::EventKind::CollaborationRetracted,
         )
+        .await
     }
 
     /// The collaboration deletion or unlinking event, use `watchCollabDeleted` to get a real-time stream instead.
@@ -265,12 +249,11 @@ impl QueryEventsRoot {
         ctx: &async_graphql::Context<'_>,
         #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<Vec<EventGQL<CollabDeletedEventDataGQL>>> {
-        expand_query_event!(
+        query_events::<showtimes_events::m::CollabDeletedEvent, CollabDeletedEventDataGQL>(
             ctx,
             id,
-            CollabDeletedEventDataGQL,
-            showtimes_events::m::CollabDeletedEvent,
-            showtimes_events::m::EventKind::CollaborationDeleted
+            showtimes_events::m::EventKind::CollaborationDeleted,
         )
+        .await
     }
 }
