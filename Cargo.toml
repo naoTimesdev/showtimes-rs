@@ -47,16 +47,16 @@ anyhow = "1"
 tosho-macros = "0.3"
 
 # Async/Futures
-tokio = { version = "1.41.0", features = ["full"] }
+tokio = { version = "1.41.1", features = ["full"] }
 tokio-stream = "0.1.16"
 futures-util = { version = "0.3.31", default-features = false, features = ["std"] }
 futures-channel = { version = "0.3.31", default-features = false, features = ["std"] }
-async-trait = "0.1.82"
+async-trait = "0.1.83"
 
 # File server
 mime_guess = "2.0.5"
 rusty-s3 = { version = "0.5.0", features = ["full"] }
-image = { version = "0.25.4", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
+image = { version = "0.25.5", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 slab = "0.4.9"
 
 # Web server
@@ -89,7 +89,7 @@ meilisearch-sdk = "0.27.1"
 jsonwebtoken = { version = "9.3.0", default-features = false }
 
 # FansubRSS/Network
-reqwest = {version = "0.12.9", default-features = false, features = [
+reqwest = { version = "0.12.9", default-features = false, features = [
     "charset",
     "macos-system-configuration",
     "rustls-tls",
@@ -101,7 +101,7 @@ pulldown-cmark = { version = "0.12.2", default-features = false, features = ["ht
 pulldown-cmark-escape = "0.11.0"
 
 # CLI
-clap = { version = "4.5.17", features = ["derive"] }
+clap = { version = "4.5.20", features = ["derive"] }
 dotenvy = "0.15.7"
 
 [profile.dev]
