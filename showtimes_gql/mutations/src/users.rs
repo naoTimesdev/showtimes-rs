@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use async_graphql::{dataloader::DataLoader, Error, ErrorExtensions, InputObject, Upload};
+use async_graphql::{dataloader::DataLoader, InputObject, Upload};
 use showtimes_db::{m::UserKind, DatabaseShared, UserHandler};
 use showtimes_fs::FsPool;
 use showtimes_search::SearchClientShared;
@@ -9,7 +9,8 @@ use tokio::io::AsyncSeekExt;
 
 use showtimes_gql_common::{
     data_loader::{DiscordIdLoad, UserDataLoader},
-    GQLError, UserKindGQL,
+    errors::GQLError,
+    GQLErrorCode, UserKindGQL,
 };
 use showtimes_gql_models::users::{UserGQL, UserSessionGQL};
 
@@ -79,7 +80,7 @@ pub async fn mutate_users_update(
     input: UserInputGQL,
 ) -> async_graphql::Result<UserGQL> {
     if !input.is_any_set() {
-        return Err(Error::new("No fields to update"));
+        return GQLError::new("No fields to update", GQLErrorCode::MissingModification).into();
     }
 
     let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
@@ -89,22 +90,36 @@ pub async fn mutate_users_update(
 
     let user_info = match user.id {
         Some(id) => loader.load_one(id).await?.ok_or_else(|| {
-            Error::new("User not found").extend_with(|_, e| {
-                e.set("id", id.to_string());
-                e.set("reason", "invalid_user");
-            })
+            GQLError::new("User not found", GQLErrorCode::UserNotFound)
+                .extend(|e| e.set("id", id.to_string()))
+                .build()
         })?,
         None => user.requester.clone(),
     };
 
     if user_info.kind == UserKind::Owner {
         // Fails, Owner cannot be updated
-        return Err(Error::new("Owner cannot be updated"));
+        return GQLError::new(
+            "Unable to update owner information",
+            GQLErrorCode::UserSuperuserMode,
+        )
+        .extend(|e| {
+            e.set("id", user_info.id.to_string());
+        })
+        .into();
     }
 
     if user.requester.kind == UserKind::User && user_info.id != user.requester.id {
         // Fails, User cannot be updated by another user
-        return Err(Error::new("User cannot be updated by another user"));
+        return GQLError::new(
+            "Unable to update user information",
+            GQLErrorCode::UserUnauthorized,
+        )
+        .extend(|e| {
+            e.set("id", user_info.id.to_string());
+            e.set("requester", user.requester.id.to_string());
+        })
+        .into();
     }
 
     let proceed_user_kind = match (user_info.kind, input.kind) {
@@ -126,8 +141,12 @@ pub async fn mutate_users_update(
     };
 
     if !proceed_user_kind {
-        return Err(Error::new("Invalid user kind update").extend_with(|_, e| {
-            e.set("reason", "invalid_user_kind");
+        return GQLError::new(
+            "Insufficient privilege to update user privilege/kind",
+            GQLErrorCode::UserInsufficientPrivilege,
+        )
+        .extend(|e| {
+            e.set("id", user_info.id.to_string());
             e.set("from", user_info.kind.to_name());
             e.set(
                 "to",
@@ -136,7 +155,8 @@ pub async fn mutate_users_update(
                     None => "None",
                 },
             );
-        }));
+        })
+        .into();
     }
 
     let mut user_info = user_info.clone();
@@ -165,30 +185,34 @@ pub async fn mutate_users_update(
         let format = showtimes_gql_common::image::detect_upload_data(&mut file_target)
             .await
             .map_err(|err| {
-                Error::new(format!("Failed to detect image format: {err}")).extend_with(|_, e| {
+                GQLError::new(
+                    format!("Failed to detect image format: {err}"),
+                    GQLErrorCode::IOError,
+                )
+                .extend(|e| {
                     e.set("id", user_info.id.to_string());
                     e.set("where", "user");
-                    e.set("reason", GQLError::IOError);
-                    e.set("code", GQLError::IOError.code());
                     e.set("original", format!("{err}"));
                     e.set("original_code", format!("{}", err.kind()));
                 })
+                .build()
             })?;
         // Seek back to the start of the file
         file_target
             .seek(std::io::SeekFrom::Start(0))
             .await
             .map_err(|err| {
-                Error::new(format!("Failed to seek to image to start: {err}")).extend_with(
-                    |_, e| {
-                        e.set("id", user_info.id.to_string());
-                        e.set("where", "user");
-                        e.set("reason", GQLError::IOError);
-                        e.set("code", GQLError::IOError.code());
-                        e.set("original", format!("{err}"));
-                        e.set("original_code", format!("{}", err.kind()));
-                    },
+                GQLError::new(
+                    format!("Failed to seek to image to start: {err}"),
+                    GQLErrorCode::IOError,
                 )
+                .extend(|e| {
+                    e.set("id", user_info.id.to_string());
+                    e.set("where", "user");
+                    e.set("original", format!("{err}"));
+                    e.set("original_code", format!("{}", err.kind()));
+                })
+                .build()
             })?;
 
         let filename = format!("avatar.{}", format.as_extension());
@@ -203,13 +227,16 @@ pub async fn mutate_users_update(
             )
             .await
             .map_err(|err| {
-                Error::new(format!("Failed to upload image: {err}")).extend_with(|_, e| {
+                GQLError::new(
+                    format!("Failed to upload image: {err}"),
+                    GQLErrorCode::ImageUploadError,
+                )
+                .extend(|e| {
                     e.set("id", user_info.id.to_string());
                     e.set("where", "user");
-                    e.set("reason", GQLError::ImageUploadError);
-                    e.set("code", GQLError::ImageUploadError.code());
                     e.set("original", format!("{err}"));
                 })
+                .build()
             })?;
 
         let image_meta = showtimes_db::m::ImageMetadata::new(
@@ -272,11 +299,19 @@ pub async fn mutate_users_authenticate(
         showtimes_session::ShowtimesAudience::DiscordAuth,
     )
     .map_err(|err| {
-        err.extend_with(|_, e| {
-            e.set("reason", "invalid_state");
-            e.set("state", state);
-            e.set("token", token.clone());
-        })
+        let sel_error = match err.kind() {
+            showtimes_session::SessionErrorKind::ExpiredSignature => GQLErrorCode::ExpiredToken,
+            showtimes_session::SessionErrorKind::InvalidAudience => {
+                GQLErrorCode::UserInvalidAudience
+            }
+            _ => GQLErrorCode::InvalidToken,
+        };
+        GQLError::new(err.to_string(), sel_error)
+            .extend(|e| {
+                e.set("token", &token);
+                e.set("state", &state);
+            })
+            .build()
     })?;
 
     // Valid!

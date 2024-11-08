@@ -17,7 +17,7 @@ pub mod queries;
 pub use async_graphql::http::{graphiql_plugin_explorer, GraphiQLSource, ALL_WEBSOCKET_PROTOCOLS};
 pub use async_graphql::{dataloader::DataLoader, extensions::Tracing, Data, Error, Schema};
 /// Re-exports of the errors enums
-pub use errors::{GQLDataLoaderWhere, GQLError};
+pub use errors::{GQLDataLoaderWhere, GQLErrorCode, GQLErrorExt};
 pub use image::MAX_IMAGE_SIZE;
 
 /// A wrapper around ULID to allow it to be used in GraphQL

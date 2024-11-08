@@ -1,5 +1,6 @@
-use async_graphql::{dataloader::DataLoader, ErrorExtensions, Object, SimpleObject};
+use async_graphql::{dataloader::DataLoader, Object, SimpleObject};
 
+use errors::GQLError;
 use showtimes_gql_common::{data_loader::ServerDataLoader, *};
 use showtimes_gql_models::servers::{ServerGQL, ServerUserGQL};
 
@@ -20,8 +21,9 @@ impl ServerCreatedEventDataGQL {
         let loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
 
         let user = loader.load_one(self.id).await?.ok_or_else(|| {
-            async_graphql::Error::new("Server not found")
-                .extend_with(|_, e| e.set("id", self.id.to_string()))
+            GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
+                .extend(|e| e.set("id", self.id.to_string()))
+                .build()
         })?;
 
         let srv_gql = ServerGQL::from(user);
@@ -85,8 +87,9 @@ impl ServerUpdatedEventDataGQL {
         let loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
 
         let user = loader.load_one(self.id).await?.ok_or_else(|| {
-            async_graphql::Error::new("Server not found")
-                .extend_with(|_, e| e.set("id", self.id.to_string()))
+            GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
+                .extend(|e| e.set("id", self.id.to_string()))
+                .build()
         })?;
 
         let srv_gql = ServerGQL::from(user);

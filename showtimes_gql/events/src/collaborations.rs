@@ -1,5 +1,6 @@
-use async_graphql::{dataloader::DataLoader, ErrorExtensions, Object, SimpleObject};
+use async_graphql::{dataloader::DataLoader, Object, SimpleObject};
 
+use errors::GQLError;
 use showtimes_gql_common::{data_loader::ServerSyncLoader, *};
 use showtimes_gql_models::collaborations::CollaborationSyncGQL;
 
@@ -23,8 +24,9 @@ impl CollabCreatedEventDataGQL {
         let loader = ctx.data_unchecked::<DataLoader<ServerSyncLoader>>();
 
         let item = loader.load_one(self.id).await?.ok_or_else(|| {
-            async_graphql::Error::new("Collab not found")
-                .extend_with(|_, e| e.set("id", self.id.to_string()))
+            GQLError::new("Collab not found", GQLErrorCode::ServerSyncNotFound)
+                .extend(|e| e.set("id", self.id.to_string()))
+                .build()
         })?;
 
         let gql_item = CollaborationSyncGQL::from(item);
@@ -59,8 +61,9 @@ impl CollabAcceptedEventDataGQL {
         let loader = ctx.data_unchecked::<DataLoader<ServerSyncLoader>>();
 
         let item = loader.load_one(self.id).await?.ok_or_else(|| {
-            async_graphql::Error::new("Collab not found")
-                .extend_with(|_, e| e.set("id", self.id.to_string()))
+            GQLError::new("Collab not found", GQLErrorCode::ServerSyncNotFound)
+                .extend(|e| e.set("id", self.id.to_string()))
+                .build()
         })?;
 
         let gql_item = CollaborationSyncGQL::from(item);
@@ -125,8 +128,9 @@ impl CollabDeletedEventDataGQL {
         let loader = ctx.data_unchecked::<DataLoader<ServerSyncLoader>>();
 
         let item = loader.load_one(self.id).await?.ok_or_else(|| {
-            async_graphql::Error::new("Collab not found")
-                .extend_with(|_, e| e.set("id", self.id.to_string()))
+            GQLError::new("Collab not found", GQLErrorCode::ServerSyncNotFound)
+                .extend(|e| e.set("id", self.id.to_string()))
+                .build()
         })?;
 
         let gql_item = CollaborationSyncGQL::from(item);

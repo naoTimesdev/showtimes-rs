@@ -44,6 +44,19 @@ impl AnilistFuzzyDate {
     }
 }
 
+impl std::fmt::Display for AnilistFuzzyDate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // YYYY-MM-DD, YYYY-MM, or YYYY, or ""
+        write!(
+            f,
+            "{}{}{}",
+            self.year.map_or(String::new(), |y| y.to_string()),
+            self.month.map_or(String::new(), |m| format!("-{:02}", m)),
+            self.day.map_or(String::new(), |d| format!("-{:02}", d)),
+        )
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
 pub struct AnilistAiringSchedule {
     pub id: i32,

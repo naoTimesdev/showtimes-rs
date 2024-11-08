@@ -1,0 +1,4 @@
+disallowed-types = [
+    { path = "async_graphql::ErrorExtensions", reason = "use `showtimes_gql_common::GQLErrorExt` instead." },
+    # { path = "async_graphql::Error", reason = "use `showtimes_gql_common::GQLError` instead." }
+]

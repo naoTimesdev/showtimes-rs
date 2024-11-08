@@ -1,6 +1,6 @@
-use async_graphql::{ErrorExtensions, OutputType};
+use async_graphql::OutputType;
 use serde::{de::DeserializeOwned, Serialize};
-use showtimes_gql_common::{queries::ServerQueryUser, UlidGQL};
+use showtimes_gql_common::{errors::GQLError, queries::ServerQueryUser, GQLErrorCode, UlidGQL};
 
 use crate::prelude::{EventGQL, QueryNew};
 
@@ -20,23 +20,16 @@ where
 
     while !stream.is_exhausted() {
         let event_batch = stream.advance().await.map_err(|err| {
-            async_graphql::Error::new(format!(
-                "Failed querying data from query stream: {}",
-                kind.to_name(),
-            ))
-            .extend_with(|_, e| {
+            GQLError::new(
+                format!("Failed querying data from query stream: {}", kind.to_name(),),
+                GQLErrorCode::EventAdvanceFailure,
+            )
+            .extend(|e| {
                 e.set("id", id.to_string());
                 e.set("kind", kind.to_name());
                 e.set("original", format!("{}", err));
-                e.set(
-                    "reason",
-                    showtimes_gql_common::GQLError::EventAdvanceFailure,
-                );
-                e.set(
-                    "code",
-                    showtimes_gql_common::GQLError::EventAdvanceFailure.code(),
-                );
             })
+            .build()
         })?;
 
         results.extend(event_batch.into_iter().map(|event| {
@@ -73,23 +66,18 @@ where
 
     while !stream.is_exhausted() {
         let event_batch = stream.advance().await.map_err(|err| {
-            async_graphql::Error::new(format!(
-                "Failed querying data from query stream: {}",
-                kind.to_name(),
-            ))
-            .extend_with(|_, e| {
+            GQLError::new(
+                format!("Failed querying data from query stream: {}", kind.to_name(),),
+                GQLErrorCode::EventAdvanceFailure,
+            )
+            .extend(|e| {
                 e.set("id", id.to_string());
                 e.set("kind", kind.to_name());
                 e.set("original", format!("{}", err));
-                e.set(
-                    "reason",
-                    showtimes_gql_common::GQLError::EventAdvanceFailure,
-                );
-                e.set(
-                    "code",
-                    showtimes_gql_common::GQLError::EventAdvanceFailure.code(),
-                );
+                e.set("user", user_query.id().to_string());
+                e.set("user_kind", user_query.kind().to_name());
             })
+            .build()
         })?;
 
         results.extend(event_batch.into_iter().map(|event| {

@@ -1,5 +1,6 @@
-use async_graphql::{dataloader::DataLoader, Enum, ErrorExtensions, Object, SimpleObject};
+use async_graphql::{dataloader::DataLoader, Enum, Object, SimpleObject};
 
+use errors::GQLError;
 use showtimes_gql_common::{
     data_loader::{ProjectDataLoader, UserDataLoader},
     *,
@@ -32,8 +33,9 @@ impl ProjectCreatedEventDataGQL {
         let loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
 
         let project = loader.load_one(self.id).await?.ok_or_else(|| {
-            async_graphql::Error::new("Project not found")
-                .extend_with(|_, e| e.set("id", self.id.to_string()))
+            GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
+                .extend(|e| e.set("id", self.id.to_string()))
+                .build()
         })?;
 
         let prj_gql = ProjectGQL::from(project);
@@ -159,8 +161,9 @@ impl ProjectUpdatedEventDataGQL {
         let loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
 
         let project = loader.load_one(self.id).await?.ok_or_else(|| {
-            async_graphql::Error::new("Project not found")
-                .extend_with(|_, e| e.set("id", self.id.to_string()))
+            GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
+                .extend(|e| e.set("id", self.id.to_string()))
+                .build()
         })?;
 
         let prj_gql = ProjectGQL::from(project);
@@ -211,8 +214,9 @@ impl ProjectEpisodeUpdatedEventDataGQL {
         let loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
 
         let project = loader.load_one(self.id).await?.ok_or_else(|| {
-            async_graphql::Error::new("Project not found")
-                .extend_with(|_, e| e.set("id", self.id.to_string()))
+            GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
+                .extend(|e| e.set("id", self.id.to_string()))
+                .build()
         })?;
 
         let prj_gql = ProjectGQL::from(project);

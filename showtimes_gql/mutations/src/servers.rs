@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use async_graphql::{dataloader::DataLoader, Error, ErrorExtensions, InputObject, Upload};
+use async_graphql::{dataloader::DataLoader, InputObject, Upload};
 use showtimes_db::{m::UserKind, mongodb::bson::doc, DatabaseShared, ServerHandler};
 use showtimes_fs::{FsFileKind, FsPool};
 use showtimes_search::SearchClientShared;
 use tokio::io::AsyncSeekExt;
 
 use showtimes_gql_common::{
-    data_loader::ServerDataLoader, GQLError, OkResponse, UlidGQL, UserKindGQL,
+    data_loader::ServerDataLoader, errors::GQLError, GQLErrorCode, OkResponse, UlidGQL, UserKindGQL,
 };
 use showtimes_gql_models::servers::ServerGQL;
 
@@ -74,7 +74,15 @@ pub async fn mutate_servers_create(
     let meili = ctx.data_unchecked::<SearchClientShared>();
 
     if user.kind == UserKind::Owner {
-        return Err(Error::new("This account cannot create a server"));
+        // Fails, Owner cannot create server
+        return GQLError::new(
+            "This account cannot create a server",
+            GQLErrorCode::UserSuperuserMode,
+        )
+        .extend(|e| {
+            e.set("id", user.id.to_string());
+        })
+        .into();
     }
 
     let current_user = vec![showtimes_db::m::ServerUser::new(
@@ -91,11 +99,16 @@ pub async fn mutate_servers_create(
                     server.add_integration(integration.into());
                 }
                 _ => {
-                    return Err(Error::new("Only add action is allowed for new servers")
-                        .extend_with(|_, e| {
-                            e.set("id", integration.id.clone());
-                            e.set("kind", integration.kind.to_string());
-                        }));
+                    return GQLError::new(
+                        "Only add action is allowed for new servers",
+                        GQLErrorCode::InvalidRequest,
+                    )
+                    .extend(|e| {
+                        e.set("id", integration.id.clone());
+                        e.set("kind", integration.kind.to_string());
+                        e.set("user_id", user.id.to_string());
+                    })
+                    .into();
                 }
             }
         }
@@ -110,32 +123,32 @@ pub async fn mutate_servers_create(
             let format = showtimes_gql_common::image::detect_upload_data(&mut file_target)
                 .await
                 .map_err(|err| {
-                    Error::new(format!("Failed to detect image format: {err}")).extend_with(
-                        |_, e| {
-                            e.set("id", server.id.to_string());
-                            e.set("where", "server");
-                            e.set("reason", GQLError::IOError);
-                            e.set("code", GQLError::IOError.code());
-                            e.set("original", format!("{err}"));
-                            e.set("original_code", format!("{}", err.kind()));
-                        },
+                    GQLError::new(
+                        format!("Failed to detect image format: {err}"),
+                        GQLErrorCode::IOError,
                     )
+                    .extend(|e| {
+                        e.set("id", server.id.to_string());
+                        e.set("where", "server");
+                        e.set("original", format!("{err}"));
+                        e.set("original_code", format!("{}", err.kind()));
+                    })
                 })?;
             // Seek back to the start of the file
             file_target
                 .seek(std::io::SeekFrom::Start(0))
                 .await
                 .map_err(|err| {
-                    Error::new(format!("Failed to seek to image to start: {err}")).extend_with(
-                        |_, e| {
-                            e.set("id", server.id.to_string());
-                            e.set("where", "server");
-                            e.set("reason", GQLError::IOError);
-                            e.set("code", GQLError::IOError.code());
-                            e.set("original", format!("{err}"));
-                            e.set("original_code", format!("{}", err.kind()));
-                        },
+                    GQLError::new(
+                        format!("Failed to seek to image to start: {err}"),
+                        GQLErrorCode::IOError,
                     )
+                    .extend(|e| {
+                        e.set("id", server.id.to_string());
+                        e.set("where", "server");
+                        e.set("original", format!("{err}"));
+                        e.set("original_code", format!("{}", err.kind()));
+                    })
                 })?;
 
             let filename = format!("avatar.{}", format.as_extension());
@@ -151,11 +164,13 @@ pub async fn mutate_servers_create(
                 )
                 .await
                 .map_err(|err| {
-                    Error::new(format!("Failed to upload image: {err}")).extend_with(|_, e| {
+                    GQLError::new(
+                        format!("Failed to upload image: {err}"),
+                        GQLErrorCode::ImageUploadError,
+                    )
+                    .extend(|e| {
                         e.set("id", server.id.to_string());
                         e.set("where", "server");
-                        e.set("reason", GQLError::ImageUploadError);
-                        e.set("code", GQLError::ImageUploadError.code());
                         e.set("original", format!("{err}"));
                     })
                 })?;
@@ -218,21 +233,25 @@ async fn get_and_check_server(
 ) -> async_graphql::Result<showtimes_db::m::Server> {
     let loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
     let server = loader.load_one(id).await?.ok_or_else(|| {
-        Error::new("Server not found").extend_with(|_, e| e.set("id", id.to_string()))
+        GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
+            .extend(|e| e.set("id", id.to_string()))
+            .build()
     })?;
 
     let user_owner = server.owners.iter().find(|o| o.id == user.id);
     let user_owner = match (user.kind, user_owner) {
         (UserKind::User, Some(user_owner)) => user_owner.clone(),
         (UserKind::User, None) => {
-            return Err(
-                Error::new("User does not have permission to update the server").extend_with(
-                    |_, e| {
-                        e.set("id", id.to_string());
-                        e.set("user", user.id.to_string());
-                    },
-                ),
-            );
+            return GQLError::new(
+                "User does not have permission to update the server",
+                GQLErrorCode::UserInsufficientPrivilege,
+            )
+            .extend(|e| {
+                e.set("id", id.to_string());
+                e.set("user", user.id.to_string());
+                e.set("is_in_server", false);
+            })
+            .into();
         }
         // Admin and Owner has "Owner" privilege
         (_, _) => showtimes_db::m::ServerUser::new(user.id, showtimes_db::m::UserPrivilege::Owner),
@@ -240,14 +259,18 @@ async fn get_and_check_server(
 
     // Anything below min_privilege is disallowed
     if user_owner.privilege < min_privilege {
-        return Err(
-            Error::new("User does not have permission to update the server").extend_with(|_, e| {
-                e.set("id", id.to_string());
-                e.set("user", user.id.to_string());
-                e.set("privilege", user_owner.privilege.to_string());
-                e.set("min_privilege", min_privilege.to_string());
-            }),
-        );
+        return GQLError::new(
+            "User does not have permission to update the server",
+            GQLErrorCode::UserInsufficientPrivilege,
+        )
+        .extend(|e| {
+            e.set("id", id.to_string());
+            e.set("user", user.id.to_string());
+            e.set("current", user_owner.privilege.to_string());
+            e.set("minimum", min_privilege.to_string());
+            e.set("is_in_server", false);
+        })
+        .into();
     }
 
     Ok(server)
@@ -260,7 +283,7 @@ pub async fn mutate_servers_update(
     input: ServerUpdateInputGQL,
 ) -> async_graphql::Result<ServerGQL> {
     if !input.is_any_set() {
-        return Err(Error::new("No fields to update"));
+        return GQLError::new("No fields to update", GQLErrorCode::MissingModification).into();
     }
 
     let db = ctx.data_unchecked::<DatabaseShared>();
@@ -305,10 +328,12 @@ pub async fn mutate_servers_update(
                     .iter()
                     .find(|i| i.id() == original_id)
                     .ok_or_else(|| {
-                        Error::new("Integration not found").extend_with(|_, e| {
-                            e.set("id", original_id.to_string());
-                            e.set("server", server_mut.id.to_string());
-                        })
+                        GQLError::new("Integration not found", GQLErrorCode::IntegrationNotFound)
+                            .extend(|e| {
+                                e.set("id", &original_id);
+                                e.set("server", server_mut.id.to_string());
+                                e.set("action", "update");
+                            })
                     })?;
 
                 // Update the integration
@@ -318,14 +343,18 @@ pub async fn mutate_servers_update(
                 any_integrations_changes = true;
             }
             (IntegrationActionGQL::Update, None) => {
-                return Err(
-                    Error::new("Original ID is required for update").extend_with(|_, e| {
-                        e.set("id", integration.id.to_string());
-                        e.set("kind", integration.kind.to_string());
-                        e.set("index", idx);
-                        e.set("server", server_mut.id.to_string());
-                    }),
-                );
+                return GQLError::new(
+                    "Integration original ID is required for update",
+                    GQLErrorCode::IntegrationMissingOriginal,
+                )
+                .extend(|e| {
+                    e.set("id", integration.id.to_string());
+                    e.set("kind", integration.kind.to_string());
+                    e.set("server", server_mut.id.to_string());
+                    e.set("action", "update");
+                    e.set("index", idx);
+                })
+                .into();
             }
             (IntegrationActionGQL::Remove, _) => {
                 // Check if the integration exists
@@ -350,11 +379,13 @@ pub async fn mutate_servers_update(
         let format = showtimes_gql_common::image::detect_upload_data(&mut file_target)
             .await
             .map_err(|err| {
-                Error::new(format!("Failed to detect image format: {err}")).extend_with(|_, e| {
-                    e.set("id", server.id.to_string());
+                GQLError::new(
+                    format!("Failed to detect image format: {err}"),
+                    GQLErrorCode::IOError,
+                )
+                .extend(|e| {
+                    e.set("id", server_mut.id.to_string());
                     e.set("where", "server");
-                    e.set("reason", GQLError::IOError);
-                    e.set("code", GQLError::IOError.code());
                     e.set("original", format!("{err}"));
                     e.set("original_code", format!("{}", err.kind()));
                 })
@@ -364,16 +395,16 @@ pub async fn mutate_servers_update(
             .seek(std::io::SeekFrom::Start(0))
             .await
             .map_err(|err| {
-                Error::new(format!("Failed to seek to image to start: {err}")).extend_with(
-                    |_, e| {
-                        e.set("id", server.id.to_string());
-                        e.set("where", "server");
-                        e.set("reason", GQLError::IOError);
-                        e.set("code", GQLError::IOError.code());
-                        e.set("original", format!("{err}"));
-                        e.set("original_code", format!("{}", err.kind()));
-                    },
+                GQLError::new(
+                    format!("Failed to seek to image to start: {err}"),
+                    GQLErrorCode::IOError,
                 )
+                .extend(|e| {
+                    e.set("id", server_mut.id.to_string());
+                    e.set("where", "server");
+                    e.set("original", format!("{err}"));
+                    e.set("original_code", format!("{}", err.kind()));
+                })
             })?;
 
         let filename = format!("avatar.{}", format.as_extension());
@@ -388,11 +419,13 @@ pub async fn mutate_servers_update(
             )
             .await
             .map_err(|err| {
-                Error::new(format!("Failed to upload image: {err}")).extend_with(|_, e| {
-                    e.set("id", server.id.to_string());
+                GQLError::new(
+                    format!("Failed to upload image: {err}"),
+                    GQLErrorCode::ImageUploadError,
+                )
+                .extend(|e| {
+                    e.set("id", server_mut.id.to_string());
                     e.set("where", "server");
-                    e.set("reason", GQLError::ImageUploadError);
-                    e.set("code", GQLError::ImageUploadError.code());
                     e.set("original", format!("{err}"));
                 })
             })?;

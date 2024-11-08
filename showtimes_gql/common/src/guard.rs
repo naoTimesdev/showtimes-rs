@@ -1,9 +1,9 @@
 //! Some request guard for GraphQL
 
-use async_graphql::{ErrorExtensions, Guard};
+use async_graphql::Guard;
 use showtimes_session::ShowtimesUserSession;
 
-use crate::{data_loader::find_authenticated_user, GQLError, UserKindGQL};
+use crate::{data_loader::find_authenticated_user, errors::GQLError, GQLErrorCode, UserKindGQL};
 
 /// A guard to check if the user is at least a certain level
 pub struct AuthUserMinimumGuard {
@@ -34,15 +34,16 @@ impl Guard for AuthUserMinimumGuard {
                             if UserKindGQL::from(user.kind) >= self.level {
                                 Ok(())
                             } else {
-                                Err(async_graphql::Error::new("Missing privilege").extend_with(
-                                    |_, e| {
-                                        e.set("id", user.id.to_string());
-                                        e.set("required", self.level.to_name());
-                                        e.set("current", user.kind.to_name());
-                                        e.set("reason", GQLError::UserInsufficientPrivilege);
-                                        e.set("code", GQLError::UserInsufficientPrivilege.code());
-                                    },
-                                ))
+                                GQLError::new(
+                                    "Missing privilege",
+                                    GQLErrorCode::UserInsufficientPrivilege,
+                                )
+                                .extend(|e| {
+                                    e.set("id", user.id.to_string());
+                                    e.set("required", self.level.to_name());
+                                    e.set("current", user.kind.to_name());
+                                })
+                                .into()
                             }
                         }
                         Err(e) => Err(e),
@@ -52,12 +53,7 @@ impl Guard for AuthUserMinimumGuard {
                     Ok(())
                 }
             }
-            None => Err(
-                async_graphql::Error::new("Unauthorized").extend_with(|_, e| {
-                    e.set("reason", GQLError::Unauthorized);
-                    e.set("code", GQLError::Unauthorized.code());
-                }),
-            ),
+            None => GQLError::new("Unauthorized", GQLErrorCode::Unauthorized).into(),
         }
     }
 }

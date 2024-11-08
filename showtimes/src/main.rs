@@ -263,7 +263,8 @@ async fn index() -> impl IntoResponse {
 
 async fn index_favicons() -> impl IntoResponse {
     let etag = format!("sh-favicons-{}", env!("CARGO_PKG_VERSION"));
-    let builder = axum::http::Response::builder()
+
+    axum::http::Response::builder()
         .status(axum::http::StatusCode::OK)
         .header(axum::http::header::CONTENT_TYPE, "image/x-icon")
         .header(
@@ -272,9 +273,7 @@ async fn index_favicons() -> impl IntoResponse {
         )
         .header(axum::http::header::ETAG, etag)
         .body(axum::body::Body::from(ASSET_ICON))
-        .unwrap();
-
-    builder
+        .unwrap()
 }
 
 async fn shutdown_signal() {

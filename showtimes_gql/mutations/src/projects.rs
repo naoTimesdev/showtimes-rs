@@ -3,9 +3,7 @@ use std::{
     sync::Arc,
 };
 
-use async_graphql::{
-    dataloader::DataLoader, CustomValidator, Enum, Error, ErrorExtensions, InputObject, Upload,
-};
+use async_graphql::{dataloader::DataLoader, CustomValidator, Enum, InputObject, Upload};
 use chrono::TimeZone;
 use showtimes_db::{m::UserKind, mongodb::bson::doc, DatabaseShared, ProjectHandler};
 use showtimes_fs::FsPool;
@@ -17,7 +15,8 @@ use showtimes_gql_common::{
     data_loader::{
         ProjectDataLoader, ServerDataLoader, ServerSyncIds, ServerSyncLoader, UserDataLoader,
     },
-    DateTimeGQL, GQLError, OkResponse, UlidGQL,
+    errors::GQLError,
+    DateTimeGQL, GQLErrorCode, GQLErrorExt, OkResponse, UlidGQL,
 };
 use showtimes_gql_models::{
     projects::{ProjectGQL, ProjectStatusGQL},
@@ -340,13 +339,26 @@ async fn fetch_metadata_via_anilist(
     ctx: &async_graphql::Context<'_>,
     input: &ProjectCreateMetadataInputGQL,
 ) -> async_graphql::Result<ExternalMediaFetchResult> {
-    let id_fetch = input.id.parse::<i32>().map_err(|_| {
-        Error::new("Invalid Anilist ID").extend_with(|_, e| e.set("id", input.id.clone()))
-    })?;
+    let id_fetch =
+        input
+            .id
+            .parse::<i32>()
+            .extend_error(GQLErrorCode::MetadataAnilistInvalidId, |e| {
+                e.set("id", input.id.clone());
+                e.set("source", "anilist");
+            })?;
+
     let anilist_loader = ctx.data_unchecked::<Arc<Mutex<showtimes_metadata::AnilistProvider>>>();
     let mut anilist = anilist_loader.lock().await;
 
-    let anilist_info = anilist.get_media(id_fetch).await?;
+    let anilist_info = anilist.get_media(id_fetch).await.map_err(|err| {
+        GQLError::new(err.to_string(), GQLErrorCode::MetadataAnilistRequestError)
+            .extend(|e| {
+                e.set("id", id_fetch);
+                e.set("source", "anilist");
+            })
+            .build()
+    })?;
 
     let mut integrations = vec![showtimes_db::m::IntegrationId::new(
         id_fetch.to_string(),
@@ -373,9 +385,13 @@ async fn fetch_metadata_via_anilist(
 
     // Remove the title from the rest of the titles
     let first_title = rest_titles.pop_front().ok_or_else(|| {
-        Error::new("No titles found from fetching metadata").extend_with(|_, e| {
-            e.set("reason", "no_titles");
+        GQLError::new(
+            "No title found from metadata".to_string(),
+            GQLErrorCode::MetadataError,
+        )
+        .extend(|e| {
             e.set("id", id_fetch);
+            e.set("source", "anilist");
         })
     })?;
 
@@ -411,12 +427,15 @@ async fn fetch_metadata_via_anilist(
                 .episodes
                 .unwrap_or_else(|| input.episode.unwrap_or(0));
             if episode_count < 1 {
-                return Err(
-                    Error::new("No episodes found from fetching metadata").extend_with(|_, e| {
-                        e.set("reason", "no_episodes");
-                        e.set("id", id_fetch);
-                    }),
-                );
+                return GQLError::new(
+                    "No episodes found from metadata".to_string(),
+                    GQLErrorCode::MetadataNoEpisodesFound,
+                )
+                .extend(|e| {
+                    e.set("id", id_fetch);
+                    e.set("source", "anilist");
+                })
+                .into();
             }
 
             episode_count
@@ -429,19 +448,27 @@ async fn fetch_metadata_via_anilist(
     let start_time = match (anilist_info.start_date, input.start_date) {
         (_, Some(start_date)) => *start_date,
         (Some(fuzzy_start), _) => fuzzy_start.into_chrono().ok_or_else(|| {
-            Error::new("Invalid fuzzy date from Anilist, please provide override").extend_with(
-                |_, e| {
-                    e.set("reason", "invalid_fuzzy_date");
-                },
+            GQLError::new(
+                "Invalid fuzzy date from Anilist, please provide override".to_string(),
+                GQLErrorCode::MetadataUnableToParseDate,
             )
+            .extend(|e| {
+                e.set("id", id_fetch);
+                e.set("date", fuzzy_start.to_string());
+                e.set("source", "anilist");
+            })
+            .build()
         })?,
         _ => {
-            return Err(
-                Error::new("No start date found from fetching metadata").extend_with(|_, e| {
-                    e.set("reason", "no_start_date");
-                    e.set("id", id_fetch);
-                }),
-            );
+            return GQLError::new(
+                "No start date found from metadata".to_string(),
+                GQLErrorCode::MetadataNoStartDate,
+            )
+            .extend(|e| {
+                e.set("id", id_fetch);
+                e.set("source", "anilist");
+            })
+            .into();
         }
     };
 
@@ -467,12 +494,15 @@ async fn fetch_metadata_via_anilist(
         | showtimes_metadata::m::AnilistMediaFormat::ONA => {
             // All of this requires episode information
             if merged_episodes.is_empty() {
-                return Err(
-                    Error::new("No episodes found from fetching metadata").extend_with(|_, e| {
-                        e.set("reason", "no_episodes");
-                        e.set("id", id_fetch);
-                    }),
-                );
+                return GQLError::new(
+                    "No episodes found from metadata".to_string(),
+                    GQLErrorCode::MetadataNoEpisodesFound,
+                )
+                .extend(|e| {
+                    e.set("id", id_fetch);
+                    e.set("source", "anilist");
+                })
+                .into();
             }
 
             // Check the episode range if all exists
@@ -557,14 +587,37 @@ async fn fetch_metadata_via_vndb(
 
     let input_id = &input.id;
     if input_id.starts_with("v") {
-        return Err(Error::new("Invalid VNDB ID").extend_with(|_, e| e.set("id", input_id.clone())));
+        return GQLError::new(
+            "VNDB ID must not start with 'v'",
+            GQLErrorCode::MetadataVNDBInvalidId,
+        )
+        .extend(|e| {
+            e.set("id", input_id);
+            e.set("source", "vndb");
+        })
+        .into();
     }
     let id_test = input_id.trim_start_matches('v');
     if id_test.parse::<u64>().is_err() {
-        return Err(Error::new("Invalid VNDB ID").extend_with(|_, e| e.set("id", input_id.clone())));
+        return GQLError::new(
+            "VNDB ID must have a number only after 'v'",
+            GQLErrorCode::MetadataVNDBInvalidId,
+        )
+        .extend(|e| {
+            e.set("id", input_id);
+            e.set("source", "vndb");
+        })
+        .into();
     }
 
-    let vndb_info = vndb_loader.get(input_id).await?;
+    let vndb_info = vndb_loader.get(input_id).await.map_err(|err| {
+        GQLError::new(err.to_string(), GQLErrorCode::MetadataVNDBRequestError)
+            .extend(|e| {
+                e.set("id", input_id);
+                e.set("source", "vndb");
+            })
+            .build()
+    })?;
 
     let integrations = vec![showtimes_db::m::IntegrationId::new(
         input_id.clone(),
@@ -593,10 +646,15 @@ async fn fetch_metadata_via_vndb(
 
     // Remove the title from the rest of the titles
     let first_title = all_titles.pop_front().ok_or_else(|| {
-        Error::new("No titles found from fetching metadata").extend_with(|_, e| {
-            e.set("reason", "no_titles");
-            e.set("id", input_id.clone());
+        GQLError::new(
+            "No title found from metadata".to_string(),
+            GQLErrorCode::MetadataError,
+        )
+        .extend(|e| {
+            e.set("id", input_id);
+            e.set("source", "vndb");
         })
+        .build()
     })?;
 
     let aired_at = vndb_info
@@ -624,11 +682,26 @@ async fn fetch_metadata_via_tmdb(
 ) -> async_graphql::Result<ExternalMediaFetchResult> {
     // TMDb request for ID requires a prefix of movies: or tv: to be valid
     let input_id = input.id.parse::<i32>().map_err(|_| {
-        Error::new("Invalid TMDb ID").extend_with(|_, e| e.set("id", input.id.clone()))
+        GQLError::new("Invalid TMDb ID", GQLErrorCode::MetadataTMDbInvalidId)
+            .extend(|e| {
+                e.set("id", input.id.clone());
+                e.set("source", "tmdb");
+            })
+            .build()
     })?;
     let tmdb_loader = ctx.data_unchecked::<Arc<showtimes_metadata::TMDbProvider>>();
 
-    let tmdb_info = tmdb_loader.get_movie_details(input_id).await?;
+    let tmdb_info = tmdb_loader
+        .get_movie_details(input_id)
+        .await
+        .map_err(|err| {
+            GQLError::new(err.to_string(), GQLErrorCode::MetadataTMDbRequestError)
+                .extend(|e| {
+                    e.set("id", input_id);
+                    e.set("source", "tmdb");
+                })
+                .build()
+        })?;
 
     let integrations = vec![showtimes_db::m::IntegrationId::new(
         input_id.to_string(),
@@ -648,10 +721,15 @@ async fn fetch_metadata_via_tmdb(
 
     // Remove the title from the rest of the titles
     let first_title = all_titles.pop_front().ok_or_else(|| {
-        Error::new("No titles found from fetching metadata").extend_with(|_, e| {
-            e.set("reason", "no_titles");
-            e.set("id", input_id.to_string());
+        GQLError::new(
+            "No title found from metadata".to_string(),
+            GQLErrorCode::MetadataError,
+        )
+        .extend(|e| {
+            e.set("id", input_id);
+            e.set("source", "vndb");
         })
+        .build()
     })?;
 
     let aired_at = tmdb_info
@@ -714,15 +792,12 @@ async fn check_permissions(
 ) -> async_graphql::Result<showtimes_db::m::Server> {
     let srv_loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
 
-    let srv = srv_loader.load_one(id).await?;
-    if srv.is_none() {
-        return Err(Error::new("Server not found").extend_with(|_, e| {
-            e.set("id", id.to_string());
-            e.set("reason", "invalid_server");
-        }));
-    }
+    let srv = srv_loader.load_one(id).await?.ok_or_else(|| {
+        GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
+            .extend(|e| e.set("id", id.to_string()))
+            .build()
+    })?;
 
-    let srv = srv.unwrap();
     let find_user = srv.owners.iter().find(|o| o.id == user.id);
 
     match (find_user, user.kind) {
@@ -733,41 +808,55 @@ async fn check_permissions(
                     if user.privilege == showtimes_db::m::UserPrivilege::ProjectManager
                         && !user.has_id(project_id)
                     {
-                        Err(
-                            Error::new("User not allowed to update projects").extend_with(
-                                |_, e| {
-                                    e.set("id", id.to_string());
-                                    e.set("reason", "invalid_privilege");
-                                },
-                            ),
+                        GQLError::new(
+                            "User not allowed to manage project",
+                            GQLErrorCode::UserInsufficientPrivilege,
                         )
+                        .extend(|e| {
+                            e.set("id", id.to_string());
+                            e.set("current", user.privilege.to_string());
+                            e.set(
+                                "required",
+                                showtimes_db::m::UserPrivilege::ProjectManager.to_string(),
+                            );
+                            e.set("is_in_server", true);
+                        })
+                        .into()
                     } else {
                         Ok(srv)
                     }
                 }
                 None => {
                     if user.privilege < showtimes_db::m::UserPrivilege::Manager {
-                        Err(
-                            Error::new("User not allowed to create/delete projects").extend_with(
-                                |_, e| {
-                                    e.set("id", id.to_string());
-                                    e.set("reason", "invalid_privilege");
-                                },
-                            ),
+                        GQLError::new(
+                            "User not allowed to create/delete projects",
+                            GQLErrorCode::UserInsufficientPrivilege,
                         )
+                        .extend(|e| {
+                            e.set("id", id.to_string());
+                            e.set("current", user.privilege.to_string());
+                            e.set(
+                                "required",
+                                showtimes_db::m::UserPrivilege::Manager.to_string(),
+                            );
+                            e.set("is_in_server", true);
+                        })
+                        .into()
                     } else {
                         Ok(srv)
                     }
                 }
             }
         }
-        (None, showtimes_db::m::UserKind::User) => Err(Error::new(
+        (None, showtimes_db::m::UserKind::User) => GQLError::new(
             "User not allowed to create projects",
+            GQLErrorCode::UserInsufficientPrivilege,
         )
-        .extend_with(|_, e| {
+        .extend(|e| {
             e.set("id", id.to_string());
-            e.set("reason", "invalid_user");
-        })),
+            e.set("is_in_server", false);
+        })
+        .into(),
         _ => {
             // Allow anyone to create a project
             Ok(srv)
@@ -842,12 +931,14 @@ pub async fn mutate_projects_create(
             for (idx, role) in roles.iter().enumerate() {
                 let role_map = showtimes_db::m::Role::new(role.key.clone(), role.name.clone())
                     .map_err(|e_root| {
-                        Error::new("Failed to create role").extend_with(|_, e| {
-                            e.set("reason", format!("{}", e_root));
-                            e.set("index", idx);
-                            e.set("key", role.key.clone());
-                            e.set("name", role.name.clone());
-                        })
+                        GQLError::new(e_root.to_string(), GQLErrorCode::InvalidRequest).extend(
+                            |e| {
+                                e.set("server", id.to_string());
+                                e.set("index", idx);
+                                e.set("key", role.key.clone());
+                                e.set("name", role.name.clone());
+                            },
+                        )
                     })?;
                 roles_list.push(role_map.with_order(idx as i32));
             }
@@ -923,32 +1014,33 @@ pub async fn mutate_projects_create(
             let format = showtimes_gql_common::image::detect_upload_data(&mut file_target)
                 .await
                 .map_err(|err| {
-                    Error::new(format!("Failed to detect image format: {err}")).extend_with(
-                        |_, e| {
-                            e.set("id", project.id.to_string());
-                            e.set("where", "project");
-                            e.set("reason", GQLError::IOError);
-                            e.set("code", GQLError::IOError.code());
-                            e.set("original", format!("{err}"));
-                            e.set("original_code", format!("{}", err.kind()));
-                        },
+                    GQLError::new(
+                        format!("Failed to detect image format: {err}"),
+                        GQLErrorCode::IOError,
                     )
+                    .extend(|e| {
+                        e.set("id", project.id.to_string());
+                        e.set("where", "project");
+                        e.set("original", format!("{err}"));
+                        e.set("original_code", format!("{}", err.kind()));
+                    })
+                    .build()
                 })?;
             // Seek back to the start of the file
             file_target
                 .seek(std::io::SeekFrom::Start(0))
                 .await
                 .map_err(|err| {
-                    Error::new(format!("Failed to seek to image to start: {err}")).extend_with(
-                        |_, e| {
-                            e.set("id", project.id.to_string());
-                            e.set("where", "project");
-                            e.set("reason", GQLError::IOError);
-                            e.set("code", GQLError::IOError.code());
-                            e.set("original", format!("{err}"));
-                            e.set("original_code", format!("{}", err.kind()));
-                        },
+                    GQLError::new(
+                        format!("Failed to seek to image to start: {err}"),
+                        GQLErrorCode::IOError,
                     )
+                    .extend(|e| {
+                        e.set("id", project.id.to_string());
+                        e.set("where", "project");
+                        e.set("original", format!("{err}"));
+                        e.set("original_code", format!("{}", err.kind()));
+                    })
                 })?;
 
             let filename = format!("cover.{}", format.as_extension());
@@ -963,13 +1055,16 @@ pub async fn mutate_projects_create(
                 )
                 .await
                 .map_err(|err| {
-                    Error::new(format!("Failed to upload image: {err}")).extend_with(|_, e| {
+                    GQLError::new(
+                        format!("Failed to upload image: {err}"),
+                        GQLErrorCode::ImageUploadError,
+                    )
+                    .extend(|e| {
                         e.set("id", project.id.to_string());
                         e.set("where", "project");
-                        e.set("reason", GQLError::ImageUploadError);
-                        e.set("code", GQLError::ImageUploadError.code());
                         e.set("original", format!("{err}"));
                     })
+                    .build()
                 })?;
 
             showtimes_db::m::ImageMetadata::new(
@@ -1094,43 +1189,53 @@ pub async fn mutate_projects_delete(
     let meili = ctx.data_unchecked::<SearchClientShared>();
 
     // Fetch project
-    let Some(prj_info) = prj_loader.load_one(*id).await? else {
-        return Err(Error::new("Project not found").extend_with(|_, e| {
-            e.set("id", id.to_string());
-            e.set("reason", "invalid_project");
-        }));
-    };
+    let prj_info = prj_loader.load_one(*id).await?.ok_or_else(|| {
+        GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
+            .extend(|e| e.set("id", id.to_string()))
+    })?;
 
-    let srv = srv_loader.load_one(prj_info.creator).await?;
+    let srv = srv_loader
+        .load_one(prj_info.creator)
+        .await?
+        .ok_or_else(|| {
+            GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
+                .extend(|e| e.set("id", prj_info.creator.to_string()))
+                .build()
+        })?;
 
-    if srv.is_none() {
-        return Err(Error::new("Server not found").extend_with(|_, e| {
-            e.set("id", id.to_string());
-            e.set("reason", "invalid_server");
-        }));
-    }
-
-    let srv = srv.unwrap();
     let find_user = srv.owners.iter().find(|o| o.id == user.id);
     match (find_user, user.kind) {
         (Some(user), showtimes_db::m::UserKind::User) => {
             // Check if we are allowed to create a project
             if user.privilege < showtimes_db::m::UserPrivilege::Manager {
-                return Err(
-                    Error::new("User not allowed to create projects").extend_with(|_, e| {
-                        e.set("id", id.to_string());
-                        e.set("reason", "invalid_privilege");
-                    }),
-                );
+                return GQLError::new(
+                    "User not allowed to delete projects",
+                    GQLErrorCode::UserInsufficientPrivilege,
+                )
+                .extend(|e| {
+                    e.set("id", id.to_string());
+                    e.set("server", srv.id.to_string());
+                    e.set("current", user.privilege.to_string());
+                    e.set(
+                        "required",
+                        showtimes_db::m::UserPrivilege::Manager.to_string(),
+                    );
+                    e.set("is_in_server", true);
+                })
+                .into();
             }
         }
         (None, showtimes_db::m::UserKind::User) => {
-            return Err(
-                Error::new("User not allowed to create projects").extend_with(|_, e| {
-                    e.set("id", id.to_string());
-                    e.set("reason", "invalid_user");
-                }),
-            );
+            return GQLError::new(
+                "User not allowed to delete projects",
+                GQLErrorCode::UserInsufficientPrivilege,
+            )
+            .extend(|e| {
+                e.set("id", id.to_string());
+                e.set("server", srv.id.to_string());
+                e.set("is_in_server", false);
+            })
+            .into();
         }
         _ => {
             // Allow anyone to delete a project
@@ -1421,16 +1526,17 @@ async fn update_single_project(
             if let Some(role_info) = find_role {
                 match &assignee.id {
                     Some(id) => {
-                        let user_info = loaded_users.get(&**id);
-                        if user_info.is_none() {
-                            return Err(Error::new("User not found").extend_with(|_, e| {
-                                e.set("id", id.to_string());
-                                e.set("role", assignee.role.clone());
-                                e.set("action", "update");
-                            }));
-                        }
+                        let user_info = loaded_users.get(&**id).ok_or_else(|| {
+                            GQLError::new("User not found", GQLErrorCode::UserNotFound).extend(
+                                |e| {
+                                    e.set("id", id.to_string());
+                                    e.set("project", prj_id.to_string());
+                                    e.set("role", &assignee.role);
+                                    e.set("action", "update");
+                                },
+                            )
+                        })?;
 
-                        let user_info = user_info.unwrap();
                         role_info.set_actor(Some(user_info.id));
                     }
                     None => {
@@ -1602,32 +1708,34 @@ async fn update_single_project(
             let format = showtimes_gql_common::image::detect_upload_data(&mut file_target)
                 .await
                 .map_err(|err| {
-                    Error::new(format!("Failed to detect image format: {err}")).extend_with(
-                        |_, e| {
-                            e.set("id", project.id.to_string());
-                            e.set("where", "project");
-                            e.set("reason", GQLError::IOError);
-                            e.set("code", GQLError::IOError.code());
-                            e.set("original", format!("{err}"));
-                            e.set("original_code", format!("{}", err.kind()));
-                        },
+                    GQLError::new(
+                        format!("Failed to detect image format: {err}"),
+                        GQLErrorCode::IOError,
                     )
+                    .extend(|e| {
+                        e.set("id", prj_id.to_string());
+                        e.set("where", "project");
+                        e.set("original", format!("{err}"));
+                        e.set("original_code", format!("{}", err.kind()));
+                    })
+                    .build()
                 })?;
             // Seek back to the start of the file
             file_target
                 .seek(std::io::SeekFrom::Start(0))
                 .await
                 .map_err(|err| {
-                    Error::new(format!("Failed to seek to image to start: {err}")).extend_with(
-                        |_, e| {
-                            e.set("id", project.id.to_string());
-                            e.set("where", "project");
-                            e.set("reason", GQLError::IOError);
-                            e.set("code", GQLError::IOError.code());
-                            e.set("original", format!("{err}"));
-                            e.set("original_code", format!("{}", err.kind()));
-                        },
+                    GQLError::new(
+                        format!("Failed to seek to image to start: {err}"),
+                        GQLErrorCode::IOError,
                     )
+                    .extend(|e| {
+                        e.set("id", prj_id.to_string());
+                        e.set("where", "project");
+                        e.set("original", format!("{err}"));
+                        e.set("original_code", format!("{}", err.kind()));
+                    })
+                    .build()
                 })?;
 
             let filename = format!("cover.{}", format.as_extension());
@@ -1642,13 +1750,16 @@ async fn update_single_project(
                 )
                 .await
                 .map_err(|err| {
-                    Error::new(format!("Failed to upload image: {err}")).extend_with(|_, e| {
-                        e.set("id", project.id.to_string());
+                    GQLError::new(
+                        format!("Failed to upload image: {err}"),
+                        GQLErrorCode::ImageUploadError,
+                    )
+                    .extend(|e| {
+                        e.set("id", prj_id.to_string());
                         e.set("where", "project");
-                        e.set("reason", GQLError::ImageUploadError);
-                        e.set("code", GQLError::ImageUploadError.code());
                         e.set("original", format!("{err}"));
                     })
+                    .build()
                 })?;
 
             let image_meta = showtimes_db::m::ImageMetadata::new(
@@ -1683,9 +1794,7 @@ pub async fn mutate_projects_update(
     input: ProjectUpdateInputGQL,
 ) -> async_graphql::Result<ProjectGQL> {
     if !input.is_any_set() {
-        return Err(Error::new("No fields to update").extend_with(|_, e| {
-            e.set("reason", "no_fields");
-        }));
+        return GQLError::new("No fields to update", GQLErrorCode::MissingModification).into();
     }
 
     let prj_loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
@@ -1695,12 +1804,10 @@ pub async fn mutate_projects_update(
     let prj_handler = ProjectHandler::new(db);
 
     // Fetch project
-    let Some(mut prj_info) = prj_loader.load_one(*id).await? else {
-        return Err(Error::new("Project not found").extend_with(|_, e| {
-            e.set("id", id.to_string());
-            e.set("reason", "invalid_project");
-        }));
-    };
+    let mut prj_info = prj_loader.load_one(*id).await?.ok_or_else(|| {
+        GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
+            .extend(|e| e.set("id", id.to_string()))
+    })?;
 
     // Check perms
     check_permissions(ctx, prj_info.creator, &user, Some(prj_info.id)).await?;
@@ -1709,17 +1816,15 @@ pub async fn mutate_projects_update(
     match (prj_info.status, input.status) {
         (showtimes_db::m::ProjectStatus::Archived, None) => {
             // Missing status update and in archived mode, error!
-            return Err(Error::new("Project is archived").extend_with(|_, e| {
-                e.set("id", id.to_string());
-                e.set("reason", "project_archived");
-            }));
+            return GQLError::new("Project is archived", GQLErrorCode::ProjectArchived)
+                .extend(|e| e.set("id", id.to_string()))
+                .into();
         }
         (showtimes_db::m::ProjectStatus::Archived, Some(new_status)) => {
             if new_status == ProjectStatusGQL::Archived {
-                return Err(Error::new("Project is archived").extend_with(|_, e| {
-                    e.set("id", id.to_string());
-                    e.set("reason", "project_archived");
-                }));
+                return GQLError::new("Project is archived", GQLErrorCode::ProjectArchived)
+                    .extend(|e| e.set("id", id.to_string()))
+                    .into();
             }
 
             let mut before_update = showtimes_events::m::ProjectUpdatedDataEvent::default();
@@ -1902,14 +2007,18 @@ pub async fn mutate_projects_update(
                     fetch_metadata_via_tmdb(ctx, &in_metadata).await?
                 }
                 _ => {
-                    return Err(Error::new(format!(
-                        "Provider `{}` not supported for metadata sync",
-                        provider.kind()
-                    ))
-                    .extend_with(|_, e| {
-                        e.set("provider", provider.kind().to_string());
+                    return GQLError::new(
+                        format!(
+                            "Provider `{}` not supported for metadata sync",
+                            provider.kind()
+                        ),
+                        GQLErrorCode::MetadataUnknownSource,
+                    )
+                    .extend(|e| {
                         e.set("id", provider.id());
-                    }));
+                        e.set("provider", provider.kind().to_string());
+                    })
+                    .into();
                 }
             };
 
@@ -2032,21 +2141,18 @@ pub async fn mutate_projects_episode_add_auto(
     let prj_handler = ProjectHandler::new(db);
 
     // Fetch project
-    let Some(mut prj_info) = prj_loader.load_one(*id).await? else {
-        return Err(Error::new("Project not found").extend_with(|_, e| {
-            e.set("id", id.to_string());
-            e.set("reason", "invalid_project");
-        }));
-    };
+    let mut prj_info = prj_loader.load_one(*id).await?.ok_or_else(|| {
+        GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
+            .extend(|e| e.set("id", id.to_string()))
+    })?;
 
     // Check perms
     check_permissions(ctx, prj_info.creator, &user, Some(prj_info.id)).await?;
 
     if prj_info.status == showtimes_db::m::ProjectStatus::Archived {
-        return Err(Error::new("Project is archived").extend_with(|_, e| {
-            e.set("id", id.to_string());
-            e.set("reason", "project_archived");
-        }));
+        return GQLError::new("Project is archived", GQLErrorCode::ProjectArchived)
+            .extend(|e| e.set("id", id.to_string()))
+            .into();
     }
 
     fn update_project_inner(
@@ -2170,21 +2276,18 @@ pub async fn mutate_projects_episode_add_manual(
     let prj_handler = ProjectHandler::new(db);
 
     // Fetch project
-    let Some(mut prj_info) = prj_loader.load_one(*id).await? else {
-        return Err(Error::new("Project not found").extend_with(|_, e| {
-            e.set("id", id.to_string());
-            e.set("reason", "invalid_project");
-        }));
-    };
+    let mut prj_info = prj_loader.load_one(*id).await?.ok_or_else(|| {
+        GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
+            .extend(|e| e.set("id", id.to_string()))
+    })?;
 
     // Check perms
     check_permissions(ctx, prj_info.creator, &user, Some(prj_info.id)).await?;
 
     if prj_info.status == showtimes_db::m::ProjectStatus::Archived {
-        return Err(Error::new("Project is archived").extend_with(|_, e| {
-            e.set("id", id.to_string());
-            e.set("reason", "project_archived");
-        }));
+        return GQLError::new("Project is archived", GQLErrorCode::ProjectArchived)
+            .extend(|e| e.set("id", id.to_string()))
+            .into();
     }
 
     fn update_project_inner(
@@ -2313,21 +2416,18 @@ pub async fn mutate_projects_episode_remove(
     let db = ctx.data_unchecked::<DatabaseShared>();
 
     // Fetch project
-    let Some(mut prj_info) = prj_loader.load_one(*id).await? else {
-        return Err(Error::new("Project not found").extend_with(|_, e| {
-            e.set("id", id.to_string());
-            e.set("reason", "invalid_project");
-        }));
-    };
+    let mut prj_info = prj_loader.load_one(*id).await?.ok_or_else(|| {
+        GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
+            .extend(|e| e.set("id", id.to_string()))
+    })?;
 
     // Check perms
     check_permissions(ctx, prj_info.creator, &user, Some(prj_info.id)).await?;
 
     if prj_info.status == showtimes_db::m::ProjectStatus::Archived {
-        return Err(Error::new("Project is archived").extend_with(|_, e| {
-            e.set("id", id.to_string());
-            e.set("reason", "project_archived");
-        }));
+        return GQLError::new("Project is archived", GQLErrorCode::ProjectArchived)
+            .extend(|e| e.set("id", id.to_string()))
+            .into();
     }
 
     fn update_project_inner(

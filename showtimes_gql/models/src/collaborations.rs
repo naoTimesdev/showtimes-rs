@@ -1,6 +1,7 @@
 //! A collaboration sync or invite models list
 
-use async_graphql::{dataloader::DataLoader, Error, ErrorExtensions, Object};
+use async_graphql::{dataloader::DataLoader, Object};
+use errors::GQLError;
 use showtimes_shared::ulid::Ulid;
 
 use showtimes_gql_common::data_loader::{ProjectDataLoader, ServerDataLoader};
@@ -163,34 +164,30 @@ impl CollaborationInviteSourceGQL {
     async fn server(&self, ctx: &async_graphql::Context<'_>) -> async_graphql::Result<ServerGQL> {
         let loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
 
-        match loader.load_one(self.server_id).await? {
-            Some(srv) => {
-                let srv_gql: ServerGQL = srv.into();
-                Ok(srv_gql.with_projects_disabled())
-            }
-            None => Err(Error::new("Server not found").extend_with(|_, e| {
-                e.set("id", self.server_id.to_string());
-                e.set("reason", "invalid_server");
-            })),
-        }
+        let srv = loader.load_one(self.server_id).await?.ok_or_else(|| {
+            GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
+                .extend(|e| e.set("id", self.server_id.to_string()))
+                .build()
+        })?;
+
+        let srv_gql: ServerGQL = srv.into();
+        Ok(srv_gql.with_projects_disabled())
     }
 
     /// The project information
     async fn project(&self, ctx: &async_graphql::Context<'_>) -> async_graphql::Result<ProjectGQL> {
         let loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
 
-        match loader.load_one(self.project_id).await? {
-            Some(prj) => {
-                let prj_gql: ProjectGQL = prj.into();
-                Ok(prj_gql
-                    .with_disable_server_fetch()
-                    .with_disable_collaboration_fetch())
-            }
-            None => Err(Error::new("Project not found").extend_with(|_, e| {
-                e.set("id", self.project_id.to_string());
-                e.set("reason", "invalid_project");
-            })),
-        }
+        let prj = loader.load_one(self.project_id).await?.ok_or_else(|| {
+            GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
+                .extend(|e| e.set("id", self.project_id.to_string()))
+                .build()
+        })?;
+
+        let prj_gql: ProjectGQL = prj.into();
+        Ok(prj_gql
+            .with_disable_server_fetch()
+            .with_disable_collaboration_fetch())
     }
 }
 
@@ -208,16 +205,14 @@ impl CollaborationInviteTargetGQL {
     async fn server(&self, ctx: &async_graphql::Context<'_>) -> async_graphql::Result<ServerGQL> {
         let loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
 
-        match loader.load_one(self.server_id).await? {
-            Some(srv) => {
-                let srv_gql: ServerGQL = srv.into();
-                Ok(srv_gql.with_projects_disabled())
-            }
-            None => Err(Error::new("Server not found").extend_with(|_, e| {
-                e.set("id", self.server_id.to_string());
-                e.set("reason", "invalid_server");
-            })),
-        }
+        let srv = loader.load_one(self.server_id).await?.ok_or_else(|| {
+            GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
+                .extend(|e| e.set("id", self.server_id.to_string()))
+                .build()
+        })?;
+
+        let srv_gql: ServerGQL = srv.into();
+        Ok(srv_gql.with_projects_disabled())
     }
 
     /// The project information
@@ -233,19 +228,18 @@ impl CollaborationInviteTargetGQL {
             Some(id) => {
                 let loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
 
-                match loader.load_one(id).await? {
-                    Some(prj) => {
-                        let prj_gql: ProjectGQL = prj.into();
-                        let prj_gql = prj_gql
-                            .with_disable_server_fetch()
-                            .with_disable_collaboration_fetch();
-                        Ok(Some(prj_gql))
-                    }
-                    None => Err(Error::new("Project not found").extend_with(|_, e| {
-                        e.set("id", id.to_string());
-                        e.set("reason", "invalid_project");
-                    })),
-                }
+                let prj = loader.load_one(id).await?.ok_or_else(|| {
+                    GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
+                        .extend(|e| e.set("id", id.to_string()))
+                        .build()
+                })?;
+
+                let prj_gql: ProjectGQL = prj.into();
+                Ok(Some(
+                    prj_gql
+                        .with_disable_server_fetch()
+                        .with_disable_collaboration_fetch(),
+                ))
             }
         }
     }

@@ -1,4 +1,4 @@
-use async_graphql::{dataloader::DataLoader, Error, ErrorExtensions, InputObject};
+use async_graphql::{dataloader::DataLoader, InputObject};
 use showtimes_db::{
     m::{ServerCollaborationSyncTarget, UserKind},
     mongodb::bson::doc,
@@ -8,7 +8,8 @@ use showtimes_search::SearchClientShared;
 
 use showtimes_gql_common::{
     data_loader::{ProjectDataLoader, ServerDataLoader, ServerSyncLoader},
-    OkResponse, UlidGQL,
+    errors::GQLError,
+    GQLErrorCode, OkResponse, UlidGQL,
 };
 use showtimes_gql_models::collaborations::{CollaborationInviteGQL, CollaborationSyncGQL};
 
@@ -39,38 +40,45 @@ async fn check_permissions(
 ) -> async_graphql::Result<showtimes_db::m::Server> {
     let srv_loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
 
-    let srv = srv_loader.load_one(id).await?;
-    if srv.is_none() {
-        return Err(Error::new("Server not found").extend_with(|_, e| {
-            e.set("id", id.to_string());
-            e.set("reason", "invalid_server");
-        }));
-    }
+    let srv = srv_loader.load_one(id).await?.ok_or_else(|| {
+        GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
+            .extend(|e| e.set("id", id.to_string()))
+            .build()
+    })?;
 
-    let srv = srv.unwrap();
     let find_user = srv.owners.iter().find(|o| o.id == user.id);
 
     match (find_user, user.kind) {
         (Some(user), showtimes_db::m::UserKind::User) => {
             // Check if we are allowed to do collaboration
             if user.privilege < showtimes_db::m::UserPrivilege::Manager {
-                Err(
-                    Error::new("User not allowed to manage collaboration").extend_with(|_, e| {
-                        e.set("id", id.to_string());
-                        e.set("reason", "invalid_privilege");
-                    }),
+                GQLError::new(
+                    "User not allowed to manage collaborations",
+                    GQLErrorCode::UserInsufficientPrivilege,
                 )
+                .extend(|e| {
+                    e.set("id", id.to_string());
+                    e.set("current", user.privilege.to_string());
+                    e.set(
+                        "required",
+                        showtimes_db::m::UserPrivilege::Manager.to_string(),
+                    );
+                    e.set("is_in_server", true);
+                })
+                .into()
             } else {
                 Ok(srv)
             }
         }
-        (None, showtimes_db::m::UserKind::User) => Err(Error::new(
-            "User not allowed to manage collaboration",
+        (None, showtimes_db::m::UserKind::User) => GQLError::new(
+            "User not allowed to manage collaborations",
+            GQLErrorCode::UserInsufficientPrivilege,
         )
-        .extend_with(|_, e| {
+        .extend(|e| {
             e.set("id", id.to_string());
-            e.set("reason", "invalid_user");
-        })),
+            e.set("is_in_server", false);
+        })
+        .into(),
         _ => {
             // Allow anyone to manage collaboration
             Ok(srv)
@@ -87,15 +95,11 @@ pub async fn mutate_collaborations_initiate(
     let db = ctx.data_unchecked::<DatabaseShared>();
     let meili = ctx.data_unchecked::<SearchClientShared>();
 
-    let project = prj_loader.load_one(*input.project).await?;
-    if project.is_none() {
-        return Err(Error::new("Project not found").extend_with(|_, e| {
-            e.set("id", input.project.to_string());
-            e.set("reason", "invalid_project");
-        }));
-    }
-
-    let project = project.unwrap();
+    let project = prj_loader.load_one(*input.project).await?.ok_or_else(|| {
+        GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
+            .extend(|e| e.set("id", input.project.to_string()))
+            .build()
+    })?;
 
     check_permissions(ctx, &user, project.creator).await?;
 
@@ -103,22 +107,27 @@ pub async fn mutate_collaborations_initiate(
         Some(target) => match prj_loader.load_one(*target).await? {
             Some(prj) => {
                 if prj.creator != *input.target_server {
-                    return Err(Error::new("Target project has invalid owner").extend_with(
-                        |_, e| {
-                            e.set("id", target.to_string());
-                            e.set("expect_server", input.target_server.to_string());
-                            e.set("reason", "invalid_project");
-                        },
-                    ));
+                    return GQLError::new(
+                        "Target project has invalid owner",
+                        GQLErrorCode::ProjectInvalidOwner,
+                    )
+                    .extend(|e| {
+                        e.set("id", target.to_string());
+                        e.set("server", input.target_server.to_string());
+                        e.set("project_server", prj.creator.to_string());
+                    })
+                    .into();
                 } else {
                     Some(prj.id)
                 }
             }
             None => {
-                return Err(Error::new("Target project not found").extend_with(|_, e| {
-                    e.set("id", target.to_string());
-                    e.set("reason", "invalid_project");
-                }));
+                return GQLError::new("Target project not found", GQLErrorCode::ProjectNotFound)
+                    .extend(|e| {
+                        e.set("id", target.to_string());
+                        e.set("server", input.target_server.to_string());
+                    })
+                    .into()
             }
         },
         None => None,
@@ -180,10 +189,14 @@ pub async fn mutate_collaborations_accept(
         .find_by_id(&invite.to_string())
         .await?
         .ok_or_else(|| {
-            Error::new("Collaboration invite not found").extend_with(|_, e| {
+            GQLError::new(
+                "Collaboration invite not found",
+                GQLErrorCode::ServerInviteNotFound,
+            )
+            .extend(|e| {
                 e.set("id", invite.to_string());
-                e.set("reason", "invalid_invite");
             })
+            .build()
         })?;
 
     let target_srv = check_permissions(ctx, &user, invite_data.target.server).await?;
@@ -192,10 +205,15 @@ pub async fn mutate_collaborations_accept(
         .load_one(invite_data.source.project)
         .await?
         .ok_or_else(|| {
-            Error::new("Original/source project not found").extend_with(|_, e| {
+            GQLError::new(
+                "Original/source project not found",
+                GQLErrorCode::ProjectNotFound,
+            )
+            .extend(|e| {
                 e.set("id", invite_data.source.project.to_string());
-                e.set("reason", "invalid_project");
+                e.set("invite_id", invite.to_string());
             })
+            .build()
         })?;
 
     // Check done, see if we can just use the existing project or should we duplicate
@@ -317,10 +335,14 @@ pub async fn mutate_collaborations_cancel(
         .find_by_id(&invite.to_string())
         .await?
         .ok_or_else(|| {
-            Error::new("Collaboration invite not found").extend_with(|_, e| {
+            GQLError::new(
+                "Collaboration invite not found",
+                GQLErrorCode::ServerInviteNotFound,
+            )
+            .extend(|e| {
                 e.set("id", invite.to_string());
-                e.set("reason", "invalid_invite");
             })
+            .build()
         })?;
 
     // Check target server permissions
@@ -386,32 +408,29 @@ pub async fn mutate_collaborations_unlink(
     let db = ctx.data_unchecked::<DatabaseShared>();
 
     let sync_handler = showtimes_db::CollaborationSyncHandler::new(db);
-    let sync = loader.load_one(*sync_id).await?;
-
-    if sync.is_none() {
-        return Err(
-            Error::new("Collaboration sync not found").extend_with(|_, e| {
-                e.set("id", sync_id.to_string());
-                e.set("reason", "invalid_sync");
-            }),
-        );
-    }
-
-    let mut sync = sync.unwrap();
+    let mut sync = loader.load_one(*sync_id).await?.ok_or_else(|| {
+        GQLError::new(
+            "Collaboration sync not found",
+            GQLErrorCode::ServerSyncNotFound,
+        )
+        .extend(|e| {
+            e.set("id", sync_id.to_string());
+        })
+        .build()
+    })?;
 
     // Initiator is the project ID, find the project
-    let project_sync = sync.get_and_remove(*initiator);
-
-    if project_sync.is_none() {
-        return Err(
-            Error::new("Project not found in collaboration data").extend_with(|_, e| {
-                e.set("id", initiator.to_string());
-                e.set("reason", "invalid_project");
-            }),
-        );
-    }
-
-    let project_sync = project_sync.unwrap();
+    let project_sync = sync.get_and_remove(*initiator).ok_or_else(|| {
+        GQLError::new(
+            "Project not found in collaboration data",
+            GQLErrorCode::ProjectNotFound,
+        )
+        .extend(|e| {
+            e.set("id", initiator.to_string());
+            e.set("collab_id", sync.id.to_string());
+        })
+        .build()
+    })?;
 
     // Check permissions
     check_permissions(ctx, &user, project_sync.server).await?;

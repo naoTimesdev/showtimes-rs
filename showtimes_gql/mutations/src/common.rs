@@ -1,5 +1,5 @@
 use async_graphql::{CustomValidator, Enum, InputObject};
-use showtimes_gql_common::IntegrationTypeGQL;
+use showtimes_gql_common::{errors::GQLError, IntegrationTypeGQL};
 
 /// The list of possible integrations actions.
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -251,18 +251,39 @@ pub(crate) async fn execute_search_events(
             tracing::debug!("Search task failed: {}", e1);
             tracing::debug!("Events task failed: {}", e2);
             // Combine
-            Err(async_graphql::Error::new(format!(
-                "Search task failed: {}\nEvents task failed: {}",
-                e1, e2
-            )))
+            GQLError::new(
+                format!("Search task failed: {}\nEvents task failed: {}", e1, e2),
+                showtimes_gql_common::GQLErrorCode::TaskSchedulerError,
+            )
+            .extend(|e| {
+                e.set("search", true);
+                e.set("events", true);
+            })
+            .into()
         }
         (Err(e), _) => {
             tracing::debug!("Search task failed: {}", e);
-            Err(async_graphql::Error::new(e.to_string()))
+            GQLError::new(
+                e.to_string(),
+                showtimes_gql_common::GQLErrorCode::TaskSchedulerError,
+            )
+            .extend(|e| {
+                e.set("search", true);
+                e.set("events", false);
+            })
+            .into()
         }
         (_, Err(e)) => {
             tracing::debug!("Events task failed: {}", e);
-            Err(async_graphql::Error::new(e.to_string()))
+            GQLError::new(
+                e.to_string(),
+                showtimes_gql_common::GQLErrorCode::TaskSchedulerError,
+            )
+            .extend(|e| {
+                e.set("search", false);
+                e.set("events", true);
+            })
+            .into()
         }
     }
 }

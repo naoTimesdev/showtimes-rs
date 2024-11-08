@@ -1,6 +1,7 @@
 //! A server models list
 
-use async_graphql::{dataloader::DataLoader, Enum, ErrorExtensions, Object};
+use async_graphql::{dataloader::DataLoader, Enum, Object};
+use errors::GQLError;
 use showtimes_db::{m::ServerUser, mongodb::bson::doc};
 use showtimes_gql_common::{data_loader::UserDataLoader, queries::MinimalServerUsers, *};
 use showtimes_gql_paginator::projects::ProjectQuery;
@@ -60,31 +61,20 @@ impl ServerUserGQL {
     /// The complete user information
     async fn user(&self, ctx: &async_graphql::Context<'_>) -> async_graphql::Result<UserGQL> {
         let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
-        let user = loader.load_one(self.id).await.map_err(|e| {
-            e.extend_with(|_, e| {
+        let user = loader.load_one(self.id).await?.ok_or_else(|| {
+            GQLError::new(
+                format!("User {} not found", self.id),
+                GQLErrorCode::UserNotFound,
+            )
+            .extend(|e| {
                 e.set("id", self.id.to_string());
                 e.set("server_id", self.top_server.to_string());
-                e.set("reason", GQLError::UserRequestFails);
-                e.set("code", GQLError::UserRequestFails.code());
             })
+            .build()
         })?;
 
-        match user {
-            Some(user) => {
-                let user: UserGQL = user.into();
-                Ok(user.with_disable_server_fetch())
-            }
-            None => Err(
-                async_graphql::Error::new(format!("User {} not found", self.id)).extend_with(
-                    |_, e| {
-                        e.set("id", self.id.to_string());
-                        e.set("server_id", self.top_server.to_string());
-                        e.set("reason", GQLError::UserRequestFails);
-                        e.set("code", GQLError::UserRequestFails.code());
-                    },
-                ),
-            ),
-        }
+        let user_gql: UserGQL = user.into();
+        Ok(user_gql.with_disable_server_fetch())
     }
 
     /// The user's privilege

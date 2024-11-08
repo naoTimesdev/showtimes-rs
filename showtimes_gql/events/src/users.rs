@@ -1,5 +1,6 @@
-use async_graphql::{dataloader::DataLoader, ErrorExtensions, Object, SimpleObject};
+use async_graphql::{dataloader::DataLoader, Object, SimpleObject};
 
+use errors::GQLError;
 use showtimes_gql_common::{data_loader::UserDataLoader, queries::ServerQueryUser, *};
 use showtimes_gql_models::users::UserGQL;
 
@@ -23,8 +24,9 @@ impl UserCreatedEventDataGQL {
         let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
 
         let user = loader.load_one(self.id).await?.ok_or_else(|| {
-            async_graphql::Error::new("User not found")
-                .extend_with(|_, e| e.set("id", self.id.to_string()))
+            GQLError::new("User not found", GQLErrorCode::UserNotFound)
+                .extend(|e| e.set("id", self.id.to_string()))
+                .build()
         })?;
 
         let user_gql = UserGQL::from(user);
@@ -101,8 +103,9 @@ impl UserUpdatedEventDataGQL {
         let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
 
         let user = loader.load_one(self.id).await?.ok_or_else(|| {
-            async_graphql::Error::new("User not found")
-                .extend_with(|_, e| e.set("id", self.id.to_string()))
+            GQLError::new("User not found", GQLErrorCode::UserNotFound)
+                .extend(|e| e.set("id", self.id.to_string()))
+                .build()
         })?;
 
         let user_gql = UserGQL::from(user);
