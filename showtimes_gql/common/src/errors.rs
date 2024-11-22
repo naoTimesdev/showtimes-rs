@@ -101,6 +101,14 @@ pub enum GQLErrorCode {
     /// Integration requires the original ID for updating
     IntegrationMissingOriginal = 404,
 
+    // -> Parse related
+    /// A common parsing error
+    ParseError = 500,
+    /// Failed to parse ULID
+    ParseUlidError = 501,
+    /// Failed to parse API key
+    ParseAPIKeyError = 502,
+
     // --> User related
     /// Failed when requesting user
     UserRequestFails = 1000,
@@ -124,6 +132,8 @@ pub enum GQLErrorCode {
     ServerNotFound = 2001,
     /// Server already exists
     ServerAlreadyExists = 2002,
+    /// Server fetch disabled
+    ServerFetchDisabled = 2010,
 
     // --> Project related
     /// Failed when requesting project
@@ -136,6 +146,8 @@ pub enum GQLErrorCode {
     ProjectInvalidOwner = 3003,
     /// Project is archived, (almost) no action can be done.
     ProjectArchived = 3004,
+    /// Project fetch disabled
+    ProjectFetchDisabled = 3010,
 
     // --> Server collab sync related
     /// Failed when requesting server collab
@@ -161,14 +173,18 @@ pub enum GQLErrorCode {
     /// Failed when requesting metadata for Anilist
     MetadataAnilistRequestError = 6010,
     /// Failed when requesting metadata for TMDb
+    #[enum_name(rename = "metadata_tmdb_request_error")]
     MetadataTMDbRequestError = 6011,
     /// Failed when requesting metadata for VNDB
+    #[enum_name(rename = "metadata_vndb_request_error")]
     MetadataVNDBRequestError = 6012,
     /// Invalid ID for Anilist metadata
     MetadataAnilistInvalidId = 6020,
     /// Invalid ID for TMDb metadata
+    #[enum_name(rename = "metadata_tmdb_invalid_id")]
     MetadataTMDbInvalidId = 6021,
     /// Invalid ID for VNDB metadata
+    #[enum_name(rename = "metadata_vndb_invalid_id")]
     MetadataVNDBInvalidId = 6022,
     /// Metadata no episodes found
     MetadataNoEpisodesFound = 6030,

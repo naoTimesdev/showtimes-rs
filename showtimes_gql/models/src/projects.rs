@@ -1,6 +1,7 @@
 //! A project models list
 
 use async_graphql::{dataloader::DataLoader, Enum, Object, SimpleObject};
+use errors::GQLError;
 use showtimes_gql_common::data_loader::{
     ServerDataLoader, ServerSyncIds, ServerSyncLoader, UserDataLoader,
 };
@@ -237,6 +238,7 @@ impl ProjectGQL {
         let mut progress = vec![];
 
         for p in &self.progress {
+            // TODO: Fix error propagation
             progress.push(ProjectProgressGQL::from_db(p.clone(), self.roles.clone())?);
         }
 
@@ -279,6 +281,7 @@ impl ProjectGQL {
         let mut assignees = vec![];
 
         for assignee in &self.assignees {
+            // TODO: Fix error propagation
             let role = get_role(&self.roles, assignee.key())?;
             assignees.push(RoleAssigneeGQL {
                 role: role.into(),
@@ -303,18 +306,32 @@ impl ProjectGQL {
     /// If the server is not found, this will throw an error.
     async fn creator(&self, ctx: &async_graphql::Context<'_>) -> async_graphql::Result<ServerGQL> {
         if self.disable_server_fetch {
-            return Err("Server fetch from this context is disabled to avoid looping".into());
+            return GQLError::new(
+                "Server fetch from this context is disabled to avoid looping",
+                GQLErrorCode::ServerFetchDisabled,
+            )
+            .extend(|e| {
+                e.set("id", self.id.to_string());
+                e.set("server_id", self.creator.to_string());
+                e.set("root", "project");
+            })
+            .into();
         }
 
         let loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
 
-        match loader.load_one(self.creator).await? {
-            Some(server) => {
-                let map_server: ServerGQL = server.into();
-                Ok(map_server.with_projects_disabled())
-            }
-            None => Err("Server not found".into()),
-        }
+        let server = loader.load_one(self.creator).await?.ok_or_else(|| {
+            GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
+                .extend(|e| {
+                    e.set("id", self.creator.to_string());
+                    e.set("project_id", self.id.to_string());
+                    e.set("root", "project");
+                })
+                .build()
+        })?;
+
+        let map_server: ServerGQL = server.into();
+        Ok(map_server.with_projects_disabled())
     }
 
     /// The project first airing date, taken from the first episode.
@@ -403,6 +420,7 @@ impl ProjectProgressGQL {
         // XXX: We need to do this manually because we need to propagate the error.
         // XXX: Since `.try_collect()` is still nightly only :pensive:
         for status in &progress.statuses {
+            // TODO: Fix error propagation
             let role = get_role(&roles, status.key())?;
             statuses.push(RoleStatusGQL::with_role(role, status.finished()));
         }

@@ -9,8 +9,9 @@ use showtimes_db::{
     DatabaseShared,
 };
 use showtimes_gql_common::{
+    errors::GQLError,
     queries::{MinimalServerUsers, ServerQueryUser},
-    PageInfoGQL, SortOrderGQL,
+    GQLErrorCode, PageInfoGQL, SortOrderGQL,
 };
 use showtimes_shared::ulid::Ulid;
 
@@ -137,6 +138,7 @@ impl ProjectQuery {
 }
 
 /// Query the projects database and return the paginated data.
+/// TODO: Fix error propagation
 pub async fn query_projects_paginated(
     ctx: &async_graphql::Context<'_>,
     queries: ProjectQuery,
@@ -170,7 +172,21 @@ pub async fn query_projects_paginated(
             }
 
             if user_methods.is_empty() {
-                return Err("User does not have access to any of the allowed servers".into());
+                return GQLError::new(
+                    "User does not have access to any of the allowed servers",
+                    GQLErrorCode::UserInsufficientPrivilege,
+                )
+                .extend(|e| {
+                    e.set("user_id", user_info.id().to_string());
+                    e.set(
+                        "servers",
+                        servers
+                            .iter()
+                            .map(|s| s.id().to_string())
+                            .collect::<Vec<String>>(),
+                    );
+                })
+                .into();
             }
 
             let document_fetchs = user_methods

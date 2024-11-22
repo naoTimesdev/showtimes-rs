@@ -632,14 +632,24 @@ pub async fn find_authenticated_user(
         showtimes_session::ShowtimesAudience::User => {
             // load as ULID
             let user_id =
-                showtimes_shared::ulid::Ulid::from_string(session.get_claims().get_metadata())?;
+                showtimes_shared::ulid::Ulid::from_string(session.get_claims().get_metadata())
+                    .extend_error(GQLErrorCode::ParseUlidError, |e| {
+                        e.set("value", session.get_claims().get_metadata());
+                        e.set("audience", session.get_claims().get_audience().to_string());
+                    })?;
 
             loader.load_one(user_id).await
         }
         showtimes_session::ShowtimesAudience::APIKey => {
             // load as API key
             let api_key = session.get_claims().get_metadata();
-            let parse_api = showtimes_shared::APIKey::try_from(api_key)?;
+            let parse_api = showtimes_shared::APIKey::try_from(api_key).extend_error(
+                GQLErrorCode::ParseAPIKeyError,
+                |e| {
+                    e.set("value", api_key);
+                    e.set("audience", session.get_claims().get_audience().to_string());
+                },
+            )?;
 
             loader.load_one(parse_api).await
         }

@@ -83,6 +83,7 @@ impl UserQuery {
 }
 
 /// Query the users database and return the paginated data.
+/// TODO: Fix error propagation
 pub async fn query_users_paginated(
     ctx: &async_graphql::Context<'_>,
     queries: UserQuery,

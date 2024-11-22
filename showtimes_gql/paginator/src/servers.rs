@@ -97,6 +97,7 @@ impl ServerQuery {
 }
 
 /// Query the servers database and return the paginated data.
+/// TODO: Fix error propagation
 pub async fn query_servers_paginated(
     ctx: &async_graphql::Context<'_>,
     queries: ServerQuery,

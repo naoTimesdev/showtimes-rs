@@ -5,7 +5,8 @@ use async_graphql::{dataloader::DataLoader, Context, Object};
 
 use showtimes_gql_common::{
     data_loader::{find_authenticated_user, ServerAndOwnerId, ServerDataLoader, ServerOwnerId},
-    guard, UserKindGQL,
+    errors::GQLError,
+    guard, GQLErrorCode, UserKindGQL,
 };
 use showtimes_gql_events::QueryEventsRoot;
 use showtimes_gql_models::{
@@ -219,7 +220,7 @@ impl QueryRoot {
 
         match result {
             Some(server) => Ok(StatsGQL::new(server)),
-            None => Err("Server not found".into()),
+            None => GQLError::new("Server not found", GQLErrorCode::ServerNotFound).into(),
         }
     }
 

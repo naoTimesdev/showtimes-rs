@@ -42,7 +42,14 @@ impl Description for UlidGQL {
 impl ScalarType for UlidGQL {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
         match value {
-            async_graphql::Value::String(s) => Ok(UlidGQL(s.parse()?)),
+            async_graphql::Value::String(s) => {
+                let ulid = s.parse::<showtimes_shared::ulid::Ulid>().map_err(|e| {
+                    async_graphql::InputValueError::custom(e.to_string())
+                        .with_extension("value", &s)
+                })?;
+
+                Ok(UlidGQL(ulid))
+            }
             _ => Err(async_graphql::InputValueError::expected_type(value)),
         }
     }
@@ -86,7 +93,10 @@ impl ScalarType for APIKeyGQL {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
         match value {
             async_graphql::Value::String(s) => {
-                let api_key = showtimes_shared::APIKey::from_string(&s)?;
+                let api_key = showtimes_shared::APIKey::from_string(&s).map_err(|e| {
+                    async_graphql::InputValueError::custom(e.to_string())
+                        .with_extension("value", &s)
+                })?;
 
                 Ok(APIKeyGQL(api_key))
             }
@@ -137,7 +147,10 @@ impl ScalarType for DateTimeGQL {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
         match value {
             async_graphql::Value::String(s) => {
-                let rfc3399 = chrono::DateTime::parse_from_rfc3339(&s)?;
+                let rfc3399 = chrono::DateTime::parse_from_rfc3339(&s).map_err(|e| {
+                    async_graphql::InputValueError::custom(e.to_string())
+                        .with_extension("value", &s)
+                })?;
                 let utc = rfc3399.with_timezone(&chrono::Utc);
 
                 Ok(DateTimeGQL(utc))

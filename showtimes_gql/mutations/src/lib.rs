@@ -15,7 +15,8 @@ pub(crate) use common::*;
 
 use showtimes_gql_common::{
     data_loader::{find_authenticated_user, UserDataLoader},
-    guard, OkResponse, Orchestrator, UserKindGQL,
+    errors::GQLError,
+    guard, GQLErrorCode, OkResponse, Orchestrator, UserKindGQL,
 };
 use showtimes_gql_models::{
     collaborations::{CollaborationInviteGQL, CollaborationSyncGQL},
@@ -501,7 +502,7 @@ impl MutationRoot {
 
                 Ok(UserSessionGQL::new(user, claims.get_token()))
             }
-            None => Err("User not found".into()),
+            None => GQLError::new("User not found", GQLErrorCode::UserNotFound).into(),
         }
     }
 }

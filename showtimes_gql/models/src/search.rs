@@ -288,6 +288,7 @@ impl QuerySearchRoot {
         let prefer_title = prefer_title.unwrap_or(ExternalSearchTitlePrefer::English);
         let provider = ctx.data_unchecked::<AnilistProviderShared>();
         let mut query_server = provider.lock().await;
+        // TODO: Fix error propagation
         let results = query_server.search(query).await?;
 
         Ok(results
@@ -313,6 +314,7 @@ impl QuerySearchRoot {
         // TMDb provider is optional
         match provider {
             Some(provider) => {
+                // TODO: Fix error propagation
                 let results = provider.search_movie(&query).await?;
 
                 Ok(results
@@ -340,6 +342,7 @@ impl QuerySearchRoot {
         // VNDB provider is optional
         match ctx.data_opt::<VNDBProviderShared>() {
             Some(provider) => {
+                // TODO: Fix error propagation
                 let results = provider.search(query).await?;
 
                 Ok(results

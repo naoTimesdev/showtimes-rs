@@ -175,7 +175,15 @@ impl ServerGQL {
         #[graphql(desc = "Sort order, default to ID_ASC")] sort: Option<SortOrderGQL>,
     ) -> async_graphql::Result<PaginatedGQL<ProjectGQL>> {
         if self.disable_projects {
-            return Err("Projects fetch from this context is disabled to avoid looping".into());
+            return GQLError::new(
+                "Projects fetch from this context is disabled to avoid looping",
+                GQLErrorCode::ProjectFetchDisabled,
+            )
+            .extend(|e| {
+                e.set("id", self.id.to_string());
+                e.set("root", "server");
+            })
+            .into();
         }
 
         let mut queries = ProjectQuery::new()

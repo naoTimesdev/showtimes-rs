@@ -135,6 +135,31 @@ impl<'de> serde::Deserialize<'de> for PrefixUlid {
     }
 }
 
+/// An API key parse error
+#[derive(Clone, Copy, Debug)]
+pub enum APIKeyParseError {
+    /// Failed to parse UUID
+    InvalidUUID,
+    /// Wrong format provided
+    InvalidFormat,
+    /// UUID is incomplete at part X
+    IncompleteUUID(u8),
+}
+
+impl std::fmt::Display for APIKeyParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            APIKeyParseError::InvalidFormat => write!(f, "Invalid API Key format"),
+            APIKeyParseError::InvalidUUID => write!(f, "Invalid UUID"),
+            APIKeyParseError::IncompleteUUID(pos) => {
+                write!(f, "Invalid UUID, incomplete part {}", pos)
+            }
+        }
+    }
+}
+
+impl std::error::Error for APIKeyParseError {}
+
 /// An API key for authentication
 ///
 /// This is a UUIDv4 with a prefix of `nsh_`
@@ -164,30 +189,32 @@ impl APIKey {
     }
 
     /// Parse a string into an API key
-    pub fn from_string(input: impl Into<String>) -> Result<Self, String> {
+    pub fn from_string(input: impl Into<String>) -> Result<Self, APIKeyParseError> {
         let input: String = input.into();
         if !input.starts_with(API_KEY_PREFIX) {
-            return Err("Invalid API key format".to_string());
+            return Err(APIKeyParseError::InvalidFormat);
         }
 
         let input: String = input.replace(API_KEY_PREFIX, "");
         // UUID dash is replaced with empty string, so we need to insert it back
         // ex: cd427fdabb04495688aa97422a3f0320
         //     cd427fda-bb04-4956-88aa-97422a3f0320
-        let uuid_a = input.get(0..8).ok_or("Invalid UUID (incomplete part A)")?;
-        let uuid_b = input.get(8..12).ok_or("Invalid UUID (incomplete part B)")?;
+        let uuid_a = input.get(0..8).ok_or(APIKeyParseError::IncompleteUUID(0))?;
+        let uuid_b = input
+            .get(8..12)
+            .ok_or(APIKeyParseError::IncompleteUUID(1))?;
         let uuid_c = input
             .get(12..16)
-            .ok_or("Invalid UUID (incomplete part C)")?;
+            .ok_or(APIKeyParseError::IncompleteUUID(2))?;
         let uuid_d = input
             .get(16..20)
-            .ok_or("Invalid UUID (incomplete part D)")?;
+            .ok_or(APIKeyParseError::IncompleteUUID(3))?;
         let uuid_e = input
             .get(20..32)
-            .ok_or("Invalid UUID (incomplete part E)")?;
+            .ok_or(APIKeyParseError::IncompleteUUID(4))?;
         let rfmt_s = format!("{}-{}-{}-{}-{}", uuid_a, uuid_b, uuid_c, uuid_d, uuid_e);
 
-        let inner = uuid::Uuid::parse_str(&rfmt_s).map_err(|_| "Invalid UUID")?;
+        let inner = uuid::Uuid::parse_str(&rfmt_s).map_err(|_| APIKeyParseError::InvalidUUID)?;
         Ok(APIKey { inner })
     }
 
@@ -230,7 +257,7 @@ impl<'de> serde::Deserialize<'de> for APIKey {
 }
 
 impl TryFrom<String> for APIKey {
-    type Error = String;
+    type Error = APIKeyParseError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         APIKey::from_string(value)
@@ -238,7 +265,7 @@ impl TryFrom<String> for APIKey {
 }
 
 impl TryFrom<&str> for APIKey {
-    type Error = String;
+    type Error = APIKeyParseError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         APIKey::from_string(value.to_string())

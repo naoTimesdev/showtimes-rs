@@ -1,6 +1,7 @@
 //! A users models list
 
 use async_graphql::{Object, SimpleObject};
+use errors::GQLError;
 use showtimes_db::mongodb::bson::doc;
 use showtimes_gql_common::{queries::ServerQueryUser, *};
 use showtimes_gql_paginator::servers::ServerQuery;
@@ -89,7 +90,15 @@ impl UserGQL {
         #[graphql(desc = "Sort order, default to ID_ASC")] sort: Option<SortOrderGQL>,
     ) -> async_graphql::Result<PaginatedGQL<ServerGQL>> {
         if self.disallow_server_fetch {
-            return Err("Servers fetch from this context is disabled to avoid looping".into());
+            return GQLError::new(
+                "Servers fetch from this context is disabled to avoid looping",
+                GQLErrorCode::ServerFetchDisabled,
+            )
+            .extend(|e| {
+                e.set("id", self.id.to_string());
+                e.set("root", "user");
+            })
+            .into();
         }
 
         let mut queries =
