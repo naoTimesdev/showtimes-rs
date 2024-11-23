@@ -5,7 +5,7 @@
 use chrono::TimeZone;
 use serde::{Deserialize, Serialize};
 
-use crate::image::hex_to_u32;
+use crate::{errors::DetailedSerdeError, image::hex_to_u32};
 
 /// Media type
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
@@ -275,6 +275,136 @@ pub struct AnilistResponse<T> {
     #[serde(bound(deserialize = "T: Deserialize<'de>", serialize = "T: Serialize"))]
     pub data: T,
 }
+
+/// Error response schema for GraphQL
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnilistGraphQLResponseError {
+    /// The collection of errors
+    pub errors: Vec<AnilistGraphQLError>,
+}
+
+/// An error from the GraphQL response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnilistGraphQLError {
+    /// The error message
+    pub message: String,
+    /// The locations of the error in the query
+    pub locations: Vec<AnilistGraphQLErrorLocation>,
+    /// The path of the error in the query
+    pub path: Vec<serde_json::Value>,
+}
+
+/// The location of an error in the GraphQL response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnilistGraphQLErrorLocation {
+    /// The line of the error
+    pub line: u32,
+    /// The column of the error
+    pub column: u32,
+}
+
+impl std::fmt::Display for AnilistGraphQLError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Error: {msg} (at {line}, {column}[..] in {path})
+        write!(f, "Error: {}", self.message)?;
+        if !self.locations.is_empty() {
+            write!(
+                f,
+                " (at {})",
+                self.locations
+                    .iter()
+                    .map(|loc| format!("{}:{}", loc.line, loc.column))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            )?;
+        }
+        if !self.path.is_empty() {
+            // stringify path and write it
+            let path_str = self
+                .path
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<String>>()
+                .join(".");
+            write!(f, " in {}", path_str)?;
+        }
+        // newline
+        writeln!(f)
+    }
+}
+
+impl std::fmt::Display for AnilistGraphQLResponseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.errors.is_empty() {
+            writeln!(f, "No errors found")?;
+        } else if self.errors.len() == 1 {
+            writeln!(f, "{}", self.errors[0])?;
+        } else {
+            // print with numbering
+            for (i, error) in self.errors.iter().enumerate() {
+                writeln!(f, "[{}] {}", i + 1, error)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for AnilistGraphQLError {}
+impl std::error::Error for AnilistGraphQLResponseError {}
+
+/// Error type for Anilist API
+///
+/// This enum can be used to wrap the possible errors that can happen when
+/// interacting with the Anilist API.
+#[derive(Debug)]
+pub enum AnilistError {
+    /// Error related to GraphQL request
+    GraphQL(AnilistGraphQLResponseError),
+    /// Error related to request
+    Request(reqwest::Error),
+    /// Error related to deserialization
+    Serde(DetailedSerdeError),
+    /// Conversion to string failure from header
+    HeaderToString(String),
+    /// String conversion failure from header
+    StringToNumber(String),
+}
+
+impl From<DetailedSerdeError> for AnilistError {
+    fn from(value: DetailedSerdeError) -> Self {
+        AnilistError::Serde(value)
+    }
+}
+
+impl From<reqwest::Error> for AnilistError {
+    fn from(value: reqwest::Error) -> Self {
+        AnilistError::Request(value)
+    }
+}
+
+impl From<AnilistGraphQLResponseError> for AnilistError {
+    fn from(value: AnilistGraphQLResponseError) -> Self {
+        AnilistError::GraphQL(value)
+    }
+}
+
+impl std::fmt::Display for AnilistError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AnilistError::GraphQL(e) => write!(f, "{}", e),
+            AnilistError::Request(e) => write!(f, "{}", e),
+            AnilistError::Serde(e) => write!(f, "{}", e),
+            AnilistError::HeaderToString(c) => {
+                write!(f, "failed to convert `{}` header value into string", c)
+            }
+            AnilistError::StringToNumber(c) => {
+                write!(f, "failed to convert `{}` header value into number", c)
+            }
+        }
+    }
+}
+
+impl std::error::Error for AnilistError {}
 
 #[cfg(test)]
 mod tests {

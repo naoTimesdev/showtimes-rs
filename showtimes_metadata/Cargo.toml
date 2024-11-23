@@ -10,7 +10,6 @@ rust-version.workspace = true
 description = "A library to fetch metadata information of a shows or books, data provided by Anilist and TMDB"
 
 [dependencies]
-anyhow.workspace = true
 chrono.workspace = true
 nom.workspace = true
 

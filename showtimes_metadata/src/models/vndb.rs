@@ -4,6 +4,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::errors::DetailedSerdeError;
+
 /// The VNDB title list information
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VndbTitle {
@@ -145,3 +147,56 @@ fn sort_vndb_title(a: &&VndbTitle, b: &&VndbTitle) -> std::cmp::Ordering {
         std::cmp::Ordering::Equal
     }
 }
+
+/// Error type for VNDB API
+///
+/// This enum can be used to wrap the possible errors that can happen when
+/// interacting with the VNDB API.
+#[derive(Debug)]
+pub enum VNDBError {
+    /// Error related to response result
+    Response(String),
+    /// Error getting specific result
+    NotFound(String),
+    /// Error related to request
+    Request(reqwest::Error),
+    /// Error related to deserialization
+    Serde(DetailedSerdeError),
+    /// Invalid ID provided
+    InvalidId(String),
+    /// Conversion to string failure from header
+    HeaderToString(String),
+}
+
+impl From<DetailedSerdeError> for VNDBError {
+    fn from(value: DetailedSerdeError) -> Self {
+        VNDBError::Serde(value)
+    }
+}
+
+impl From<reqwest::Error> for VNDBError {
+    fn from(value: reqwest::Error) -> Self {
+        VNDBError::Request(value)
+    }
+}
+
+impl std::fmt::Display for VNDBError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VNDBError::Response(e) => write!(f, "{}", e),
+            VNDBError::Request(e) => write!(f, "{}", e),
+            VNDBError::Serde(e) => write!(f, "{}", e),
+            VNDBError::InvalidId(c) => {
+                write!(f, "invalid id provided: {}", c)
+            }
+            VNDBError::HeaderToString(c) => {
+                write!(f, "failed to convert `{}` header value into string", c)
+            }
+            VNDBError::NotFound(item) => {
+                write!(f, "no result found for `{}`", item)
+            }
+        }
+    }
+}
+
+impl std::error::Error for VNDBError {}

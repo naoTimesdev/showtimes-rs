@@ -4,6 +4,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::errors::DetailedSerdeError;
+
 const BASE_IMAGE: &str = "https://image.tmdb.org/t/p/";
 
 /// The media type of the TMDb API
@@ -263,6 +265,52 @@ impl std::fmt::Display for TMDbErrorResponse {
         write!(f, "{} (code: {})", self.status_message, self.status_code)
     }
 }
+
+impl std::error::Error for TMDbErrorResponse {}
+
+/// Error type for TMDb API
+///
+/// This enum can be used to wrap the possible errors that can happen when
+/// interacting with the TMDb API.
+#[derive(Debug)]
+pub enum TMDbError {
+    /// Error related to response result
+    Response(TMDbErrorResponse),
+    /// Error related to request
+    Request(reqwest::Error),
+    /// Error related to deserialization
+    Serde(DetailedSerdeError),
+}
+
+impl From<DetailedSerdeError> for TMDbError {
+    fn from(value: DetailedSerdeError) -> Self {
+        TMDbError::Serde(value)
+    }
+}
+
+impl From<reqwest::Error> for TMDbError {
+    fn from(value: reqwest::Error) -> Self {
+        TMDbError::Request(value)
+    }
+}
+
+impl From<TMDbErrorResponse> for TMDbError {
+    fn from(value: TMDbErrorResponse) -> Self {
+        TMDbError::Response(value)
+    }
+}
+
+impl std::fmt::Display for TMDbError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TMDbError::Response(err) => write!(f, "{}", err),
+            TMDbError::Request(err) => write!(f, "{}", err),
+            TMDbError::Serde(err) => write!(f, "{}", err),
+        }
+    }
+}
+
+impl std::error::Error for TMDbError {}
 
 fn get_backdrop(url: &str, size: TMDbBackdropSize) -> String {
     format!("{}{}{}", BASE_IMAGE, size.to_name().to_lowercase(), url)

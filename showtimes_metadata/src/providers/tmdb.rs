@@ -3,8 +3,8 @@
 //! This is incomplete and only made to support what Showtimes needed.
 
 use crate::{
-    errors::MetadataResult,
-    models::{TMDbErrorResponse, TMDbMovieResult, TMDbMultiResponse, TMDbMultiResult},
+    errors::{DetailedSerdeError, MetadataError, MetadataResult},
+    models::{TMDbError, TMDbErrorResponse, TMDbMovieResult, TMDbMultiResponse, TMDbMultiResult},
 };
 
 const TMDB_API_URL: &str = "https://api.themoviedb.org/3";
@@ -52,7 +52,7 @@ impl TMDbProvider {
         &self,
         path: &str,
         query_params: &[(&str, &str)],
-    ) -> Result<T, TMDbErrorResponse>
+    ) -> Result<T, MetadataError>
     where
         T: serde::de::DeserializeOwned,
     {
@@ -62,33 +62,26 @@ impl TMDbProvider {
             req = req.query(&[(*key, *value)]);
         }
 
-        let send_req = req.send().await;
+        let send_req = req.send().await.map_err(|e| TMDbError::Request(e))?;
 
-        match send_req {
-            Ok(send_req) => {
-                if send_req.status().is_success() {
-                    let success = send_req.json::<T>().await.map_err(|e| TMDbErrorResponse {
-                        status_code: -110,
-                        status_message: e.to_string(),
-                    })?;
+        let status = send_req.status();
+        let headers = send_req.headers().clone();
+        let url = send_req.url().clone();
+        let raw_text = send_req.text().await.map_err(|e| TMDbError::Request(e))?;
 
-                    Ok(success)
-                } else {
-                    // parse the error
-                    let error = send_req.json::<TMDbErrorResponse>().await.map_err(|e| {
-                        TMDbErrorResponse {
-                            status_code: -120,
-                            status_message: e.to_string(),
-                        }
-                    })?;
+        if status.is_success() {
+            let success = serde_json::from_str::<T>(&raw_text).map_err(|e| {
+                TMDbError::Serde(DetailedSerdeError::new(e, status, &headers, &url, raw_text))
+            })?;
 
-                    Err(error)
-                }
-            }
-            Err(e) => Err(TMDbErrorResponse {
-                status_code: -100,
-                status_message: e.to_string(),
-            }),
+            Ok(success)
+        } else {
+            // parse the error
+            let error = serde_json::from_str::<TMDbErrorResponse>(&raw_text).map_err(|e| {
+                TMDbError::Serde(DetailedSerdeError::new(e, status, &headers, &url, raw_text))
+            })?;
+
+            Err(TMDbError::Response(error).into())
         }
     }
 

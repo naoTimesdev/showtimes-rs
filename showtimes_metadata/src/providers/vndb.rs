@@ -4,7 +4,10 @@
 
 use serde_json::json;
 
-use crate::models::{VndbNovel, VndbResult};
+use crate::{
+    errors::{DetailedSerdeError, MetadataResult},
+    models::{VNDBError, VndbNovel, VndbResult},
+};
 
 const VNDB_API_URL: &str = "https://api.vndb.org/kana";
 // Common filters used when getting VN data
@@ -49,25 +52,61 @@ impl VndbProvider {
         VndbProvider { client }
     }
 
+    async fn request(
+        &self,
+        endpoint: &str,
+        params: serde_json::Value,
+    ) -> MetadataResult<VndbResult> {
+        // json POST
+        let req = self
+            .client
+            .post(format!("{}{}", VNDB_API_URL, endpoint))
+            .json(&params)
+            .send()
+            .await
+            .map_err(|e| VNDBError::Request(e))?;
+
+        // is json
+        let is_json = match req.headers().get(reqwest::header::CONTENT_TYPE) {
+            Some(header) => {
+                let header_str = header
+                    .to_str()
+                    .map_err(|_| VNDBError::HeaderToString("content-type".to_string()))?;
+
+                header_str.starts_with("application/json")
+            }
+            None => false,
+        };
+
+        let status = req.status();
+        let headers = req.headers().clone();
+        let url = req.url().clone();
+        let raw_text = req.text().await.map_err(|e| VNDBError::Request(e))?;
+
+        if !is_json {
+            return Err(VNDBError::Response(raw_text.clone()).into());
+        }
+
+        let res = serde_json::from_str::<VndbResult>(&raw_text).map_err(|err| {
+            VNDBError::Serde(DetailedSerdeError::new(
+                err, status, &headers, &url, raw_text,
+            ))
+        })?;
+
+        Ok(res)
+    }
+
     /// Search for a novel by title
     ///
     /// # Arguments
     /// * `title` - The title of the novel
-    pub async fn search(&self, title: impl Into<String>) -> anyhow::Result<Vec<VndbNovel>> {
+    pub async fn search(&self, title: impl Into<String>) -> MetadataResult<Vec<VndbNovel>> {
         let json_data = json!({
             "filters": ["search","=", title.into()],
             "fields": VNDB_VN_FILTERS
         });
 
-        // json POST
-        let req = self
-            .client
-            .post(format!("{}/vn", VNDB_API_URL))
-            .json(&json_data)
-            .send()
-            .await?;
-
-        let res = req.json::<VndbResult>().await?;
+        let res = self.request("/vn", json_data).await?;
 
         Ok(res.results)
     }
@@ -76,16 +115,16 @@ impl VndbProvider {
     ///
     /// # Arguments
     /// * `id` - The ID of the novel
-    pub async fn get(&self, id: impl Into<String>) -> anyhow::Result<VndbNovel> {
+    pub async fn get(&self, id: impl Into<String>) -> MetadataResult<VndbNovel> {
         let id: String = id.into();
         if !id.starts_with("v") {
-            anyhow::bail!("Invalid VNDB novel ID");
+            return Err(VNDBError::InvalidId(id).into());
         }
 
         // is proper ID?
         let id_test = id.trim_start_matches('v');
         if id_test.parse::<u64>().is_err() {
-            anyhow::bail!("Invalid VNDB novel ID");
+            return Err(VNDBError::InvalidId(id).into());
         }
 
         let json_data = json!({
@@ -93,20 +132,11 @@ impl VndbProvider {
             "fields": VNDB_VN_FILTERS
         });
 
-        // json POST
-        let req = self
-            .client
-            .post(format!("{}/vn", VNDB_API_URL))
-            .json(&json_data)
-            .send()
-            .await?;
+        let res = self.request("/vn", json_data).await?;
 
-        let res = req.json::<VndbResult>().await?;
-
-        if res.results.is_empty() {
-            anyhow::bail!("VNDB novel not found");
+        match res.results.first() {
+            None => Err(VNDBError::NotFound(id).into()),
+            Some(novel) => Ok(novel.clone()),
         }
-
-        Ok(res.results.into_iter().next().unwrap())
     }
 }

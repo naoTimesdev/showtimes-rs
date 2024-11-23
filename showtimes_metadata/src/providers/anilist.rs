@@ -2,10 +2,16 @@
 //!
 //! This is incomplete and only made to support what Showtimes needed.
 
+use std::str::FromStr;
+
 use serde_json::json;
 
-use crate::models::{
-    AnilistAiringSchedulePaged, AnilistMedia, AnilistPagedData, AnilistResponse, AnilistSingleMedia,
+use crate::{
+    errors::{DetailedSerdeError, MetadataResult},
+    models::{
+        AnilistAiringSchedulePaged, AnilistError, AnilistGraphQLResponseError, AnilistMedia,
+        AnilistPagedData, AnilistResponse, AnilistSingleMedia,
+    },
 };
 
 const ANILIST_GRAPHQL_URL: &str = "https://graphql.anilist.co/";
@@ -100,7 +106,7 @@ impl AnilistProvider {
         &mut self,
         query: &str,
         variables: &serde_json::Value,
-    ) -> anyhow::Result<AnilistResponse<T>>
+    ) -> MetadataResult<AnilistResponse<T>>
     where
         T: serde::de::DeserializeOwned,
     {
@@ -122,20 +128,15 @@ impl AnilistProvider {
             .post(ANILIST_GRAPHQL_URL)
             .json(&json_data)
             .send()
-            .await?;
+            .await
+            .map_err(|e| AnilistError::Request(e))?;
 
-        let rate_limit = match req.headers().get("x-ratelimit-limit") {
-            Some(limit) => limit.to_str()?.parse()?,
-            None => 0u32,
-        };
-        let rate_remaining = match req.headers().get("x-ratelimit-remaining") {
-            Some(remaining) => remaining.to_str()?.parse()?,
-            None => 0u32,
-        };
-        let rate_reset: i64 = match req.headers().get("x-ratelimit-reset") {
-            Some(reset) => reset.to_str()?.parse()?,
-            None => -1i64,
-        };
+        let rate_limit: u32 = parse_header_num(req.headers(), "x-ratelimit-limit")?;
+        let rate_remaining: u32 = parse_header_num(req.headers(), "x-ratelimit-remaining")?;
+        let mut rate_reset: i64 = parse_header_num(req.headers(), "x-ratelimit-reset")?;
+        if rate_reset == 0 {
+            rate_reset = -1;
+        }
 
         self.rate_limit = AnilistRateLimit {
             limit: rate_limit,
@@ -143,13 +144,26 @@ impl AnilistProvider {
             reset: rate_reset,
         };
 
-        let json_data: AnilistResponse<T> = req.json().await?;
+        let status = req.status();
+        let headers = req.headers().clone();
+        let url = req.url().clone();
+        let raw_text = req.text().await.map_err(|e| AnilistError::Request(e))?;
+
+        // Try parsing as errors
+        match serde_json::from_str::<AnilistGraphQLResponseError>(&raw_text) {
+            Ok(error) => return Err(AnilistError::GraphQL(error).into()),
+            Err(_) => {}
+        }
+
+        let json_data: AnilistResponse<T> = serde_json::from_str(&raw_text).map_err(|e| {
+            AnilistError::Serde(DetailedSerdeError::new(e, status, &headers, &url, raw_text))
+        })?;
 
         Ok(json_data)
     }
 
     /// Search for a media by title
-    pub async fn search(&mut self, title: impl Into<String>) -> anyhow::Result<Vec<AnilistMedia>> {
+    pub async fn search(&mut self, title: impl Into<String>) -> MetadataResult<Vec<AnilistMedia>> {
         let queries = r#"query mediaSearch($search:String) {
             Page (page:1,perPage:25) {
                 media(search:$search,sort:[SEARCH_MATCH]) {
@@ -203,7 +217,7 @@ impl AnilistProvider {
     /// Get specific media information
     ///
     /// * `id` - The ID of the media
-    pub async fn get_media(&mut self, id: i32) -> anyhow::Result<AnilistMedia> {
+    pub async fn get_media(&mut self, id: i32) -> MetadataResult<AnilistMedia> {
         let queries = r#"query mediaInfo($id:Int) {
             Media(id:$id) {
                 id
@@ -253,7 +267,7 @@ impl AnilistProvider {
         &mut self,
         id: i32,
         page: Option<u32>,
-    ) -> anyhow::Result<AnilistAiringSchedulePaged> {
+    ) -> MetadataResult<AnilistAiringSchedulePaged> {
         let queries = r#"query mediaSchedule($id:Int,$page:Int!) {
             Page (page:$page,perPage:50) {
                 airingSchedules(mediaId:$id,sort:[EPISODE]) {
@@ -296,5 +310,20 @@ impl AnilistProvider {
             airing_schedules: air_schedules.clone(),
             page_info: res.data.page.page_info,
         })
+    }
+}
+
+// T should be u32 or i64
+fn parse_header_num<T>(header: &reqwest::header::HeaderMap, name: &str) -> Result<T, AnilistError>
+where
+    T: Default + FromStr + Copy,
+{
+    match header.get(name) {
+        Some(num) => num
+            .to_str()
+            .map_err(|_| AnilistError::HeaderToString(name.to_string()))?
+            .parse()
+            .map_err(|_| AnilistError::StringToNumber(name.to_string())),
+        None => Ok(T::default()),
     }
 }
