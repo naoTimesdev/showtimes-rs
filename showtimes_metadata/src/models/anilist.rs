@@ -1,34 +1,58 @@
+//! A type definition for the Anilist API
+//!
+//! This is incomplete and only made to support what Showtimes needed.
+
 use chrono::TimeZone;
 use serde::{Deserialize, Serialize};
 
+use crate::image::hex_to_u32;
+
+/// Media type
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AnilistMediaType {
+    /// Anime media type
     Anime,
+    /// Manga media type
     Manga,
 }
 
+/// Media format
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AnilistMediaFormat {
+    /// TV media format
     Tv,
+    /// Short-TV media format, usually around 3-12 minutes long compared to the usual 20+ minutes runtime
     TvShort,
+    /// Movie media format
     Movie,
+    /// Special media format, mostly used as a one-shot or one-off event
     Special,
+    /// Original Video Animation, commonly used for Anime bonuses on DVDs and Blu-Rays
     #[serde(rename = "OVA")]
     OVA,
+    /// Original Net(work) Animation, used sometimes for Anime that only streams online on platform like Amazon or Netflix
     #[serde(rename = "ONA")]
     ONA,
+    /// Music video media format
     Music,
+    /// Manga media format
     Manga,
+    /// Novel or Light Novel media format
     Novel,
+    /// One-shot media format, used on Manga and Novel media
     OneShot,
 }
 
+/// A "fuzzy"-date where we might not have all the information
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
 pub struct AnilistFuzzyDate {
+    /// The year
     pub year: Option<i32>,
+    /// The month
     pub month: Option<i32>,
+    /// The day
     pub day: Option<i32>,
 }
 
@@ -57,85 +81,135 @@ impl std::fmt::Display for AnilistFuzzyDate {
     }
 }
 
+/// Airing schedule of the Anime
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
 pub struct AnilistAiringSchedule {
+    /// The ID of the airing schedule
     pub id: i32,
+    /// The episode of the anime
     pub episode: i32,
+    /// The time the episode airs at
     #[serde(rename = "airingAt")]
     pub airing_at: i64,
 }
 
+/// The collection of cover image from larger to smaller
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct AnilistCoverImage {
+    /// The smallest cover image, usually around 100x150
     pub medium: Option<String>,
+    /// The medium cover image, usually around 230x350
     pub large: Option<String>,
+    /// The largest cover image, usually around 425x640
     #[serde(rename = "extraLarge")]
     pub extra_large: Option<String>,
-    pub color: Option<String>,
+    /// Average hex color of the image
+    color: Option<String>,
 }
 
 impl AnilistCoverImage {
+    /// Get the largest cover image
     pub fn get_image(&self) -> Option<String> {
         self.extra_large
             .clone()
             .or_else(|| self.large.clone())
             .or_else(|| self.medium.clone())
     }
+
+    /// Get the average color of the image as a u32 from the hex color.
+    ///
+    /// `None` is returned if the color is not available or could not be parsed.
+    pub fn get_color(&self) -> Option<u32> {
+        self.color.as_ref().and_then(|color| hex_to_u32(color).ok())
+    }
 }
 
+/// The title of the media in different languages
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct AnilistMediaTitle {
+    /// The romaji title of the media
     pub romaji: Option<String>,
+    /// The english title of the media
     pub english: Option<String>,
+    /// The native title of the media
     pub native: Option<String>,
 }
 
+/// The result of a media schedule search
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct AnilistMediaScheduleResult {
+    /// The airing schedule of the media
     pub airing_schedule: AnilistAiringSchedule,
 }
 
+/// The media result from the Anilist API
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct AnilistMedia {
+    /// The ID of the media
     pub id: i32,
+    /// The ID of the media on MyAnimeList
     #[serde(rename = "idMal")]
     pub id_mal: Option<i32>,
+    /// The title of the media in different languages
     pub title: AnilistMediaTitle,
+    /// The cover image of the media in different sizes
     #[serde(rename = "coverImage")]
     pub cover_image: AnilistCoverImage,
+    /// The release date of the media
     #[serde(rename = "startDate")]
     pub start_date: Option<AnilistFuzzyDate>,
+    /// The season of the media
     pub season: Option<String>,
+    /// The year of the media
     #[serde(rename = "seasonYear")]
     pub season_year: Option<i32>,
+    /// The number of episodes of the media
     pub episodes: Option<i32>,
+    /// The number of chapters of the media
     pub chapters: Option<i32>,
+    /// The number of volumes of the media
     pub volumes: Option<i32>,
+    /// The format of the media
     pub format: AnilistMediaFormat,
+    /// The type of the media
     #[serde(rename = "type")]
     pub kind: AnilistMediaType,
+    /// The description of the media
     pub description: Option<String>,
+    /// If the media is for adult or not
     #[serde(rename = "isAdult")]
     pub is_adult: bool,
 }
 
+/// The information of the page
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct AnilistPageInfo {
+    /// The total of the results
     pub total: i32,
+    /// The results per page
     pub per_page: i32,
+    /// The current page
     pub current_page: i32,
+    /// If there is a next page or not
     pub has_next_page: bool,
 }
 
+/// The nodes of a paginated result of the Anilist API.
+///
+/// Use the function provided to get each node.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum AnilistPaginatedNodes {
+    /// The airing schedules result
     AiringSchedules {
+        /// The airing schedules
         #[serde(rename = "airingSchedules")]
         airing_schedules: Vec<AnilistAiringSchedule>,
     },
+    /// The media result
     Media {
+        /// The media
         media: Vec<AnilistMedia>,
     },
 }
@@ -158,34 +232,46 @@ impl AnilistPaginatedNodes {
     }
 }
 
+/// The result of an airing schedule search
 #[derive(Debug, Clone)]
 pub struct AnilistAiringSchedulePaged {
+    /// The airing schedules result
     pub airing_schedules: Vec<AnilistAiringSchedule>,
+    /// The page information
     pub page_info: AnilistPageInfo,
 }
 
+/// The inner data of the Anilist page result
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AnilistPageInnerData {
+    /// The nodes of the page, can be either airing schedules or media
     #[serde(flatten)]
     pub nodes: AnilistPaginatedNodes,
+    /// The page information
     #[serde(rename = "pageInfo")]
     pub page_info: AnilistPageInfo,
 }
 
+/// The inner data of the Anilist page result
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AnilistPagedData {
+    /// The inner data of the page
     #[serde(rename = "Page")]
     pub page: AnilistPageInnerData,
 }
 
+/// The response of a single media query from the Anilist API
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AnilistSingleMedia {
+    /// The media result of the query
     #[serde(rename = "Media")]
     pub media: AnilistMedia,
 }
 
+/// The response from the Anilist API
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AnilistResponse<T> {
+    /// The data inside the response
     #[serde(bound(deserialize = "T: Deserialize<'de>", serialize = "T: Serialize"))]
     pub data: T,
 }

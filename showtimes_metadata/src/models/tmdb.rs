@@ -1,37 +1,66 @@
+//! A type definition for the TMDb API
+//!
+//! This is incomplete and only made to support what Showtimes needed.
+
 use serde::{Deserialize, Serialize};
 
 const BASE_IMAGE: &str = "https://image.tmdb.org/t/p/";
 
+/// The media type of the TMDb API
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum TMDbMediaType {
+    /// A movie
     Movie,
+    /// A TV series
     Tv,
+    /// A collection of movies
     Collection,
+    /// A company
     Company,
+    /// A keyword
     Keyword,
+    /// A person
     Person,
 }
 
+/// The sizes of the poster images of the TMDb API
+///
+/// Usually 2:3 aspect ratio
 #[derive(Debug, Clone, Copy, PartialEq, tosho_macros::EnumName)]
 pub enum TMDbPosterSize {
+    /// 92x138
     W92,
+    /// 154x231
     W154,
+    /// 185x278
     W185,
+    /// 342x513
     W342,
+    /// 500x750
     W500,
+    /// 780x1170
     W780,
+    /// The original size
     Original,
 }
 
+/// The sizes of the backdrop images of the TMDb API
+///
+/// Usually 16:9 aspect ratio
 #[derive(Debug, Clone, Copy, PartialEq, tosho_macros::EnumName)]
 pub enum TMDbBackdropSize {
+    /// 300x169
     W300,
+    /// 780x438
     W780,
+    /// 1280x720
     W1280,
+    /// The original size
     Original,
 }
 
+/// A single result from the TMDb API about a movie
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct TMDbMovieResult {
     /// The ID of the result
@@ -94,6 +123,9 @@ impl TMDbMovieResult {
     }
 }
 
+/// A multi result from the TMDb API
+///
+/// This covers almost all the possible search result of each media types.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct TMDbMultiResult {
     /// The ID of the result
@@ -129,6 +161,8 @@ pub struct TMDbMultiResult {
     /// The release date of the result
     pub release_date: Option<String>,
     /// The first air date of the result (for TV)
+    ///
+    /// This is YYYY-MM-DD, but can be YYYY-MM or YYYY
     pub first_air_date: Option<String>,
     /// Overview/description of the result
     pub overview: Option<String>,
@@ -198,6 +232,10 @@ impl TMDbMultiResult {
     }
 }
 
+/// Response from TMDb API with multiple results
+///
+/// This is used for APIs that return multiple results such as search
+/// and discover.
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct TMDbMultiResponse<T> {
     /// The page of the response
@@ -211,6 +249,7 @@ pub struct TMDbMultiResponse<T> {
     pub results: Vec<T>,
 }
 
+/// Error response from TMDb API
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct TMDbErrorResponse {
     /// The status code of the error
@@ -221,11 +260,7 @@ pub struct TMDbErrorResponse {
 
 impl std::fmt::Display for TMDbErrorResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "TMDb Error {}: {}",
-            self.status_code, self.status_message
-        )
+        write!(f, "{} (code: {})", self.status_message, self.status_code)
     }
 }
 

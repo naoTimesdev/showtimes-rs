@@ -1,10 +1,16 @@
+//! The provider for VNDB source.
+//!
+//! This is incomplete and only made to support what Showtimes needed.
+
 use serde_json::json;
 
 use crate::models::{VndbNovel, VndbResult};
 
 const VNDB_API_URL: &str = "https://api.vndb.org/kana";
+// Common filters used when getting VN data
 const VNDB_VN_FILTERS: &str = "id, titles.lang, titles.title, titles.official, titles.latin, titles.main, olang, platforms, image.id, image.url, description, developers.id, developers.name, image.sexual, released";
 
+/// The main client that provide data from VNDB
 #[derive(Debug, Clone)]
 pub struct VndbProvider {
     client: reqwest::Client,
@@ -29,7 +35,8 @@ impl VndbProvider {
         headers.insert(reqwest::header::USER_AGENT, ua_bind);
         headers.insert(
             reqwest::header::AUTHORIZATION,
-            reqwest::header::HeaderValue::from_str(&format!("Token {}", token.into())).unwrap(),
+            reqwest::header::HeaderValue::from_str(&format!("Token {}", token.into()))
+                .expect("Failed to build the Auth header for VNDB API"),
         );
 
         let client = reqwest::ClientBuilder::new()

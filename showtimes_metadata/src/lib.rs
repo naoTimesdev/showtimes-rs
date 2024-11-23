@@ -1,6 +1,8 @@
-// #![warn(missing_docs, clippy::empty_docs, rustdoc::broken_intra_doc_links)]
+#![warn(missing_docs, clippy::empty_docs, rustdoc::broken_intra_doc_links)]
 #![doc = include_str!("../README.md")]
 
+pub mod errors;
+pub mod image;
 pub mod models;
 pub mod providers;
 

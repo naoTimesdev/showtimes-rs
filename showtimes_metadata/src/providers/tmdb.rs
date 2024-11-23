@@ -1,7 +1,15 @@
-use crate::models::{TMDbErrorResponse, TMDbMovieResult, TMDbMultiResponse, TMDbMultiResult};
+//! The provider for TMDb source.
+//!
+//! This is incomplete and only made to support what Showtimes needed.
+
+use crate::{
+    errors::MetadataResult,
+    models::{TMDbErrorResponse, TMDbMovieResult, TMDbMultiResponse, TMDbMultiResult},
+};
 
 const TMDB_API_URL: &str = "https://api.themoviedb.org/3";
 
+/// The main client that provide data from TMDb
 #[derive(Debug, Clone)]
 pub struct TMDbProvider {
     client: reqwest::Client,
@@ -27,7 +35,7 @@ impl TMDbProvider {
         headers.insert(
             reqwest::header::AUTHORIZATION,
             reqwest::header::HeaderValue::from_str(&format!("Bearer {}", access_token.into()))
-                .unwrap(),
+                .expect("Failed to build the Auth header for TMDb API"),
         );
 
         let client = reqwest::ClientBuilder::new()
@@ -90,7 +98,7 @@ impl TMDbProvider {
     ///
     /// # Arguments
     /// * `query` - The query to search for
-    pub async fn search(&self, query: &str) -> Result<Vec<TMDbMultiResult>, TMDbErrorResponse> {
+    pub async fn search(&self, query: &str) -> MetadataResult<Vec<TMDbMultiResult>> {
         let response: TMDbMultiResponse<TMDbMultiResult> = self
             .request(
                 "search/multi",
@@ -105,10 +113,7 @@ impl TMDbProvider {
     ///
     /// # Arguments
     /// * `query` - The query to search for
-    pub async fn search_movie(
-        &self,
-        query: &str,
-    ) -> Result<Vec<TMDbMovieResult>, TMDbErrorResponse> {
+    pub async fn search_movie(&self, query: &str) -> MetadataResult<Vec<TMDbMovieResult>> {
         let response: TMDbMultiResponse<TMDbMovieResult> = self
             .request(
                 "search/movie",
@@ -123,7 +128,7 @@ impl TMDbProvider {
     ///
     /// # Arguments
     /// * `id` - The movie ID
-    pub async fn get_movie_details(&self, id: i32) -> Result<TMDbMovieResult, TMDbErrorResponse> {
+    pub async fn get_movie_details(&self, id: i32) -> MetadataResult<TMDbMovieResult> {
         let response: TMDbMovieResult = self.request(&format!("movie/{}", id), &[]).await?;
 
         Ok(response)

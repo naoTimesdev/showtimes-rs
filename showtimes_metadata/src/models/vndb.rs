@@ -1,3 +1,7 @@
+//! A type definition for the VNDB v2 API
+//!
+//! This is incomplete and only made to support what Showtimes needed.
+
 use serde::{Deserialize, Serialize};
 
 /// The VNDB title list information

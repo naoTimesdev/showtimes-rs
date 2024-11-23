@@ -1,3 +1,5 @@
+//! A collection of supported metadata providers
+
 pub mod anilist;
 pub mod tmdb;
 pub mod vndb;

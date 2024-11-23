@@ -1,3 +1,7 @@
+//! The provider for Anilist source.
+//!
+//! This is incomplete and only made to support what Showtimes needed.
+
 use serde_json::json;
 
 use crate::models::{
@@ -7,9 +11,13 @@ use crate::models::{
 const ANILIST_GRAPHQL_URL: &str = "https://graphql.anilist.co/";
 
 #[derive(Debug, Clone)]
+/// The rate limit from Anilist.
 pub struct AnilistRateLimit {
+    /// The maximum of queries you can do per 5 minutes.
     pub limit: u32,
+    /// The remaining queries left.
     pub remaining: u32,
+    /// The time when the rate limit will reset in seconds since UNIX epoch.
     pub reset: i64,
 }
 
@@ -30,6 +38,7 @@ impl Default for AnilistRateLimit {
     }
 }
 
+/// The main client that provide data from Anilist
 #[derive(Debug, Clone)]
 pub struct AnilistProvider {
     client: reqwest::Client,
@@ -116,15 +125,15 @@ impl AnilistProvider {
             .await?;
 
         let rate_limit = match req.headers().get("x-ratelimit-limit") {
-            Some(limit) => limit.to_str().unwrap().parse().unwrap(),
+            Some(limit) => limit.to_str()?.parse()?,
             None => 0u32,
         };
         let rate_remaining = match req.headers().get("x-ratelimit-remaining") {
-            Some(remaining) => remaining.to_str().unwrap().parse().unwrap(),
+            Some(remaining) => remaining.to_str()?.parse()?,
             None => 0u32,
         };
         let rate_reset: i64 = match req.headers().get("x-ratelimit-reset") {
-            Some(reset) => reset.to_str().unwrap().parse().unwrap(),
+            Some(reset) => reset.to_str()?.parse()?,
             None => -1i64,
         };
 
