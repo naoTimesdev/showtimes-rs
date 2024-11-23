@@ -26,7 +26,6 @@ impl UserCreatedEventDataGQL {
         let user = loader.load_one(self.id).await?.ok_or_else(|| {
             GQLError::new("User not found", GQLErrorCode::UserNotFound)
                 .extend(|e| e.set("id", self.id.to_string()))
-                .build()
         })?;
 
         let user_gql = UserGQL::from(user);
@@ -105,7 +104,6 @@ impl UserUpdatedEventDataGQL {
         let user = loader.load_one(self.id).await?.ok_or_else(|| {
             GQLError::new("User not found", GQLErrorCode::UserNotFound)
                 .extend(|e| e.set("id", self.id.to_string()))
-                .build()
         })?;
 
         let user_gql = UserGQL::from(user);

@@ -43,7 +43,6 @@ async fn check_permissions(
     let srv = srv_loader.load_one(id).await?.ok_or_else(|| {
         GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
             .extend(|e| e.set("id", id.to_string()))
-            .build()
     })?;
 
     let find_user = srv.owners.iter().find(|o| o.id == user.id);
@@ -98,7 +97,6 @@ pub async fn mutate_collaborations_initiate(
     let project = prj_loader.load_one(*input.project).await?.ok_or_else(|| {
         GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
             .extend(|e| e.set("id", input.project.to_string()))
-            .build()
     })?;
 
     check_permissions(ctx, &user, project.creator).await?;
@@ -211,7 +209,6 @@ pub async fn mutate_collaborations_accept(
                 e.set("id", invite_data.source.project.to_string());
                 e.set("invite_id", invite.to_string());
             })
-            .build()
         })?;
 
     // Check done, see if we can just use the existing project or should we duplicate
@@ -419,7 +416,6 @@ pub async fn mutate_collaborations_unlink(
         .extend(|e| {
             e.set("id", sync_id.to_string());
         })
-        .build()
     })?;
 
     // Initiator is the project ID, find the project
@@ -432,7 +428,6 @@ pub async fn mutate_collaborations_unlink(
             e.set("id", initiator.to_string());
             e.set("collab_id", sync.id.to_string());
         })
-        .build()
     })?;
 
     // Check permissions

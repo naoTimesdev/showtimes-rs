@@ -319,13 +319,11 @@ impl ProjectGQL {
         let loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
 
         let server = loader.load_one(self.creator).await?.ok_or_else(|| {
-            GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
-                .extend(|e| {
-                    e.set("id", self.creator.to_string());
-                    e.set("project_id", self.id.to_string());
-                    e.set("root", "project");
-                })
-                .build()
+            GQLError::new("Server not found", GQLErrorCode::ServerNotFound).extend(|e| {
+                e.set("id", self.creator.to_string());
+                e.set("project_id", self.id.to_string());
+                e.set("root", "project");
+            })
         })?;
 
         let map_server: ServerGQL = server.into();

@@ -247,7 +247,6 @@ async fn get_and_check_server(
     let server = loader.load_one(id).await?.ok_or_else(|| {
         GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
             .extend(|e| e.set("id", id.to_string()))
-            .build()
     })?;
 
     let user_owner = server.owners.iter().find(|o| o.id == user.id);

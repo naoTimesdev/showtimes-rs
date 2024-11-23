@@ -35,7 +35,6 @@ impl ProjectCreatedEventDataGQL {
         let project = loader.load_one(self.id).await?.ok_or_else(|| {
             GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
                 .extend(|e| e.set("id", self.id.to_string()))
-                .build()
         })?;
 
         let prj_gql = ProjectGQL::from(project);
@@ -163,7 +162,6 @@ impl ProjectUpdatedEventDataGQL {
         let project = loader.load_one(self.id).await?.ok_or_else(|| {
             GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
                 .extend(|e| e.set("id", self.id.to_string()))
-                .build()
         })?;
 
         let prj_gql = ProjectGQL::from(project);
@@ -216,7 +214,6 @@ impl ProjectEpisodeUpdatedEventDataGQL {
         let project = loader.load_one(self.id).await?.ok_or_else(|| {
             GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
                 .extend(|e| e.set("id", self.id.to_string()))
-                .build()
         })?;
 
         let prj_gql = ProjectGQL::from(project);

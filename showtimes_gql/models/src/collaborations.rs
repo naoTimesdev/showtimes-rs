@@ -167,7 +167,6 @@ impl CollaborationInviteSourceGQL {
         let srv = loader.load_one(self.server_id).await?.ok_or_else(|| {
             GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
                 .extend(|e| e.set("id", self.server_id.to_string()))
-                .build()
         })?;
 
         let srv_gql: ServerGQL = srv.into();
@@ -181,7 +180,6 @@ impl CollaborationInviteSourceGQL {
         let prj = loader.load_one(self.project_id).await?.ok_or_else(|| {
             GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
                 .extend(|e| e.set("id", self.project_id.to_string()))
-                .build()
         })?;
 
         let prj_gql: ProjectGQL = prj.into();
@@ -208,7 +206,6 @@ impl CollaborationInviteTargetGQL {
         let srv = loader.load_one(self.server_id).await?.ok_or_else(|| {
             GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
                 .extend(|e| e.set("id", self.server_id.to_string()))
-                .build()
         })?;
 
         let srv_gql: ServerGQL = srv.into();
@@ -231,7 +228,6 @@ impl CollaborationInviteTargetGQL {
                 let prj = loader.load_one(id).await?.ok_or_else(|| {
                     GQLError::new("Project not found", GQLErrorCode::ProjectNotFound)
                         .extend(|e| e.set("id", id.to_string()))
-                        .build()
                 })?;
 
                 let prj_gql: ProjectGQL = prj.into();

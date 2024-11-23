@@ -92,7 +92,6 @@ pub async fn mutate_users_update(
         Some(id) => loader.load_one(id).await?.ok_or_else(|| {
             GQLError::new("User not found", GQLErrorCode::UserNotFound)
                 .extend(|e| e.set("id", id.to_string()))
-                .build()
         })?,
         None => user.requester.clone(),
     };
@@ -189,7 +188,6 @@ pub async fn mutate_users_update(
                 e.set("original", format!("{err}"));
                 e.set("original_code", format!("{}", err.kind()));
             })
-            .build()
         })?;
         let mut file_target = tokio::fs::File::from_std(info_up.content);
 
@@ -207,7 +205,6 @@ pub async fn mutate_users_update(
                     e.set("original", format!("{err}"));
                     e.set("original_code", format!("{}", err.kind()));
                 })
-                .build()
             })?;
         // Seek back to the start of the file
         file_target
@@ -224,7 +221,6 @@ pub async fn mutate_users_update(
                     e.set("original", format!("{err}"));
                     e.set("original_code", format!("{}", err.kind()));
                 })
-                .build()
             })?;
 
         let filename = format!("avatar.{}", format.as_extension());
@@ -248,7 +244,6 @@ pub async fn mutate_users_update(
                     e.set("where", "user");
                     e.set("original", format!("{err}"));
                 })
-                .build()
             })?;
 
         let image_meta = showtimes_db::m::ImageMetadata::new(

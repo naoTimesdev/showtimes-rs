@@ -70,7 +70,6 @@ impl ServerUserGQL {
                 e.set("id", self.id.to_string());
                 e.set("server_id", self.top_server.to_string());
             })
-            .build()
         })?;
 
         let user_gql: UserGQL = user.into();

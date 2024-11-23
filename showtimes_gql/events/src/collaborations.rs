@@ -26,7 +26,6 @@ impl CollabCreatedEventDataGQL {
         let item = loader.load_one(self.id).await?.ok_or_else(|| {
             GQLError::new("Collab not found", GQLErrorCode::ServerSyncNotFound)
                 .extend(|e| e.set("id", self.id.to_string()))
-                .build()
         })?;
 
         let gql_item = CollaborationSyncGQL::from(item);
@@ -63,7 +62,6 @@ impl CollabAcceptedEventDataGQL {
         let item = loader.load_one(self.id).await?.ok_or_else(|| {
             GQLError::new("Collab not found", GQLErrorCode::ServerSyncNotFound)
                 .extend(|e| e.set("id", self.id.to_string()))
-                .build()
         })?;
 
         let gql_item = CollaborationSyncGQL::from(item);
@@ -130,7 +128,6 @@ impl CollabDeletedEventDataGQL {
         let item = loader.load_one(self.id).await?.ok_or_else(|| {
             GQLError::new("Collab not found", GQLErrorCode::ServerSyncNotFound)
                 .extend(|e| e.set("id", self.id.to_string()))
-                .build()
         })?;
 
         let gql_item = CollaborationSyncGQL::from(item);

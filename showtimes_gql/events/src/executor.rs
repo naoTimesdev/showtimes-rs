@@ -29,7 +29,6 @@ where
                 e.set("kind", kind.to_name());
                 e.set("original", format!("{}", err));
             })
-            .build()
         })?;
 
         results.extend(event_batch.into_iter().map(|event| {
@@ -77,7 +76,6 @@ where
                 e.set("user", user_query.id().to_string());
                 e.set("user_kind", user_query.kind().to_name());
             })
-            .build()
         })?;
 
         results.extend(event_batch.into_iter().map(|event| {

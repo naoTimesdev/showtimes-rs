@@ -23,7 +23,6 @@ impl ServerCreatedEventDataGQL {
         let user = loader.load_one(self.id).await?.ok_or_else(|| {
             GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
                 .extend(|e| e.set("id", self.id.to_string()))
-                .build()
         })?;
 
         let srv_gql = ServerGQL::from(user);
@@ -89,7 +88,6 @@ impl ServerUpdatedEventDataGQL {
         let user = loader.load_one(self.id).await?.ok_or_else(|| {
             GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
                 .extend(|e| e.set("id", self.id.to_string()))
-                .build()
         })?;
 
         let srv_gql = ServerGQL::from(user);

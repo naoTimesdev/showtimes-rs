@@ -794,7 +794,6 @@ async fn check_permissions(
     let srv = srv_loader.load_one(id).await?.ok_or_else(|| {
         GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
             .extend(|e| e.set("id", id.to_string()))
-            .build()
     })?;
 
     let find_user = srv.owners.iter().find(|o| o.id == user.id);
@@ -1268,7 +1267,6 @@ pub async fn mutate_projects_delete(
         .ok_or_else(|| {
             GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
                 .extend(|e| e.set("id", prj_info.creator.to_string()))
-                .build()
         })?;
 
     let find_user = srv.owners.iter().find(|o| o.id == user.id);
@@ -1823,7 +1821,6 @@ async fn update_single_project(
                         e.set("original", format!("{err}"));
                         e.set("original_code", format!("{}", err.kind()));
                     })
-                    .build()
                 })?;
 
             let filename = format!("cover.{}", format.as_extension());
