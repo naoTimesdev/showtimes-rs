@@ -10,7 +10,6 @@ rust-version.workspace = true
 description = "Shared utility for Showtimes API"
 
 [dependencies]
-anyhow.workspace = true
 tokio.workspace = true
 
 uuid.workspace = true

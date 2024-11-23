@@ -3007,7 +3007,6 @@ dependencies = [
 name = "showtimes-shared"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bson",
  "chrono",
  "pulldown-cmark",

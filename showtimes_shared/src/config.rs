@@ -171,6 +171,13 @@ pub struct Config {
     pub jwt: JwtSession,
 }
 
+/// This macro wraps [`ConfigVerifyError`] and the error item &str into a String
+macro_rules! bail_verify {
+    ($variant:ident, $item:expr) => {{
+        return Err(ConfigVerifyError::$variant($item.to_string()).into());
+    }};
+}
+
 impl Config {
     fn with_defaults(&mut self) {
         if self.host.is_none() {
@@ -201,7 +208,7 @@ impl Config {
     }
 
     /// Load the configuration from the file path
-    pub fn load(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
+    pub fn load(path: impl AsRef<std::path::Path>) -> ConfigResult<Self> {
         let buffer = std::fs::read_to_string(path)?;
 
         let mut config: Self = toml::from_str(&buffer)?;
@@ -211,9 +218,8 @@ impl Config {
     }
 
     /// Load the configuration from the file path in async context
-    pub async fn async_load(path: impl AsRef<std::path::Path>) -> anyhow::Result<Self> {
-        let file = tokio::fs::read(path).await?;
-        let buffer = String::from_utf8(file.to_vec())?;
+    pub async fn async_load(path: impl AsRef<std::path::Path>) -> ConfigResult<Self> {
+        let buffer = tokio::fs::read_to_string(path).await?;
 
         let mut config: Self = toml::from_str(&buffer)?;
         config.with_defaults();
@@ -222,21 +228,21 @@ impl Config {
     }
 
     /// Verify provided config if it's fullfill some of the preferred requirements
-    pub fn verify(&self) -> Result<(), &'static str> {
+    pub fn verify(&self) -> ConfigResult<()> {
         // Verify master key
         if self.master_key.is_empty() {
-            return Err("Master key is not set");
+            bail_verify!(Required, "Master key")
         }
         if self.master_key == DEFAULT_MASTER_KEY {
-            return Err("Master key is not changed from default, please change it");
+            bail_verify!(NoDefault, "Master key")
         }
 
         // Verify JWT
         if self.jwt.secret.is_empty() {
-            return Err("JWT secret is not set");
+            bail_verify!(Required, "JWT secret")
         }
         if self.jwt.secret == DEFAULT_SECRET {
-            return Err("JWT secret is not changed from default, please change it");
+            bail_verify!(NoDefault, "JWT secret")
         }
 
         // --> Database will be verified when loading the connection
@@ -245,59 +251,123 @@ impl Config {
 
         // Verify Discord OAuth2
         if self.discord.client_id.is_empty() {
-            return Err("Discord OAuth2 client ID is not set");
+            bail_verify!(Required, "Discord OAuth2 client ID")
         }
         if self.discord.client_secret.is_empty() {
-            return Err("Discord OAuth2 client secret is not set");
+            bail_verify!(Required, "Discord OAuth2 client secret")
         }
         if self.discord.redirect_url.is_empty() {
-            return Err("Discord OAuth2 redirect URL is not set");
+            bail_verify!(Required, "Discord OAuth2 redirect URL")
         }
 
         if self.discord.client_id == "00000000000000000000" {
-            return Err("Discord OAuth2 client ID is not changed from default, please change it");
+            bail_verify!(NoDefault, "Discord OAuth2 client ID")
         }
         if self.discord.client_secret == "supersecretdiscordclientsecret" {
-            return Err(
-                "Discord OAuth2 client secret is not changed from default, please change it",
-            );
+            bail_verify!(NoDefault, "Discord OAuth2 client secret")
         }
         if self.discord.redirect_url.contains("your.naotimes.ui") {
-            return Err(
-                "Discord OAuth2 redirect URL is not changed from default, please change it",
-            );
+            bail_verify!(NoDefault, "Discord OAuth2 redirect URL")
         }
 
         // Verify external services
         if let Some(tmdb) = &self.external.tmdb {
             if tmdb.is_empty() {
-                return Err("TMDb API key is empty, please set to null if not used");
+                bail_verify!(NoDefaultOrNull, "TMDb API key")
             }
 
             if tmdb == "your-valid-access-token-for-tmdb" {
-                return Err(
-                    "TMDb API key is not changed from default, please change it or set to null",
-                );
+                bail_verify!(NoDefaultOrNull, "TMDb API key")
             }
         }
 
         if let Some(vndb) = &self.external.vndb {
             if vndb.is_empty() {
-                return Err("VNDB API key is empty, please set to null if not used");
+                bail_verify!(NoDefaultOrNull, "VNDB API key")
             }
 
             if vndb == "your-valid-access-token-for-vndb" {
-                return Err(
-                    "VNDB API key is not changed from default, please change it or set to null",
-                );
+                bail_verify!(NoDefaultOrNull, "VNDB API key")
             }
         }
 
         // Verify storage
         if !self.storages.is_available() {
-            return Err("No storage is configured");
+            bail_verify!(Required, "Storage")
         }
 
         Ok(())
     }
 }
+
+/// A wrapper result for config and [`ConfigError`] type.
+pub type ConfigResult<T> = Result<T, ConfigError>;
+
+/// A collection of error when loading config or verifying config
+#[derive(Debug)]
+pub enum ConfigError {
+    /// Error when loading config
+    LoadError(std::io::Error),
+    /// Error when parsing config
+    ParseError(toml::de::Error),
+    /// Error when verifying config
+    VerifyError(ConfigVerifyError),
+}
+
+/// A collection of error when verifying config
+#[derive(Debug)]
+pub enum ConfigVerifyError {
+    /// Required field is not set
+    Required(String),
+    /// Field is not changed from default, we need to change it
+    NoDefault(String),
+    /// Field is not changed from default, we need to change it or set it to null to disable.
+    NoDefaultOrNull(String),
+}
+
+impl From<toml::de::Error> for ConfigError {
+    fn from(value: toml::de::Error) -> Self {
+        ConfigError::ParseError(value)
+    }
+}
+
+impl From<std::io::Error> for ConfigError {
+    fn from(value: std::io::Error) -> Self {
+        ConfigError::LoadError(value)
+    }
+}
+
+impl From<ConfigVerifyError> for ConfigError {
+    fn from(value: ConfigVerifyError) -> Self {
+        ConfigError::VerifyError(value)
+    }
+}
+
+impl std::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfigError::LoadError(e) => write!(f, "Failed to load config: {}", e),
+            ConfigError::ParseError(e) => write!(f, "Failed to parse config: {}", e),
+            ConfigError::VerifyError(e) => write!(f, "Failed to verify config: {}", e),
+        }
+    }
+}
+
+impl std::fmt::Display for ConfigVerifyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfigVerifyError::Required(item) => write!(f, "{} is required and not set!", item),
+            ConfigVerifyError::NoDefault(item) => {
+                write!(f, "{} is not changed from default, please change it!", item)
+            }
+            ConfigVerifyError::NoDefaultOrNull(item) => write!(
+                f,
+                "{} is not changed from default, please change it or set to `null` if not used!",
+                item
+            ),
+        }
+    }
+}
+
+impl std::error::Error for ConfigError {}
+impl std::error::Error for ConfigVerifyError {}
