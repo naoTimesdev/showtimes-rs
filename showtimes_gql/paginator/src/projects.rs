@@ -11,7 +11,7 @@ use showtimes_db::{
 use showtimes_gql_common::{
     errors::GQLError,
     queries::{MinimalServerUsers, ServerQueryUser},
-    GQLErrorCode, PageInfoGQL, SortOrderGQL,
+    GQLDataLoaderWhere, GQLErrorCode, GQLErrorExt, PageInfoGQL, SortOrderGQL,
 };
 use showtimes_shared::ulid::Ulid;
 
@@ -135,10 +135,46 @@ impl ProjectQuery {
     pub fn set_unpaged(&mut self) {
         self.unpaged = true;
     }
+
+    fn dump_query(&self, ctx: &mut async_graphql::ErrorExtensionValues) {
+        if let Some(ids) = &self.ids {
+            ctx.set(
+                "ids",
+                ids.iter().map(|id| id.to_string()).collect::<Vec<String>>(),
+            );
+        }
+        if let Some(per_page) = self.per_page {
+            ctx.set("per_page", per_page);
+        }
+        if let Some(cursor) = &self.cursor {
+            ctx.set("cursor", cursor.to_string());
+        }
+        ctx.set("sort", self.sort.to_name());
+        if let Some(creators) = &self.creators {
+            ctx.set(
+                "creators",
+                creators
+                    .iter()
+                    .map(|id| id.to_string())
+                    .collect::<Vec<String>>(),
+            );
+        }
+        if let Some(servers) = &self.servers_users {
+            let mapped_data = servers
+                .iter()
+                .map(|s| s.as_graphql_value())
+                .collect::<Vec<_>>();
+
+            ctx.set("servers", mapped_data);
+        }
+        if let Some(user) = &self.current_user {
+            ctx.set("current_user", user.as_graphql_value());
+        }
+        ctx.set("unpaged", self.unpaged);
+    }
 }
 
 /// Query the projects database and return the paginated data.
-/// TODO: Fix error propagation
 pub async fn query_projects_paginated(
     ctx: &async_graphql::Context<'_>,
     queries: ProjectQuery,
@@ -153,7 +189,7 @@ pub async fn query_projects_paginated(
 
     let prj_handler = showtimes_db::ProjectHandler::new(db);
 
-    let fetch_docs = match (queries.servers_users, queries.current_user) {
+    let fetch_docs = match (&queries.servers_users, queries.current_user) {
         (Some(servers), Some(user_info)) => {
             // If provided with allowed servers, then filter out the projects that are not in the list
             let mut user_methods: HashMap<Ulid, showtimes_db::m::ServerUser> = servers
@@ -166,7 +202,7 @@ pub async fn query_projects_paginated(
                 })
                 .collect();
 
-            if let Some(creators) = queries.creators {
+            if let Some(creators) = &queries.creators {
                 // Since creators is provided, remove the servers that are not in the list
                 user_methods.retain(|k, _| creators.contains(k));
             }
@@ -240,11 +276,10 @@ pub async fn query_projects_paginated(
         }
         _ => {
             // If not provided with allowed servers, then fetch all projects
-            let all_queries = match (queries.ids, queries.creators) {
+            let all_queries = match (&queries.ids, &queries.creators) {
                 (Some(ids), Some(creators)) => {
-                    let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
-                    let creators: Vec<String> =
-                        creators.into_iter().map(|id| id.to_string()).collect();
+                    let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
+                    let creators: Vec<String> = creators.iter().map(|id| id.to_string()).collect();
                     doc! {
                         "$or": [
                             { "id": { "$in": ids } },
@@ -253,14 +288,13 @@ pub async fn query_projects_paginated(
                     }
                 }
                 (Some(ids), None) => {
-                    let ids: Vec<String> = ids.into_iter().map(|id| id.to_string()).collect();
+                    let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
                     doc! {
                         "id": { "$in": ids }
                     }
                 }
                 (None, Some(creators)) => {
-                    let creators: Vec<String> =
-                        creators.into_iter().map(|id| id.to_string()).collect();
+                    let creators: Vec<String> = creators.iter().map(|id| id.to_string()).collect();
                     doc! {
                         "creator": { "$in": creators }
                     }
@@ -332,13 +366,29 @@ pub async fn query_projects_paginated(
     } else {
         base_cursor.limit((per_page + 1) as i64)
     }
-    .await?;
+    .await
+    .extend_error(GQLErrorCode::ProjectRequestFails, |f_ctx| {
+        queries.dump_query(f_ctx);
+        f_ctx.set("where", GQLDataLoaderWhere::ProjectLoaderPaginated);
+    })?;
     let count = prj_handler
         .get_collection()
         .count_documents(query_count_fetch)
-        .await?;
+        .await
+        .extend_error(GQLErrorCode::ProjectRequestFails, |f_ctx| {
+            queries.dump_query(f_ctx);
+            f_ctx.set("where", GQLDataLoaderWhere::ProjectLoaderPaginatedCount);
+        })?;
 
-    let mut all_servers: Vec<showtimes_db::m::Project> = cursor.try_collect().await?;
+    let mut all_servers: Vec<showtimes_db::m::Project> =
+        cursor
+            .try_collect()
+            .await
+            .extend_error(GQLErrorCode::ProjectRequestFails, |f_ctx| {
+                queries.dump_query(f_ctx);
+                f_ctx.set("where", GQLDataLoaderWhere::ProjectLoaderCollect);
+                f_ctx.set("where_req", GQLDataLoaderWhere::ProjectLoaderPaginatedCount);
+            })?;
 
     if queries.unpaged {
         let page_info = PageInfoGQL::new(count, per_page, None);

@@ -1,5 +1,6 @@
 use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
+use showtimes_derive::EnumName;
 use showtimes_shared::{ulid_opt_serializer, ulid_serializer};
 
 use super::{ImageMetadata, IntegrationId, ShowModelHandler};
@@ -7,7 +8,8 @@ use super::{ImageMetadata, IntegrationId, ShowModelHandler};
 /// Enum to hold user privileges on a server.
 ///
 /// There is no "normal" user, as all users are considered normal.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, EnumName)]
+#[enum_name(rename_all = "kebab-case")]
 pub enum UserPrivilege {
     /// A project manager on a server
     ///

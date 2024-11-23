@@ -7,7 +7,7 @@ use showtimes_db::{
 use showtimes_search::SearchClientShared;
 
 use showtimes_gql_common::{
-    data_loader::{ProjectDataLoader, ServerDataLoader, ServerSyncLoader},
+    data_loader::{ProjectDataLoader, ServerDataLoader, ServerInviteLoader, ServerSyncLoader},
     errors::GQLError,
     GQLErrorCode, OkResponse, UlidGQL,
 };
@@ -148,6 +148,7 @@ pub async fn mutate_collaborations_initiate(
         showtimes_db::m::ServerCollaborationInvite::new(source_invite, target_invite);
 
     let invite_handler = CollaborationInviteHandler::new(db);
+    // TODO: Propragate error properly
     invite_handler.save(&mut collab_invite, None).await?;
 
     // Save in search index
@@ -183,21 +184,18 @@ pub async fn mutate_collaborations_accept(
     let db = ctx.data_unchecked::<DatabaseShared>();
     let meili = ctx.data_unchecked::<SearchClientShared>();
     let prj_loader = ctx.data_unchecked::<DataLoader<ProjectDataLoader>>();
+    let invite_loader = ctx.data_unchecked::<DataLoader<ServerInviteLoader>>();
 
     let invite_db = showtimes_db::CollaborationInviteHandler::new(db);
-    let invite_data = invite_db
-        .find_by_id(&invite.to_string())
-        .await?
-        .ok_or_else(|| {
-            GQLError::new(
-                "Collaboration invite not found",
-                GQLErrorCode::ServerInviteNotFound,
-            )
-            .extend(|e| {
-                e.set("id", invite.to_string());
-            })
-            .build()
-        })?;
+    let invite_data = invite_loader.load_one(*invite).await?.ok_or_else(|| {
+        GQLError::new(
+            "Collaboration invite not found",
+            GQLErrorCode::ServerInviteNotFound,
+        )
+        .extend(|e| {
+            e.set("id", invite.to_string());
+        })
+    })?;
 
     let target_srv = check_permissions(ctx, &user, invite_data.target.server).await?;
 
@@ -230,14 +228,17 @@ pub async fn mutate_collaborations_accept(
 
     // Save the project to DB first for target
     let prj_handler = showtimes_db::ProjectHandler::new(db);
+    // TODO: Propagate error properly
     prj_handler.save(&mut target_proj, None).await?;
 
     // Save to search index
     let prj_search = showtimes_search::models::Project::from(target_proj.clone());
+    // TODO: Propagate error properly
     prj_search.update_document(meili).await?;
 
     // Find any pre-existing sync
     let sync_handler = showtimes_db::CollaborationSyncHandler::new(db);
+    // TODO: Propagate error properly
     let mut sync_ss = sync_handler
         .find_by(doc! {
             "projects.project": orig_proj.id.to_string(),
@@ -252,6 +253,7 @@ pub async fn mutate_collaborations_accept(
             .push(ServerCollaborationSyncTarget::from(target_proj));
 
         // Update DB
+        // TODO: Propagate error properly
         sync_handler.save(sync, None).await?;
 
         // Save in search index
@@ -285,6 +287,7 @@ pub async fn mutate_collaborations_accept(
         let mut sync = showtimes_db::m::ServerCollaborationSync::new(vec![src_sync, target_sync]);
 
         // Save to DB
+        // TODO: Propagate error properly
         sync_handler.save(&mut sync, None).await?;
 
         // Save in search index
@@ -313,9 +316,11 @@ pub async fn mutate_collaborations_accept(
     };
 
     // Delete invite
+    // TODO: Propagate error properly
     invite_db.delete(&invite_data).await?;
     // Remove from search index
     let invite_search = showtimes_search::models::ServerCollabInvite::from(invite_data.clone());
+    // TODO: Propagate error properly
     invite_search.delete_document(meili).await?;
 
     Ok(sync_gql)
@@ -329,21 +334,18 @@ pub async fn mutate_collaborations_cancel(
 ) -> async_graphql::Result<OkResponse> {
     let db = ctx.data_unchecked::<DatabaseShared>();
     let meili = ctx.data_unchecked::<SearchClientShared>();
+    let invite_loader = ctx.data_unchecked::<DataLoader<ServerInviteLoader>>();
 
     let invite_db = showtimes_db::CollaborationInviteHandler::new(db);
-    let invite_data = invite_db
-        .find_by_id(&invite.to_string())
-        .await?
-        .ok_or_else(|| {
-            GQLError::new(
-                "Collaboration invite not found",
-                GQLErrorCode::ServerInviteNotFound,
-            )
-            .extend(|e| {
-                e.set("id", invite.to_string());
-            })
-            .build()
-        })?;
+    let invite_data = invite_loader.load_one(*invite).await?.ok_or_else(|| {
+        GQLError::new(
+            "Collaboration invite not found",
+            GQLErrorCode::ServerInviteNotFound,
+        )
+        .extend(|e| {
+            e.set("id", invite.to_string());
+        })
+    })?;
 
     // Check target server permissions
     let server_id = if is_deny {
@@ -354,6 +356,7 @@ pub async fn mutate_collaborations_cancel(
     check_permissions(ctx, &user, server_id).await?;
 
     // Deny the invite
+    // TODO: Propagate error properly
     invite_db.delete(&invite_data).await?;
 
     // Remove from search index
@@ -438,6 +441,7 @@ pub async fn mutate_collaborations_unlink(
     // Check if we need to delete the sync
     if sync.length() < 2 {
         // Delete the sync
+        // TODO: Propagate error properly
         sync_handler.delete(&sync).await?;
 
         // Remove from search index
@@ -463,6 +467,7 @@ pub async fn mutate_collaborations_unlink(
 
         execute_search_events(task_search, task_events).await?;
     } else {
+        // TODO: Propagate error properly
         sync_handler.save(&mut sync, None).await?;
 
         // Save in search index

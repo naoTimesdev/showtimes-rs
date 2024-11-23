@@ -65,6 +65,8 @@ impl std::fmt::Display for SessionError {
     }
 }
 
+impl std::error::Error for SessionError {}
+
 impl From<SessionKind> for ShowtimesAudience {
     fn from(value: SessionKind) -> Self {
         match value {

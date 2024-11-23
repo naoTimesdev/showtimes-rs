@@ -19,6 +19,7 @@ pub use async_graphql::{dataloader::DataLoader, extensions::Tracing, Data, Error
 /// Re-exports of the errors enums
 pub use errors::{GQLDataLoaderWhere, GQLErrorCode, GQLErrorExt};
 pub use image::MAX_IMAGE_SIZE;
+use showtimes_derive::EnumName;
 
 /// A wrapper around ULID to allow it to be used in GraphQL
 #[derive(Clone, Copy)]
@@ -357,7 +358,8 @@ impl Default for PageInfoGQL {
 }
 
 /// Global sort order for the list
-#[derive(Enum, Debug, Default, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Enum, Debug, Default, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, EnumName)]
+#[enum_name(rename_all = "kebab-case")]
 pub enum SortOrderGQL {
     /// Sort by ID (Ascending)
     #[default]

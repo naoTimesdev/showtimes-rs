@@ -209,19 +209,20 @@ impl QueryRoot {
         let user = find_authenticated_user(ctx).await?;
 
         let projector = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
-        let result = match user.kind {
+        let server = match user.kind {
             showtimes_db::m::UserKind::User => {
                 projector
                     .load_one(ServerAndOwnerId::new(*id, user.id))
                     .await?
             }
             _ => projector.load_one(*id).await?,
-        };
-
-        match result {
-            Some(server) => Ok(StatsGQL::new(server)),
-            None => GQLError::new("Server not found", GQLErrorCode::ServerNotFound).into(),
         }
+        .ok_or_else(|| {
+            GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
+                .extend(|e| e.set("id", id.to_string()))
+        })?;
+
+        Ok(StatsGQL::new(server))
     }
 
     /// Do a external searvice metadata search

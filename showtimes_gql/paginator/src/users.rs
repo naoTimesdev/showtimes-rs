@@ -5,7 +5,10 @@ use showtimes_db::{
     mongodb::bson::{doc, Document},
     DatabaseShared,
 };
-use showtimes_gql_common::{queries::ServerQueryUser, PageInfoGQL, SortOrderGQL};
+use showtimes_gql_common::{
+    queries::ServerQueryUser, GQLDataLoaderWhere, GQLErrorCode, GQLErrorExt, PageInfoGQL,
+    SortOrderGQL,
+};
 use showtimes_shared::ulid::Ulid;
 
 use crate::PaginatedResult;
@@ -80,10 +83,28 @@ impl UserQuery {
     pub fn set_current_user(&mut self, user: ServerQueryUser) {
         self.current_user = Some(user);
     }
+
+    fn dump_query(&self, ctx: &mut async_graphql::ErrorExtensionValues) {
+        if let Some(ids) = &self.ids {
+            ctx.set(
+                "ids",
+                ids.iter().map(|id| id.to_string()).collect::<Vec<String>>(),
+            );
+        }
+        if let Some(per_page) = self.per_page {
+            ctx.set("per_page", per_page);
+        }
+        if let Some(cursor) = &self.cursor {
+            ctx.set("cursor", cursor.to_string());
+        }
+        ctx.set("sort", self.sort);
+        if let Some(user) = &self.current_user {
+            ctx.set("current_user", user.as_graphql_value());
+        }
+    }
 }
 
 /// Query the users database and return the paginated data.
-/// TODO: Fix error propagation
 pub async fn query_users_paginated(
     ctx: &async_graphql::Context<'_>,
     queries: UserQuery,
@@ -134,13 +155,29 @@ pub async fn query_users_paginated(
         .find(doc_query)
         .limit((per_page + 1) as i64)
         .sort(queries.sort.into_sort_doc(Some("username".to_string())))
-        .await?;
+        .await
+        .extend_error(GQLErrorCode::UserRequestFails, |e| {
+            queries.dump_query(e);
+            e.set("where", GQLDataLoaderWhere::UserLoaderPaginated);
+        })?;
     let count = srv_handler
         .get_collection()
         .count_documents(count_query)
-        .await?;
+        .await
+        .extend_error(GQLErrorCode::UserRequestFails, |e| {
+            queries.dump_query(e);
+            e.set("where", GQLDataLoaderWhere::UserLoaderPaginatedCount);
+        })?;
 
-    let mut all_users: Vec<showtimes_db::m::User> = cursor.try_collect().await?;
+    let mut all_users: Vec<showtimes_db::m::User> =
+        cursor
+            .try_collect()
+            .await
+            .extend_error(GQLErrorCode::UserRequestFails, |e| {
+                queries.dump_query(e);
+                e.set("where", GQLDataLoaderWhere::UserLoaderCollect);
+                e.set("where_req", GQLDataLoaderWhere::UserLoaderPaginated)
+            })?;
 
     // If all_users is equal to per_page, then there is a next page
     let last_srv = if all_users.len() > per_page as usize {
@@ -152,18 +189,4 @@ pub async fn query_users_paginated(
     let page_info = PageInfoGQL::new(count, per_page, last_srv.map(|p| p.id.into()));
 
     Ok(PaginatedResult::new(all_users, page_info))
-    // Ok(PaginatedGQL::new(
-    //     all_users
-    //         .into_iter()
-    //         .map(|p| {
-    //             let usr_gql = UserGQL::from(p);
-    //             if let Some(user) = &queries.current_user {
-    //                 usr_gql.with_requester(*user)
-    //             } else {
-    //                 usr_gql
-    //             }
-    //         })
-    //         .collect(),
-    //     page_info,
-    // ))
 }

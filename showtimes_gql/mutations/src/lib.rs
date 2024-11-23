@@ -56,6 +56,7 @@ impl MutationRoot {
 
         match (token, jwt.get_claims().get_audience()) {
             (_, showtimes_session::ShowtimesAudience::User) => {
+                // TODO: Propagate error properly
                 sessions
                     .lock()
                     .await
@@ -65,6 +66,7 @@ impl MutationRoot {
                 Ok(OkResponse::ok("Successfully logged out"))
             }
             (Some(token), showtimes_session::ShowtimesAudience::MasterKey) => {
+                // TODO: Propagate error properly
                 sessions.lock().await.remove_session(&token).await?;
 
                 Ok(OkResponse::ok("Successfully revoked token"))
@@ -482,27 +484,26 @@ impl MutationRoot {
         let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
         let session = ctx.data_unchecked::<SharedSessionManager>();
         let config = ctx.data_unchecked::<Arc<showtimes_shared::config::Config>>();
-        let user = loader.load_one(*id).await?;
+        let user = loader.load_one(*id).await?.ok_or_else(|| {
+            GQLError::new("User not found", GQLErrorCode::UserNotFound)
+                .extend(|e| e.set("id", id.to_string()))
+        })?;
 
-        match user {
-            Some(user) => {
-                // Create actual session
-                let (claims, _) = showtimes_session::create_session(
-                    user.id,
-                    config.jwt.get_expiration() as i64,
-                    &config.jwt.secret,
-                )?;
+        // Create actual session
+        let (claims, _) = showtimes_session::create_session(
+            user.id,
+            config.jwt.get_expiration() as i64,
+            &config.jwt.secret,
+        )?;
 
-                // We don't create refresh token session for this custom orchestration.
-                let mut sess_mutex = session.lock().await;
-                sess_mutex
-                    .set_session(claims.get_token(), claims.get_claims())
-                    .await?;
-                drop(sess_mutex);
+        // We don't create refresh token session for this custom orchestration.
+        let mut sess_mutex = session.lock().await;
+        // TODO: Propagate error properly
+        sess_mutex
+            .set_session(claims.get_token(), claims.get_claims())
+            .await?;
+        drop(sess_mutex);
 
-                Ok(UserSessionGQL::new(user, claims.get_token()))
-            }
-            None => GQLError::new("User not found", GQLErrorCode::UserNotFound).into(),
-        }
+        Ok(UserSessionGQL::new(user, claims.get_token()))
     }
 }

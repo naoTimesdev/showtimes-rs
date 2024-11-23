@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use async_graphql::{Enum, Object, SimpleObject};
-use showtimes_gql_common::ProjectKindGQL;
+use showtimes_gql_common::{errors::GQLError, GQLErrorCode, ProjectKindGQL};
 use showtimes_metadata::{
     m::{AnilistFuzzyDate, AnilistMedia, AnilistMediaFormat, TMDbMovieResult, VndbNovel},
     AnilistProvider, TMDbProvider, VndbProvider,
@@ -288,8 +288,12 @@ impl QuerySearchRoot {
         let prefer_title = prefer_title.unwrap_or(ExternalSearchTitlePrefer::English);
         let provider = ctx.data_unchecked::<AnilistProviderShared>();
         let mut query_server = provider.lock().await;
-        // TODO: Fix error propagation
-        let results = query_server.search(query).await?;
+        let results = query_server.search(&query).await.map_err(|err| {
+            GQLError::new(err.to_string(), GQLErrorCode::MetadataAnilistRequestError).extend(|e| {
+                e.set("query", &query);
+                e.set("source", "anilist");
+            })
+        })?;
 
         Ok(results
             .iter()
@@ -314,8 +318,14 @@ impl QuerySearchRoot {
         // TMDb provider is optional
         match provider {
             Some(provider) => {
-                // TODO: Fix error propagation
-                let results = provider.search_movie(&query).await?;
+                let results = provider.search_movie(&query).await.map_err(|err| {
+                    GQLError::new(err.to_string(), GQLErrorCode::MetadataTMDbRequestError).extend(
+                        |e| {
+                            e.set("query", &query);
+                            e.set("source", "tmdb");
+                        },
+                    )
+                })?;
 
                 Ok(results
                     .iter()
@@ -342,8 +352,14 @@ impl QuerySearchRoot {
         // VNDB provider is optional
         match ctx.data_opt::<VNDBProviderShared>() {
             Some(provider) => {
-                // TODO: Fix error propagation
-                let results = provider.search(query).await?;
+                let results = provider.search(&query).await.map_err(|err| {
+                    GQLError::new(err.to_string(), GQLErrorCode::MetadataVNDBRequestError).extend(
+                        |e| {
+                            e.set("query", &query);
+                            e.set("source", "vndb");
+                        },
+                    )
+                })?;
 
                 Ok(results
                     .iter()

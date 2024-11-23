@@ -48,6 +48,10 @@ pub struct VndbImage {
 
 impl VndbImage {
     /// Is the image NSFW
+    ///
+    /// Turns out the nsfw flag is a float, with the higher the number the more NSFW it is
+    ///
+    /// We use 1.5 as some arbitrary threshold.
     pub fn is_nsfw(&self) -> bool {
         self.nsfw > 1.5
     }

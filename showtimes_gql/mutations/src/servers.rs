@@ -116,7 +116,18 @@ pub async fn mutate_servers_create(
 
     match input.avatar {
         Some(avatar_upload) => {
-            let info_up = avatar_upload.value(ctx)?;
+            let info_up = avatar_upload.value(ctx).map_err(|err| {
+                GQLError::new(
+                    format!("Failed to read upload image: {err}"),
+                    GQLErrorCode::IOError,
+                )
+                .extend(|e| {
+                    e.set("id", server.id.to_string());
+                    e.set("where", "server");
+                    e.set("original", format!("{err}"));
+                    e.set("original_code", format!("{}", err.kind()));
+                })
+            })?;
             let mut file_target = tokio::fs::File::from_std(info_up.content);
 
             // Get format
@@ -198,6 +209,7 @@ pub async fn mutate_servers_create(
 
     // Commit to database
     let srv_handler = ServerHandler::new(db);
+    // TODO: Propagate error properly
     srv_handler.save_direct(&mut server, None).await?;
 
     // Commit to search engine
@@ -372,7 +384,18 @@ pub async fn mutate_servers_update(
     }
 
     if let Some(avatar_upload) = input.avatar {
-        let info_up = avatar_upload.value(ctx)?;
+        let info_up = avatar_upload.value(ctx).map_err(|err| {
+            GQLError::new(
+                format!("Failed to read upload image: {err}"),
+                GQLErrorCode::IOError,
+            )
+            .extend(|e| {
+                e.set("id", server_mut.id.to_string());
+                e.set("where", "server");
+                e.set("original", format!("{err}"));
+                e.set("original_code", format!("{}", err.kind()));
+            })
+        })?;
         let mut file_target = tokio::fs::File::from_std(info_up.content);
 
         // Get format
@@ -447,6 +470,7 @@ pub async fn mutate_servers_update(
 
     // Update the user
     let srv_handler = ServerHandler::new(db);
+    // TODO: Propagate error properly
     srv_handler.save(&mut server_mut, None).await?;
 
     // Update index
@@ -495,6 +519,7 @@ pub async fn mutate_servers_delete(
 
     // Unlink Collab sync and invite
     let collab_handler = showtimes_db::CollaborationSyncHandler::new(db);
+    // TODO: Propagate error properly
     let collab_info = collab_handler
         .find_all_by(doc! {
             "projects.server": server.id.to_string()
@@ -512,6 +537,7 @@ pub async fn mutate_servers_delete(
             // If only 1 or zero, delete this link
             if collab_mut.length() < 2 {
                 // Delete from DB
+                // TODO: Propagate error properly
                 collab_handler.delete(&collab).await?;
 
                 // Delete from search engine
@@ -523,6 +549,7 @@ pub async fn mutate_servers_delete(
 
                 collab_deleted.push(collab.id.to_string());
             } else {
+                // TODO: Propagate error properly
                 collab_handler.save(&mut collab_mut, None).await?;
 
                 collab_updated_events.push(showtimes_events::m::CollabDeletedEvent::new(
@@ -608,6 +635,7 @@ pub async fn mutate_servers_delete(
     }
 
     let collab_invite_handler = showtimes_db::CollaborationInviteHandler::new(db);
+    // TODO: Propagate error properly
     let collab_invite_info = collab_invite_handler
         .find_all_by(doc! {
             "$or": [
@@ -628,6 +656,7 @@ pub async fn mutate_servers_delete(
 
     if !all_invite_ids.is_empty() {
         // Delete from DB
+        // TODO: Propagate error properly
         collab_invite_handler
             .delete_by(doc! {
                 "id": {
@@ -676,6 +705,7 @@ pub async fn mutate_servers_delete(
 
     // Delete projects
     let project_handler = showtimes_db::ProjectHandler::new(db);
+    // TODO: Propagate error properly
     let project_info = project_handler
         .find_all_by(doc! {
             "creator": server.id.to_string()
@@ -689,6 +719,7 @@ pub async fn mutate_servers_delete(
 
     if !all_project_ids.is_empty() {
         // Delete from DB
+        // TODO: Propagate error properly
         project_handler
             .delete_by(doc! {
                 "id": {
@@ -736,12 +767,14 @@ pub async fn mutate_servers_delete(
     }
 
     // Delete assets
+    // TODO: Propagate error properly
     storages
         .directory_delete(server.id, None, Some(showtimes_fs::FsFileKind::Images))
         .await?;
 
     // Delete from DB
     let srv_handler = ServerHandler::new(db);
+    // TODO: Propagate error properly
     srv_handler.delete(&server).await?;
 
     // Delete from search engine

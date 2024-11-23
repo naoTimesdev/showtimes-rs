@@ -238,7 +238,6 @@ impl ProjectGQL {
         let mut progress = vec![];
 
         for p in &self.progress {
-            // TODO: Fix error propagation
             progress.push(ProjectProgressGQL::from_db(p.clone(), self.roles.clone())?);
         }
 
@@ -281,7 +280,6 @@ impl ProjectGQL {
         let mut assignees = vec![];
 
         for assignee in &self.assignees {
-            // TODO: Fix error propagation
             let role = get_role(&self.roles, assignee.key())?;
             assignees.push(RoleAssigneeGQL {
                 role: role.into(),
@@ -414,13 +412,12 @@ impl ProjectProgressGQL {
     fn from_db(
         progress: showtimes_db::m::EpisodeProgress,
         roles: Vec<showtimes_db::m::Role>,
-    ) -> Result<Self, String> {
+    ) -> async_graphql::Result<Self> {
         let mut statuses = vec![];
 
         // XXX: We need to do this manually because we need to propagate the error.
         // XXX: Since `.try_collect()` is still nightly only :pensive:
         for status in &progress.statuses {
-            // TODO: Fix error propagation
             let role = get_role(&roles, status.key())?;
             statuses.push(RoleStatusGQL::with_role(role, status.finished()));
         }
@@ -524,10 +521,20 @@ impl ProjectGQL {
 fn get_role(
     roles: &[showtimes_db::m::Role],
     key: impl Into<String>,
-) -> Result<&showtimes_db::m::Role, String> {
+) -> async_graphql::Result<&showtimes_db::m::Role> {
     let key = key.into();
-    roles
-        .iter()
-        .find(|&r| r.key() == key)
-        .ok_or_else(|| format!("Role {} not found", key))
+    roles.iter().find(|&r| r.key() == key).ok_or(
+        GQLError::new(
+            format!("Role {key} not found"),
+            GQLErrorCode::ProjectRoleNotFound,
+        )
+        .extend(|e| {
+            e.set("key", key);
+            e.set(
+                "roles",
+                roles.iter().map(|r| r.key()).collect::<Vec<&str>>(),
+            );
+        })
+        .build(),
+    )
 }

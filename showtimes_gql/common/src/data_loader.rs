@@ -423,7 +423,7 @@ impl Loader<ServerAndOwnerId> for ServerDataLoader {
     }
 }
 
-/// A data loader for the server sync model
+/// A data loader for the server sync/collab model
 pub struct ServerSyncLoader {
     col: showtimes_db::CollaborationSyncHandler,
 }
@@ -613,6 +613,54 @@ impl Loader<ServerSyncIds> for ServerSyncLoader {
 
                 res.map(|r| (k.clone(), r.clone()))
             })
+            .collect();
+
+        Ok(mapped_res)
+    }
+}
+
+/// A data loader for the server collab invite model
+pub struct ServerInviteLoader {
+    col: showtimes_db::CollaborationInviteHandler,
+}
+
+impl ServerInviteLoader {
+    /// Create a new server sync data loader
+    pub fn new(col: &DatabaseShared) -> Self {
+        let col = showtimes_db::CollaborationInviteHandler::new(col);
+        ServerInviteLoader { col }
+    }
+}
+
+impl Loader<Ulid> for ServerInviteLoader {
+    type Value = showtimes_db::m::ServerCollaborationInvite;
+    type Error = FieldError;
+
+    async fn load(&self, keys: &[Ulid]) -> Result<HashMap<Ulid, Self::Value>, Self::Error> {
+        let keys_to_string = keys.iter().map(|k| k.to_string()).collect::<Vec<_>>();
+        let result = self
+            .col
+            .get_collection()
+            .find(doc! {
+                "id": { "$in": keys_to_string.clone() }
+            })
+            .await
+            .extend_error(GQLErrorCode::ServerInviteRequestFails, |e| {
+                e.set("ids", keys_to_string.clone());
+                e.set("where", GQLDataLoaderWhere::ServerSyncLoaderId);
+            })?;
+
+        let all_results = result
+            .try_collect::<Vec<showtimes_db::m::ServerCollaborationInvite>>()
+            .await
+            .extend_error(GQLErrorCode::ServerInviteRequestFails, |e| {
+                e.set("ids", keys_to_string.clone());
+                e.set("where", GQLDataLoaderWhere::ServerSyncInviteLoaderCollect);
+                e.set("where_req", GQLDataLoaderWhere::ServerSyncLoaderId);
+            })?;
+        let mapped_res: HashMap<Ulid, showtimes_db::m::ServerCollaborationInvite> = all_results
+            .iter()
+            .map(|proj| (proj.id, proj.clone()))
             .collect();
 
         Ok(mapped_res)

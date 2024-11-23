@@ -178,7 +178,19 @@ pub async fn mutate_users_update(
         user_after.set_api_key(user_info.api_key);
     }
     if let Some(avatar_upload) = input.avatar {
-        let info_up = avatar_upload.value(ctx)?;
+        let info_up = avatar_upload.value(ctx).map_err(|err| {
+            GQLError::new(
+                format!("Failed to read image upload: {err}"),
+                GQLErrorCode::IOError,
+            )
+            .extend(|e| {
+                e.set("id", user_info.id.to_string());
+                e.set("where", "user");
+                e.set("original", format!("{err}"));
+                e.set("original_code", format!("{}", err.kind()));
+            })
+            .build()
+        })?;
         let mut file_target = tokio::fs::File::from_std(info_up.content);
 
         // Get format
@@ -256,6 +268,7 @@ pub async fn mutate_users_update(
 
     // Update the user
     let user_handler = UserHandler::new(db);
+    // TODO: Propagate error properly
     user_handler.save(&mut user_info, None).await?;
 
     let search_arc = meili.clone();
@@ -306,23 +319,23 @@ pub async fn mutate_users_authenticate(
             }
             _ => GQLErrorCode::InvalidToken,
         };
-        GQLError::new(err.to_string(), sel_error)
-            .extend(|e| {
-                e.set("token", &token);
-                e.set("state", &state);
-            })
-            .build()
+        GQLError::new(err.to_string(), sel_error).extend(|e| {
+            e.set("token", &token);
+            e.set("state", &state);
+        })
     })?;
 
     // Valid!
     let discord = ctx.data_unchecked::<Arc<DiscordClient>>();
 
     tracing::info!("Exchanging code {} for OAuth2 token...", &token);
+    // TODO: Propagate error properly
     let exchanged = discord
         .exchange_code(&token, &config.discord.redirect_url)
         .await?;
 
     tracing::info!("Success, getting user for code {}", &token);
+    // TODO: Propagate error properly
     let user_info = discord.get_user(&exchanged.access_token).await?;
 
     // Load handler and data loader
@@ -354,15 +367,19 @@ pub async fn mutate_users_authenticate(
 
             after_user.set_discord_meta(&user.discord_meta);
 
+            // TODO: Propagate error properly
             handler.save(&mut user, None).await?;
 
+            // TODO: Propagate error properly
             let (oauth_user, refresh_token) = showtimes_session::create_session(
                 user.id,
+                // TODO: Propagate error properly
                 config.jwt.get_expiration().try_into()?,
                 &config.jwt.secret,
             )?;
 
             // Emit event
+            // TODO: Propagate error properly
             event_manager
                 .create_event(
                     showtimes_events::m::EventKind::UserUpdated,
@@ -373,9 +390,11 @@ pub async fn mutate_users_authenticate(
 
             let mut sess_mutex = sess_manager.lock().await;
 
+            // TODO: Propagate error properly
             sess_mutex
                 .set_session(oauth_user.get_token(), oauth_user.get_claims())
                 .await?;
+            // TODO: Propagate error properly
             sess_mutex
                 .set_refresh_session(&refresh_token, oauth_user.get_token())
                 .await?;
@@ -404,9 +423,11 @@ pub async fn mutate_users_authenticate(
             };
 
             let mut user = showtimes_db::m::User::new(user_info.username, discord_user);
+            // TODO: Propagate error properly
             handler.save(&mut user, None).await?;
 
             // Emit event
+            // TODO: Propagate error properly
             event_manager
                 .create_event(
                     showtimes_events::m::EventKind::UserCreated,
@@ -415,17 +436,21 @@ pub async fn mutate_users_authenticate(
                 )
                 .await?;
 
+            // TODO: Propagate error properly
             let (oauth_user, refresh_token) = showtimes_session::create_session(
                 user.id,
+                // TODO: Propagate error properly
                 config.jwt.get_expiration().try_into()?,
                 &config.jwt.secret,
             )?;
 
             let mut sess_mutex = sess_manager.lock().await;
 
+            // TODO: Propagate error properly
             sess_mutex
                 .set_session(oauth_user.get_token(), oauth_user.get_claims())
                 .await?;
+            // TODO: Propagate error properly
             sess_mutex
                 .set_refresh_session(&refresh_token, oauth_user.get_token())
                 .await?;

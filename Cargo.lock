@@ -2873,7 +2873,6 @@ dependencies = [
 name = "showtimes-gql-mutations"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-graphql",
  "chrono",
  "image",

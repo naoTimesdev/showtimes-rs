@@ -146,6 +146,8 @@ pub enum GQLErrorCode {
     ProjectInvalidOwner = 3003,
     /// Project is archived, (almost) no action can be done.
     ProjectArchived = 3004,
+    /// Project role does not exist
+    ProjectRoleNotFound = 3005,
     /// Project fetch disabled
     ProjectFetchDisabled = 3010,
 
@@ -170,6 +172,10 @@ pub enum GQLErrorCode {
     MetadataError = 6000,
     /// Unknown metadata source/provider
     MetadataUnknownSource = 6001,
+    /// Failed to build client for metadata
+    MetadataClientError = 6002,
+    /// Failed to fetch poster from metadata
+    MetadataPosterError = 6003,
     /// Failed when requesting metadata for Anilist
     MetadataAnilistRequestError = 6010,
     /// Failed when requesting metadata for TMDb
@@ -213,6 +219,10 @@ pub enum GQLDataLoaderWhere {
     UserLoaderAPIKey,
     /// User loader db collection
     UserLoaderCollect,
+    /// User loader paginated queries
+    UserLoaderPaginated,
+    /// User loader paginated count queries
+    UserLoaderPaginatedCount,
     /// Server loader (ULID ID)
     ServerLoaderId,
     /// Server loader (Owner ID)
@@ -221,12 +231,20 @@ pub enum GQLDataLoaderWhere {
     ServerLoaderIdOrOwnerId,
     /// Server loader db collection
     ServerLoaderCollect,
+    /// Server loader paginated queries
+    ServerLoaderPaginated,
+    /// Server loader paginated count queries
+    ServerLoaderPaginatedCount,
     /// Project loader (ULID ID)
     ProjectLoaderId,
     /// Project loader (Owner ID)
     ProjectLoaderOwnerId,
     /// Project loader (ULID ID or Owner ID)
     ProjectLoaderCollect,
+    /// Project loader paginated queries
+    ProjectLoaderPaginated,
+    /// Server loader paginated count queries
+    ProjectLoaderPaginatedCount,
     /// Server collab loader (ULID ID)
     ServerSyncLoaderId,
     /// Server collab loader (Server ID)
@@ -235,6 +253,10 @@ pub enum GQLDataLoaderWhere {
     ServerSyncLoaderServerAndProjectId,
     /// Server collab loader db collection
     ServerSyncLoaderCollect,
+    /// Server collab invite loader (ULID ID)
+    ServerSyncInviteLoaderId,
+    /// Server collab invite  loader db collection
+    ServerSyncInviteLoaderCollect,
 }
 
 impl From<GQLErrorCode> for async_graphql::Value {

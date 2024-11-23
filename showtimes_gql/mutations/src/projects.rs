@@ -352,12 +352,10 @@ async fn fetch_metadata_via_anilist(
     let mut anilist = anilist_loader.lock().await;
 
     let anilist_info = anilist.get_media(id_fetch).await.map_err(|err| {
-        GQLError::new(err.to_string(), GQLErrorCode::MetadataAnilistRequestError)
-            .extend(|e| {
-                e.set("id", id_fetch);
-                e.set("source", "anilist");
-            })
-            .build()
+        GQLError::new(err.to_string(), GQLErrorCode::MetadataAnilistRequestError).extend(|e| {
+            e.set("id", id_fetch);
+            e.set("source", "anilist");
+        })
     })?;
 
     let mut integrations = vec![showtimes_db::m::IntegrationId::new(
@@ -401,7 +399,17 @@ async fn fetch_metadata_via_anilist(
     while continue_fetch {
         let air_sched = anilist
             .get_airing_schedules(id_fetch, Some(current_page))
-            .await?;
+            .await
+            .map_err(|err| {
+                GQLError::new(err.to_string(), GQLErrorCode::MetadataAnilistRequestError).extend(
+                    |e| {
+                        e.set("id", id_fetch);
+                        e.set("page", current_page);
+                        e.set("when", "airing_schedules");
+                        e.set("source", "anilist");
+                    },
+                )
+            })?;
         let resultings: Vec<ExternalMediaFetchProgressResult> = air_sched
             .airing_schedules
             .iter()
@@ -457,7 +465,6 @@ async fn fetch_metadata_via_anilist(
                 e.set("date", fuzzy_start.to_string());
                 e.set("source", "anilist");
             })
-            .build()
         })?,
         _ => {
             return GQLError::new(
@@ -611,12 +618,10 @@ async fn fetch_metadata_via_vndb(
     }
 
     let vndb_info = vndb_loader.get(input_id).await.map_err(|err| {
-        GQLError::new(err.to_string(), GQLErrorCode::MetadataVNDBRequestError)
-            .extend(|e| {
-                e.set("id", input_id);
-                e.set("source", "vndb");
-            })
-            .build()
+        GQLError::new(err.to_string(), GQLErrorCode::MetadataVNDBRequestError).extend(|e| {
+            e.set("id", input_id);
+            e.set("source", "vndb");
+        })
     })?;
 
     let integrations = vec![showtimes_db::m::IntegrationId::new(
@@ -654,7 +659,6 @@ async fn fetch_metadata_via_vndb(
             e.set("id", input_id);
             e.set("source", "vndb");
         })
-        .build()
     })?;
 
     let aired_at = vndb_info
@@ -682,12 +686,10 @@ async fn fetch_metadata_via_tmdb(
 ) -> async_graphql::Result<ExternalMediaFetchResult> {
     // TMDb request for ID requires a prefix of movies: or tv: to be valid
     let input_id = input.id.parse::<i32>().map_err(|_| {
-        GQLError::new("Invalid TMDb ID", GQLErrorCode::MetadataTMDbInvalidId)
-            .extend(|e| {
-                e.set("id", input.id.clone());
-                e.set("source", "tmdb");
-            })
-            .build()
+        GQLError::new("Invalid TMDb ID", GQLErrorCode::MetadataTMDbInvalidId).extend(|e| {
+            e.set("id", input.id.clone());
+            e.set("source", "tmdb");
+        })
     })?;
     let tmdb_loader = ctx.data_unchecked::<Arc<showtimes_metadata::TMDbProvider>>();
 
@@ -695,12 +697,10 @@ async fn fetch_metadata_via_tmdb(
         .get_movie_details(input_id)
         .await
         .map_err(|err| {
-            GQLError::new(err.to_string(), GQLErrorCode::MetadataTMDbRequestError)
-                .extend(|e| {
-                    e.set("id", input_id);
-                    e.set("source", "tmdb");
-                })
-                .build()
+            GQLError::new(err.to_string(), GQLErrorCode::MetadataTMDbRequestError).extend(|e| {
+                e.set("id", input_id);
+                e.set("source", "tmdb");
+            })
         })?;
 
     let integrations = vec![showtimes_db::m::IntegrationId::new(
@@ -729,7 +729,6 @@ async fn fetch_metadata_via_tmdb(
             e.set("id", input_id);
             e.set("source", "vndb");
         })
-        .build()
     })?;
 
     let aired_at = tmdb_info
@@ -961,17 +960,20 @@ pub async fn mutate_projects_create(
                 let user_info = all_assignees.get(&*assignee.id);
                 match user_info {
                     Some(user_info) => {
+                        // TODO: Propagate error properly
                         assignees.push(showtimes_db::m::RoleAssignee::new(
                             role.key(),
                             Some(user_info.id),
                         )?);
                     }
                     None => {
+                        // TODO: Propagate error properly
                         assignees.push(showtimes_db::m::RoleAssignee::new(role.key(), None)?);
                     }
                 }
             }
             None => {
+                // TODO: Propagate error properly
                 assignees.push(showtimes_db::m::RoleAssignee::new(role.key(), None)?);
             }
         }
@@ -989,6 +991,7 @@ pub async fn mutate_projects_create(
         all_progress.push(progress);
     }
 
+    // TODO: Propagate error properly
     let mut project = showtimes_db::m::Project::new(metadata.title, metadata.kind, srv.id)?;
     project.roles = all_roles;
     project.assignees = assignees;
@@ -1007,7 +1010,18 @@ pub async fn mutate_projects_create(
     // Upload the poster
     let poster_url = match (input.poster, metadata.poster_url) {
         (Some(poster), _) => {
-            let info_up = poster.value(ctx)?;
+            let info_up = poster.value(ctx).map_err(|err| {
+                GQLError::new(
+                    format!("Failed to read image upload: {err}"),
+                    GQLErrorCode::IOError,
+                )
+                .extend(|e| {
+                    e.set("id", project.id.to_string());
+                    e.set("where", "project");
+                    e.set("original", format!("{err}"));
+                    e.set("original_code", format!("{}", err.kind()));
+                })
+            })?;
             let mut file_target = tokio::fs::File::from_std(info_up.content);
 
             // Get format
@@ -1024,7 +1038,6 @@ pub async fn mutate_projects_create(
                         e.set("original", format!("{err}"));
                         e.set("original_code", format!("{}", err.kind()));
                     })
-                    .build()
                 })?;
             // Seek back to the start of the file
             file_target
@@ -1064,7 +1077,6 @@ pub async fn mutate_projects_create(
                         e.set("where", "project");
                         e.set("original", format!("{err}"));
                     })
-                    .build()
                 })?;
 
             showtimes_db::m::ImageMetadata::new(
@@ -1092,7 +1104,18 @@ pub async fn mutate_projects_create(
                     Some(&srv.id.to_string()),
                     Some(showtimes_fs::FsFileKind::Images),
                 )
-                .await?;
+                .await
+                .map_err(|err| {
+                    GQLError::new(
+                        format!("Failed to upload image: {err}"),
+                        GQLErrorCode::ImageUploadError,
+                    )
+                    .extend(|e| {
+                        e.set("id", project.id.to_string());
+                        e.set("where", "project");
+                        e.set("original", format!("{err}"));
+                    })
+                })?;
 
             showtimes_db::m::ImageMetadata::new(
                 showtimes_fs::FsFileKind::Images.as_path_name(),
@@ -1135,6 +1158,7 @@ pub async fn mutate_projects_create(
 
     // Save the project
     let prj_handler = ProjectHandler::new(db);
+    // TODO: Propagate error properly
     prj_handler.save(&mut project, None).await?;
 
     // Update index
@@ -1149,7 +1173,7 @@ pub async fn mutate_projects_create(
     Ok(prj_gql)
 }
 
-async fn download_cover(url: &str) -> anyhow::Result<Vec<u8>> {
+async fn download_cover(url: &str) -> async_graphql::Result<Vec<u8>> {
     let ua_ver = format!(
         "showtimes-rs-gql/{} (+https://github.com/naoTimesdev/showtimes-rs)",
         env!("CARGO_PKG_VERSION")
@@ -1157,22 +1181,66 @@ async fn download_cover(url: &str) -> anyhow::Result<Vec<u8>> {
     let mut header_maps = reqwest::header::HeaderMap::new();
     header_maps.insert(
         reqwest::header::USER_AGENT,
-        reqwest::header::HeaderValue::from_str(&ua_ver)?,
+        reqwest::header::HeaderValue::from_str(&ua_ver).map_err(|_| {
+            GQLError::new(
+                "Failed to parse user agent for downloading cover",
+                GQLErrorCode::MetadataClientError,
+            )
+            .extend(|f| {
+                f.set("url", url);
+            })
+        })?,
     );
 
     let client = reqwest::ClientBuilder::new()
         .http2_adaptive_window(true)
         .default_headers(header_maps)
         .use_rustls_tls()
-        .build()?;
+        .build()
+        .map_err(|e| {
+            GQLError::new(
+                "Failed to create request client for downloading cover",
+                GQLErrorCode::MetadataClientError,
+            )
+            .extend(|f| {
+                f.set("url", url);
+                f.set("original", format!("{}", e));
+            })
+        })?;
 
-    let resp = client.get(url).send().await?;
+    let resp = client.get(url).send().await.map_err(|e| {
+        GQLError::new(
+            "Failed to fetch cover from url",
+            GQLErrorCode::MetadataClientError,
+        )
+        .extend(|f| {
+            f.set("url", url);
+            f.set("original", format!("{}", e));
+        })
+    })?;
 
     if !resp.status().is_success() {
-        return Err(anyhow::anyhow!("Failed to download cover"));
+        return Err(GQLError::new(
+            format!("Failed to download cover: {}", url),
+            GQLErrorCode::MetadataPosterError,
+        )
+        .extend(|f| {
+            f.set("url", url);
+            f.set("status_code", resp.status().as_u16());
+        })
+        .into());
     }
 
-    let bytes = resp.bytes().await?;
+    let bytes = resp.bytes().await.map_err(|e| {
+        GQLError::new(
+            format!("Failed to process cover bytes: {}", url),
+            GQLErrorCode::MetadataPosterError,
+        )
+        .extend(|f| {
+            f.set("url", url);
+            f.set("original", format!("{}", e));
+        })
+    })?;
     let bytes_map = bytes.to_vec();
     Ok(bytes_map)
 }
@@ -1243,6 +1311,7 @@ pub async fn mutate_projects_delete(
     }
 
     let collab_handler = showtimes_db::CollaborationSyncHandler::new(db);
+    // TODO: Propagate error properly
     let collab_info = collab_handler
         .find_by(doc! {
             "projects.project": prj_info.id.to_string(),
@@ -1260,11 +1329,13 @@ pub async fn mutate_projects_delete(
             // If only 1 or zero, delete this link
             if collab_info.length() < 2 {
                 // Delete from DB
+                // TODO: Propagate error properly
                 collab_handler.delete(&collab_info).await?;
 
                 // Delete from search engine
                 let collab_search =
                     showtimes_search::models::ServerCollabSync::from(collab_info.clone());
+                // TODO: Propagate error properly
                 collab_search.delete_document(meili).await?;
 
                 // Delete from search engine
@@ -1295,6 +1366,7 @@ pub async fn mutate_projects_delete(
                 execute_search_events(task_search, task_events).await?;
             } else {
                 // Save the collab
+                // TODO: Propagate error properly
                 collab_handler.save(&mut collab_info, None).await?;
 
                 // Update search engine
@@ -1322,12 +1394,14 @@ pub async fn mutate_projects_delete(
                         },
                     );
 
+                // TODO: Propagate error properly
                 execute_search_events(task_search, task_events).await?;
             }
         }
     }
 
     let collab_invite_handler = showtimes_db::CollaborationInviteHandler::new(db);
+    // TODO: Propagate error properly
     let collab_invite_info = collab_invite_handler
         .find_all_by(doc! {
             "$or": [
@@ -1349,6 +1423,7 @@ pub async fn mutate_projects_delete(
 
     if !all_ids.is_empty() {
         // Delete from DB
+        // TODO: Propagate error properly
         collab_invite_handler
             .delete_by(doc! {
                 "id": {
@@ -1397,6 +1472,7 @@ pub async fn mutate_projects_delete(
     // Delete poster
     let poster_info = &prj_info.poster.image;
     if poster_info.kind == showtimes_fs::FsFileKind::Images.as_path_name() {
+        // TODO: Propagate error properly
         storages
             .file_delete(
                 poster_info.key.clone(),
@@ -1409,6 +1485,7 @@ pub async fn mutate_projects_delete(
 
     // Delete project
     let prj_handler = ProjectHandler::new(db);
+    // TODO: Propagate error properly
     prj_handler.delete(&prj_info).await?;
 
     // Delete from search engine
@@ -1487,6 +1564,7 @@ async fn update_single_project(
                     }
                 }
                 ProjectRoleUpdateAction::Add => {
+                    // TODO: Propagate error properly
                     let new_role =
                         showtimes_db::m::Role::new(role.role.key.clone(), role.role.name.clone())?;
                     let mut ordered_roles = project.roles.clone();
@@ -1701,7 +1779,18 @@ async fn update_single_project(
     // Update poster
     if is_main {
         if let Some(poster_upload) = input.poster {
-            let info_up = poster_upload.value(ctx)?;
+            let info_up = poster_upload.value(ctx).map_err(|err| {
+                GQLError::new(
+                    format!("Failed to read image upload: {err}"),
+                    GQLErrorCode::IOError,
+                )
+                .extend(|e| {
+                    e.set("id", prj_id.to_string());
+                    e.set("where", "project");
+                    e.set("original", format!("{err}"));
+                    e.set("original_code", format!("{}", err.kind()));
+                })
+            })?;
             let mut file_target = tokio::fs::File::from_std(info_up.content);
 
             // Get format
@@ -1718,7 +1807,6 @@ async fn update_single_project(
                         e.set("original", format!("{err}"));
                         e.set("original_code", format!("{}", err.kind()));
                     })
-                    .build()
                 })?;
             // Seek back to the start of the file
             file_target
@@ -1759,7 +1847,6 @@ async fn update_single_project(
                         e.set("where", "project");
                         e.set("original", format!("{err}"));
                     })
-                    .build()
                 })?;
 
             let image_meta = showtimes_db::m::ImageMetadata::new(
@@ -1835,6 +1922,7 @@ pub async fn mutate_projects_update(
             after_update.set_status(prj_info.status);
 
             // Save the project
+            // TODO: Propagate error properly
             prj_handler.save(&mut prj_info, None).await?;
 
             // Save search results
@@ -1895,6 +1983,7 @@ pub async fn mutate_projects_update(
                 after_update.set_status(prj_info.status);
 
                 // Save the project
+                // TODO: Propagate error properly
                 prj_handler.save(&mut prj_info, None).await?;
 
                 // Save search results
@@ -2026,6 +2115,7 @@ pub async fn mutate_projects_update(
         }
     }
 
+    // TODO: Validate propagate error
     let (project_event, episode_event) = update_single_project(
         ctx,
         &mut prj_info,
@@ -2037,6 +2127,7 @@ pub async fn mutate_projects_update(
     .await?;
 
     // Save the project
+    // TODO: Propagate error properly
     prj_handler.save(&mut prj_info, None).await?;
 
     // Search results
@@ -2048,9 +2139,11 @@ pub async fn mutate_projects_update(
     let mut all_project_episodes_events = vec![];
     all_project_episodes_events.extend(episode_event);
 
+    // TODO: Validate propagate error
     let mut other_projects = fetch_project_collaborators(ctx, &prj_info).await?;
 
     for o_project in other_projects.iter_mut() {
+        // TODO: Validate propagate error
         let (project_event, episode_event) = update_single_project(
             ctx,
             o_project,
@@ -2062,6 +2155,7 @@ pub async fn mutate_projects_update(
         .await?;
 
         // Save the project
+        // TODO: Propagate error properly
         prj_handler.save(o_project, None).await?;
 
         // Create search results
@@ -2120,6 +2214,7 @@ pub async fn mutate_projects_update(
         );
 
     // Wait for all events to finish
+    // TODO: Propagate error properly
     let (t_a, t_b, t_c) = tokio::try_join!(task_search, task_project_events, task_episode_events)?;
     t_a?;
     t_b?;
@@ -2209,6 +2304,7 @@ pub async fn mutate_projects_episode_add_auto(
 
     // Save the project
     let project_event = update_project_inner(&mut prj_info, count);
+    // TODO: Propagate error properly
     prj_handler.save(&mut prj_info, None).await?;
 
     // Push to search and events
@@ -2216,10 +2312,12 @@ pub async fn mutate_projects_episode_add_auto(
     all_events_content.push(project_event);
 
     // Fetch collaborators
+    // TODO: Validate propagate error
     let mut other_projects = fetch_project_collaborators(ctx, &prj_info).await?;
     for project in other_projects.iter_mut() {
         let project_event = update_project_inner(project, count);
         // Save other project
+        // TODO: Propagate error properly
         prj_handler.save(project, None).await?;
 
         // Push to search and events
@@ -2348,15 +2446,18 @@ pub async fn mutate_projects_episode_add_manual(
     let mut all_events_content = vec![project_event];
 
     // Save the project
+    // TODO: Propagate error properly
     prj_handler.save(&mut prj_info, None).await?;
     let mut all_search_contents = vec![showtimes_search::models::Project::from(&prj_info)];
 
     // Sync the collaborations
+    // TODO: Validate propagate error
     let mut other_projects = fetch_project_collaborators(ctx, &prj_info).await?;
 
     for project in other_projects.iter_mut() {
         let project_event = update_project_inner(project, episodes);
         // Save other project
+        // TODO: Propagate error properly
         prj_handler.save(project, None).await?;
 
         // Push to search and events
@@ -2465,17 +2566,20 @@ pub async fn mutate_projects_episode_remove(
 
     // Save the project
     let prj_handler = ProjectHandler::new(db);
+    // TODO: Propagate error properly
     prj_handler.save(&mut prj_info, None).await?;
 
     // Create search results
     let mut all_search_contents = vec![showtimes_search::models::Project::from(&prj_info)];
 
     // Sync the collaborations
+    // TODO: Validate propagate error
     let mut other_projects = fetch_project_collaborators(ctx, &prj_info).await?;
 
     for project in other_projects.iter_mut() {
         let project_event = update_project_inner(project, episodes);
         // Save other project
+        // TODO: Propagate error properly
         prj_handler.save(project, None).await?;
 
         // Push to search and events

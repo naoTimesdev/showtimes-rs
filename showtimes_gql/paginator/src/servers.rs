@@ -6,7 +6,10 @@ use showtimes_db::{
     mongodb::bson::{doc, Document},
     DatabaseShared,
 };
-use showtimes_gql_common::{queries::ServerQueryUser, PageInfoGQL, SortOrderGQL};
+use showtimes_gql_common::{
+    queries::ServerQueryUser, GQLDataLoaderWhere, GQLErrorCode, GQLErrorExt, PageInfoGQL,
+    SortOrderGQL,
+};
 use showtimes_shared::ulid::Ulid;
 
 use crate::PaginatedResult;
@@ -24,8 +27,6 @@ pub struct ServerQuery {
     current_user: Option<ServerQueryUser>,
     /// Sort order
     sort: SortOrderGQL,
-    /// Disable project fetch
-    disable_projects: bool,
 }
 
 #[allow(dead_code)]
@@ -84,20 +85,27 @@ impl ServerQuery {
         self.current_user = Some(user);
     }
 
-    /// Disable project fetch
-    pub fn with_disable_projects(mut self) -> Self {
-        self.disable_projects = true;
-        self
-    }
-
-    /// Disable project fetch
-    pub fn set_disable_projects(&mut self) {
-        self.disable_projects = true;
+    fn dump_query(&self, ctx: &mut async_graphql::ErrorExtensionValues) {
+        if let Some(ids) = &self.ids {
+            ctx.set(
+                "ids",
+                ids.iter().map(|id| id.to_string()).collect::<Vec<String>>(),
+            );
+        }
+        if let Some(per_page) = self.per_page {
+            ctx.set("per_page", per_page);
+        }
+        if let Some(cursor) = &self.cursor {
+            ctx.set("cursor", cursor.to_string());
+        }
+        ctx.set("sort", self.sort);
+        if let Some(user) = &self.current_user {
+            ctx.set("current_user", user.as_graphql_value());
+        }
     }
 }
 
 /// Query the servers database and return the paginated data.
-/// TODO: Fix error propagation
 pub async fn query_servers_paginated(
     ctx: &async_graphql::Context<'_>,
     queries: ServerQuery,
@@ -154,13 +162,29 @@ pub async fn query_servers_paginated(
         .find(doc_query)
         .limit((per_page + 1) as i64)
         .sort(queries.sort.into_sort_doc(Some("name".to_string())))
-        .await?;
+        .await
+        .extend_error(GQLErrorCode::ServerRequestFails, |e| {
+            queries.dump_query(e);
+            e.set("where", GQLDataLoaderWhere::ServerLoaderPaginated);
+        })?;
     let count = srv_handler
         .get_collection()
         .count_documents(count_query)
-        .await?;
+        .await
+        .extend_error(GQLErrorCode::ServerRequestFails, |e| {
+            queries.dump_query(e);
+            e.set("where", GQLDataLoaderWhere::ServerLoaderPaginatedCount);
+        })?;
 
-    let mut all_servers: Vec<showtimes_db::m::Server> = cursor.try_collect().await?;
+    let mut all_servers: Vec<showtimes_db::m::Server> =
+        cursor
+            .try_collect()
+            .await
+            .extend_error(GQLErrorCode::ServerRequestFails, |e| {
+                queries.dump_query(e);
+                e.set("where", GQLDataLoaderWhere::ServerLoaderCollect);
+                e.set("where_req", GQLDataLoaderWhere::ServerLoaderPaginated);
+            })?;
 
     // If all_servers is equal to per_page, then there is a next page
     let last_srv = if all_servers.len() > per_page as usize {
@@ -172,28 +196,4 @@ pub async fn query_servers_paginated(
     let page_info = PageInfoGQL::new(count, per_page, last_srv.map(|p| p.id.into()));
 
     Ok(PaginatedResult::new(all_servers, page_info))
-
-    // Ok(PaginatedGQL::new(
-    //     all_servers
-    //         .into_iter()
-    //         .map(|p| {
-    //             let srv_gql: ServerGQL = p.into();
-    //             let srv_gql = if queries.disable_projects {
-    //                 srv_gql.with_projects_disabled()
-    //             } else {
-    //                 srv_gql
-    //             };
-
-    //             if let Some(user) = &queries.current_user {
-    //                 match user.kind {
-    //                     UserKind::User => srv_gql.with_current_user(user.id),
-    //                     _ => srv_gql,
-    //                 }
-    //             } else {
-    //                 srv_gql
-    //             }
-    //         })
-    //         .collect(),
-    //     page_info,
-    // ))
 }

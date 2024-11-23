@@ -1,5 +1,5 @@
 use async_graphql::{CustomValidator, Enum, InputObject};
-use showtimes_gql_common::{errors::GQLError, IntegrationTypeGQL};
+use showtimes_gql_common::{errors::GQLError, GQLErrorExt, IntegrationTypeGQL};
 
 /// The list of possible integrations actions.
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
@@ -244,7 +244,12 @@ pub(crate) async fn execute_search_events(
     task_events: tokio::task::JoinHandle<Result<(), showtimes_events::ClickHouseError>>,
 ) -> async_graphql::Result<()> {
     tracing::debug!("Waiting for tasks to finish...");
-    let (r_search, r_events) = tokio::try_join!(task_search, task_events)?;
+    let (r_search, r_events) = tokio::try_join!(task_search, task_events).extend_error(
+        showtimes_gql_common::GQLErrorCode::TaskSchedulerError,
+        |f_ctx| {
+            f_ctx.set("initial", true);
+        },
+    )?;
     match (r_search, r_events) {
         (Ok(_), Ok(_)) => Ok(()),
         (Err(e1), Err(e2)) => {
