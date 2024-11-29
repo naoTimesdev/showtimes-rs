@@ -10,7 +10,6 @@ rust-version.workspace = true
 description = "MongoDB models mapping for Showtimes Database"
 
 [dependencies]
-anyhow.workspace = true
 serde.workspace = true
 chrono.workspace = true
 

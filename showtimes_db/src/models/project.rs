@@ -4,6 +4,8 @@ use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
 use showtimes_shared::{bson_datetime_opt_serializer, ulid_opt_serializer, ulid_serializer};
 
+use crate::errors::{SHDbResult, StringValidationError, StringValidationErrorKind};
+
 use super::{ImageMetadata, IntegrationId, ShowModelHandler};
 
 static DEFAULT_ROLES_SHOWS: LazyLock<Vec<Role>> = LazyLock::new(|| {
@@ -234,24 +236,37 @@ impl From<&ProjectType> for ProjectKind {
     }
 }
 
-fn validate_key(key: &str) -> anyhow::Result<()> {
+fn validate_key(key: &str) -> SHDbResult<(), StringValidationError> {
     if key.is_empty() {
-        anyhow::bail!("`key` must not be empty");
+        return Err(StringValidationError::new(
+            "key",
+            StringValidationErrorKind::Empty,
+        ));
     }
     if !key.is_ascii() {
-        anyhow::bail!("`key` must be ASCII");
+        return Err(StringValidationError::new(
+            "key",
+            StringValidationErrorKind::ASCIIOnly,
+        ));
     }
     if !key.contains(' ') && key.to_ascii_uppercase() != key {
-        anyhow::bail!("`key` must be uppercase and have no spaces");
+        return Err(StringValidationError::new(
+            "key",
+            StringValidationErrorKind::Contains("uppercase and no spaces".to_string()),
+        ));
     }
     Ok(())
 }
 
-fn validate_name(name: &str) -> anyhow::Result<()> {
+fn validate_name(name: &str) -> SHDbResult<(), StringValidationError> {
     if name.is_empty() {
-        anyhow::bail!("`name` must not be empty");
+        Err(StringValidationError::new(
+            "key",
+            StringValidationErrorKind::Empty,
+        ))
+    } else {
+        Ok(())
     }
-    Ok(())
 }
 
 /// A model to hold each project role in the database.
@@ -291,7 +306,7 @@ impl Ord for Role {
 
 impl Role {
     /// Create a new role
-    pub fn new(key: impl Into<String>, name: impl Into<String>) -> anyhow::Result<Self> {
+    pub fn new(key: impl Into<String>, name: impl Into<String>) -> SHDbResult<Self> {
         let key: String = key.into();
         validate_key(&key)?;
         let name: String = name.into();
@@ -345,7 +360,7 @@ pub struct RoleStatus {
 
 impl RoleStatus {
     /// Create a new role status
-    pub fn new(key: impl Into<String>, finished: bool) -> anyhow::Result<Self> {
+    pub fn new(key: impl Into<String>, finished: bool) -> SHDbResult<Self> {
         let key: String = key.into();
         validate_key(&key)?;
 
@@ -422,7 +437,7 @@ impl RoleAssignee {
     pub fn new(
         key: impl Into<String>,
         actor: Option<showtimes_shared::ulid::Ulid>,
-    ) -> anyhow::Result<Self> {
+    ) -> SHDbResult<Self> {
         let key: String = key.into();
         validate_key(&key)?;
 
@@ -547,11 +562,9 @@ impl EpisodeProgress {
         self.aired = aired;
     }
 
-    pub fn set_aired_from_unix(&mut self, aired: i64) -> anyhow::Result<()> {
-        let timestamp = match chrono::DateTime::<chrono::Utc>::from_timestamp(aired, 0) {
-            Some(t) => t,
-            None => anyhow::bail!("Failed to convert timestamp: {}", aired),
-        };
+    pub fn set_aired_from_unix(&mut self, aired: i64) -> SHDbResult<()> {
+        let timestamp = chrono::DateTime::<chrono::Utc>::from_timestamp(aired, 0)
+            .ok_or(crate::errors::Error::TimeConversionError(aired))?;
 
         self.aired = Some(timestamp);
         Ok(())
@@ -698,7 +711,7 @@ impl Project {
         title: impl Into<String>,
         kind: ProjectType,
         creator: showtimes_shared::ulid::Ulid,
-    ) -> anyhow::Result<Self> {
+    ) -> SHDbResult<Self> {
         let title: String = title.into();
         validate_name(&title)?;
 
@@ -721,7 +734,7 @@ impl Project {
         kind: ProjectType,
         creator: showtimes_shared::ulid::Ulid,
         poster: Poster,
-    ) -> anyhow::Result<Self> {
+    ) -> SHDbResult<Self> {
         let title: String = title.into();
         validate_name(&title)?;
 
@@ -746,7 +759,7 @@ impl Project {
         creator: showtimes_shared::ulid::Ulid,
         poster: Poster,
         roles: Vec<Role>,
-    ) -> anyhow::Result<Self> {
+    ) -> SHDbResult<Self> {
         let title: String = title.into();
         validate_name(&title)?;
 
@@ -776,7 +789,7 @@ impl Project {
         poster: Poster,
         roles: Vec<Role>,
         assignees: Vec<RoleAssignee>,
-    ) -> anyhow::Result<Self> {
+    ) -> SHDbResult<Self> {
         let title: String = title.into();
         validate_name(&title)?;
 

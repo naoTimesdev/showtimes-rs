@@ -101,13 +101,21 @@ pub enum GQLErrorCode {
     /// Integration requires the original ID for updating
     IntegrationMissingOriginal = 404,
 
-    // -> Parse related
+    // --> Parse related
     /// A common parsing error
     ParseError = 500,
     /// Failed to parse ULID
     ParseUlidError = 501,
     /// Failed to parse API key
     ParseAPIKeyError = 502,
+
+    // --> Other sesison related handling
+    /// Common error related to Session
+    SessionError = 600,
+    /// Failed to create new session
+    SessionCreateError = 601,
+    /// Failed to delete session
+    SessionDeleteError = 602,
 
     // --> User related
     /// Failed when requesting user
@@ -124,6 +132,14 @@ pub enum GQLErrorCode {
     UserInsufficientPrivilege = 1005,
     /// User is owner and cannot be modified or do anything "user"-like
     UserSuperuserMode = 1006,
+    /// Failed to update user
+    UserUpdateError = 1010,
+    /// Failed to update user in search database
+    UserUpdateSearchError = 1011,
+    /// Failed to delete user
+    UserDeleteError = 1012,
+    /// Failed to delete user in search database
+    UserDeleteSearchError = 1013,
 
     // --> Server related
     /// Failed when requesting server
@@ -132,8 +148,16 @@ pub enum GQLErrorCode {
     ServerNotFound = 2001,
     /// Server already exists
     ServerAlreadyExists = 2002,
+    /// Failed to update server
+    ServerUpdateError = 2010,
+    /// Failed to update server in search database
+    ServerUpdateSearchError = 2011,
+    /// Failed to delete server
+    ServerDeleteError = 2012,
+    /// Failed to delete server in search database
+    ServerDeleteSearchError = 2013,
     /// Server fetch disabled
-    ServerFetchDisabled = 2010,
+    ServerFetchDisabled = 2020,
 
     // --> Project related
     /// Failed when requesting project
@@ -148,8 +172,16 @@ pub enum GQLErrorCode {
     ProjectArchived = 3004,
     /// Project role does not exist
     ProjectRoleNotFound = 3005,
+    /// Failed to update project
+    ProjectUpdateError = 3010,
+    /// Failed to update project in search database
+    ProjectUpdateSearchError = 3011,
+    /// Failed to delete project
+    ProjectDeleteError = 3012,
+    /// Failed to delete project in search database
+    ProjectDeleteSearchError = 3013,
     /// Project fetch disabled
-    ProjectFetchDisabled = 3010,
+    ProjectFetchDisabled = 3020,
 
     // --> Server collab sync related
     /// Failed when requesting server collab
@@ -158,6 +190,14 @@ pub enum GQLErrorCode {
     ServerSyncNotFound = 4001,
     /// Server collab already exists
     ServerSyncAlreadyExists = 4002,
+    /// Failed to update server collab
+    ServerSyncUpdateError = 4010,
+    /// Failed to update server collab in search database
+    ServerSyncUpdateSearchError = 4011,
+    /// Failed to delete server collab
+    ServerSyncDeleteError = 4012,
+    /// Failed to delete server collab in search database
+    ServerSyncDeleteSearchError = 4013,
 
     // --> Server collab ivite related
     /// Failed when requesting server collab invite
@@ -166,6 +206,14 @@ pub enum GQLErrorCode {
     ServerInviteNotFound = 5001,
     /// Server collab invite already exists
     ServerInviteAlreadyExists = 5002,
+    /// Failed to update server collab invite
+    ServerInviteUpdateError = 5010,
+    /// Failed to update server collab invite in search database
+    ServerInviteUpdateSearchError = 5011,
+    /// Failed to delete server collab invite
+    ServerInviteDeleteError = 5012,
+    /// Failed to delete server collab invite in search database
+    ServerInviteDeleteSearchError = 5013,
 
     // -> Metadata related
     /// Generic metadata error

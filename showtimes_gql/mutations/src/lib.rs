@@ -16,7 +16,7 @@ pub(crate) use common::*;
 use showtimes_gql_common::{
     data_loader::{find_authenticated_user, UserDataLoader},
     errors::GQLError,
-    guard, GQLErrorCode, OkResponse, Orchestrator, UserKindGQL,
+    guard, GQLErrorCode, GQLErrorExt, OkResponse, Orchestrator, UserKindGQL,
 };
 use showtimes_gql_models::{
     collaborations::{CollaborationInviteGQL, CollaborationSyncGQL},
@@ -56,18 +56,27 @@ impl MutationRoot {
 
         match (token, jwt.get_claims().get_audience()) {
             (_, showtimes_session::ShowtimesAudience::User) => {
-                // TODO: Propagate error properly
                 sessions
                     .lock()
                     .await
                     .remove_session(jwt.get_token())
-                    .await?;
+                    .await
+                    .extend_error(GQLErrorCode::SessionDeleteError, |f_ctx| {
+                        f_ctx.set("token", jwt.get_token());
+                    })?;
 
                 Ok(OkResponse::ok("Successfully logged out"))
             }
             (Some(token), showtimes_session::ShowtimesAudience::MasterKey) => {
-                // TODO: Propagate error properly
-                sessions.lock().await.remove_session(&token).await?;
+                sessions
+                    .lock()
+                    .await
+                    .remove_session(&token)
+                    .await
+                    .extend_error(GQLErrorCode::SessionDeleteError, |f_ctx| {
+                        f_ctx.set("token", &token);
+                        f_ctx.set("is_master", true);
+                    })?;
 
                 Ok(OkResponse::ok("Successfully revoked token"))
             }
@@ -498,10 +507,12 @@ impl MutationRoot {
 
         // We don't create refresh token session for this custom orchestration.
         let mut sess_mutex = session.lock().await;
-        // TODO: Propagate error properly
         sess_mutex
             .set_session(claims.get_token(), claims.get_claims())
-            .await?;
+            .await
+            .extend_error(GQLErrorCode::SessionCreateError, |f_ctx| {
+                f_ctx.set("id", id.to_string());
+            })?;
         drop(sess_mutex);
 
         Ok(UserSessionGQL::new(user, claims.get_token()))

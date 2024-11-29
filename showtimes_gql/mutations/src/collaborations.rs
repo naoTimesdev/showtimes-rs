@@ -33,6 +33,16 @@ pub struct CollaborationRequestInputGQL {
     target_server: UlidGQL,
 }
 
+impl CollaborationRequestInputGQL {
+    fn dump_query(&self, ctx: &mut async_graphql::ErrorExtensionValues) {
+        ctx.set("project", self.project.to_string());
+        ctx.set("target_server", self.target_server.to_string());
+        if let Some(target) = &self.target_project {
+            ctx.set("target_project", target.to_string());
+        }
+    }
+}
+
 async fn check_permissions(
     ctx: &async_graphql::Context<'_>,
     user: &showtimes_db::m::User,
@@ -146,8 +156,15 @@ pub async fn mutate_collaborations_initiate(
         showtimes_db::m::ServerCollaborationInvite::new(source_invite, target_invite);
 
     let invite_handler = CollaborationInviteHandler::new(db);
-    // TODO: Propragate error properly
-    invite_handler.save(&mut collab_invite, None).await?;
+    invite_handler
+        .save(&mut collab_invite, None)
+        .await
+        .map_err(|e| {
+            GQLError::new(e.to_string(), GQLErrorCode::ServerInviteUpdateError).extend(|f| {
+                f.set("id", collab_invite.id.to_string());
+                input.dump_query(f);
+            })
+        })?;
 
     // Save in search index
     let invite_clone = collab_invite.clone();
@@ -225,22 +242,41 @@ pub async fn mutate_collaborations_accept(
 
     // Save the project to DB first for target
     let prj_handler = showtimes_db::ProjectHandler::new(db);
-    // TODO: Propagate error properly
-    prj_handler.save(&mut target_proj, None).await?;
+    prj_handler
+        .save(&mut target_proj, None)
+        .await
+        .map_err(|e| {
+            GQLError::new(e.to_string(), GQLErrorCode::ProjectUpdateError).extend(|f| {
+                f.set("id", target_proj.id.to_string());
+                f.set("invite_id", invite.to_string());
+                f.set("from", "invite_accept");
+            })
+        })?;
 
     // Save to search index
     let prj_search = showtimes_search::models::Project::from(target_proj.clone());
-    // TODO: Propagate error properly
-    prj_search.update_document(meili).await?;
+    prj_search.update_document(meili).await.map_err(|e| {
+        GQLError::new(e.to_string(), GQLErrorCode::ProjectUpdateSearchError).extend(|f| {
+            f.set("id", target_proj.id.to_string());
+            f.set("invite_id", invite.to_string());
+            f.set("from", "invite_accept");
+        })
+    })?;
 
     // Find any pre-existing sync
     let sync_handler = showtimes_db::CollaborationSyncHandler::new(db);
-    // TODO: Propagate error properly
     let mut sync_ss = sync_handler
         .find_by(doc! {
             "projects.project": orig_proj.id.to_string(),
         })
-        .await?;
+        .await
+        .map_err(|e| {
+            GQLError::new(e.to_string(), GQLErrorCode::ServerSyncRequestFails).extend(|f| {
+                f.set("source_project", orig_proj.id.to_string());
+                f.set("invite_id", invite.to_string());
+                f.set("from", "invite_accept");
+            })
+        })?;
 
     let sync_mut = sync_ss.as_mut();
 
@@ -250,8 +286,14 @@ pub async fn mutate_collaborations_accept(
             .push(ServerCollaborationSyncTarget::from(target_proj));
 
         // Update DB
-        // TODO: Propagate error properly
-        sync_handler.save(sync, None).await?;
+        sync_handler.save(sync, None).await.map_err(|e| {
+            GQLError::new(e.to_string(), GQLErrorCode::ServerSyncUpdateError).extend(|f| {
+                f.set("id", sync.id.to_string());
+                f.set("invite_id", invite.to_string());
+                f.set("from", "invite_accept");
+                f.set("is_new", false);
+            })
+        })?;
 
         // Save in search index
         let sync_clone = sync.clone();
@@ -284,8 +326,14 @@ pub async fn mutate_collaborations_accept(
         let mut sync = showtimes_db::m::ServerCollaborationSync::new(vec![src_sync, target_sync]);
 
         // Save to DB
-        // TODO: Propagate error properly
-        sync_handler.save(&mut sync, None).await?;
+        sync_handler.save(&mut sync, None).await.map_err(|e| {
+            GQLError::new(e.to_string(), GQLErrorCode::ServerSyncUpdateError).extend(|f| {
+                f.set("id", sync.id.to_string());
+                f.set("invite_id", invite.to_string());
+                f.set("from", "invite_accept");
+                f.set("is_new", true);
+            })
+        })?;
 
         // Save in search index
         let sync_clone = sync.clone();
@@ -313,12 +361,20 @@ pub async fn mutate_collaborations_accept(
     };
 
     // Delete invite
-    // TODO: Propagate error properly
-    invite_db.delete(&invite_data).await?;
+    invite_db.delete(&invite_data).await.map_err(|e| {
+        GQLError::new(e.to_string(), GQLErrorCode::ServerInviteDeleteError).extend(|f| {
+            f.set("id", invite.to_string());
+            f.set("from", "invite_accept");
+        })
+    })?;
     // Remove from search index
     let invite_search = showtimes_search::models::ServerCollabInvite::from(invite_data.clone());
-    // TODO: Propagate error properly
-    invite_search.delete_document(meili).await?;
+    invite_search.delete_document(meili).await.map_err(|e| {
+        GQLError::new(e.to_string(), GQLErrorCode::ServerInviteDeleteSearchError).extend(|f| {
+            f.set("id", invite.to_string());
+            f.set("from", "invite_accept");
+        })
+    })?;
 
     Ok(sync_gql)
 }
@@ -353,8 +409,19 @@ pub async fn mutate_collaborations_cancel(
     check_permissions(ctx, &user, server_id).await?;
 
     // Deny the invite
-    // TODO: Propagate error properly
-    invite_db.delete(&invite_data).await?;
+    invite_db.delete(&invite_data).await.map_err(|e| {
+        GQLError::new(e.to_string(), GQLErrorCode::ServerInviteDeleteError).extend(|f| {
+            f.set("id", invite.to_string());
+            f.set(
+                "from",
+                if is_deny {
+                    "invite_deny"
+                } else {
+                    "invite_retract"
+                },
+            );
+        })
+    })?;
 
     // Remove from search index
     let meili_clone = meili.clone();
@@ -436,8 +503,14 @@ pub async fn mutate_collaborations_unlink(
     // Check if we need to delete the sync
     if sync.length() < 2 {
         // Delete the sync
-        // TODO: Propagate error properly
-        sync_handler.delete(&sync).await?;
+        sync_handler.delete(&sync).await.map_err(|e| {
+            GQLError::new(e.to_string(), GQLErrorCode::ServerSyncDeleteError).extend(|f| {
+                f.set("id", sync.id.to_string());
+                f.set("from", "invite_unlink");
+                f.set("action", "delete");
+                f.set("initiator", initiator.to_string());
+            })
+        })?;
 
         // Remove from search index
         let sync_clone = sync.clone();
@@ -462,8 +535,15 @@ pub async fn mutate_collaborations_unlink(
 
         execute_search_events(task_search, task_events).await?;
     } else {
-        // TODO: Propagate error properly
-        sync_handler.save(&mut sync, None).await?;
+        // Update the server sync with our server removed.
+        sync_handler.save(&mut sync, None).await.map_err(|e| {
+            GQLError::new(e.to_string(), GQLErrorCode::ServerSyncUpdateError).extend(|f| {
+                f.set("id", sync.id.to_string());
+                f.set("from", "invite_unlink");
+                f.set("action", "unlink");
+                f.set("initiator", initiator.to_string());
+            })
+        })?;
 
         // Save in search index
         let sync_clone = sync.clone();

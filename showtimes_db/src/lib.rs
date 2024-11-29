@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+pub mod errors;
 pub mod models;
 
 use bson::doc;
@@ -34,7 +35,7 @@ pub struct Connection {
 /// # Arguments
 /// - `url` - The URL of the MongoDB server.
 ///           This is formatted as `mongodb://<host>:<port>`
-pub async fn create_connection(url: &str) -> anyhow::Result<Connection> {
+pub async fn create_connection(url: &str) -> Result<Connection, mongodb::error::Error> {
     // Parse the connection string
     let mut options = ClientOptions::parse(url).await?;
 

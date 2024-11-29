@@ -201,7 +201,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             #[doc = "Find all documents in the"]
             #[doc = #model_name_full]
             #[doc = "collection"]
-            pub async fn find_all(&self) -> anyhow::Result<Vec<#model_ident>> {
+            pub async fn find_all(&self) -> mongodb::error::Result<Vec<#model_ident>> {
                 let mut cursor = self.col.find(mongodb::bson::doc! {}).await?;
                 let mut results = Vec::new();
 
@@ -215,7 +215,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             #[doc = "Find a document by [`mongodb::bson::oid::ObjectId`] in the"]
             #[doc = #model_name_full]
             #[doc = "collection"]
-            pub async fn find_by_oid(&self, id: &mongodb::bson::oid::ObjectId) -> anyhow::Result<Option<#model_ident>> {
+            pub async fn find_by_oid(&self, id: &mongodb::bson::oid::ObjectId) -> mongodb::error::Result<Option<#model_ident>> {
                 let result = self.col.find_one(mongodb::bson::doc! { "_id": id }).await?;
                 Ok(result)
             }
@@ -223,7 +223,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             #[doc = "Find a document by Id in the"]
             #[doc = #model_name_full]
             #[doc = "collection"]
-            pub async fn find_by_id(&self, id: &str) -> anyhow::Result<Option<#model_ident>> {
+            pub async fn find_by_id(&self, id: &str) -> mongodb::error::Result<Option<#model_ident>> {
                 let result = self.col.find_one(mongodb::bson::doc! { "id": id }).await?;
                 Ok(result)
             }
@@ -234,7 +234,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             pub async fn find_by(
                 &self,
                 filter: mongodb::bson::Document,
-            ) -> anyhow::Result<Option<#model_ident>> {
+            ) -> mongodb::error::Result<Option<#model_ident>> {
                 let result = self.col.find_one(filter).await?;
                 Ok(result)
             }
@@ -245,7 +245,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             pub async fn find_all_by(
                 &self,
                 filter: mongodb::bson::Document,
-            ) -> anyhow::Result<Vec<#model_ident>> {
+            ) -> mongodb::error::Result<Vec<#model_ident>> {
                 let mut cursor = self.col.find(filter).await?;
                 let mut results = Vec::new();
 
@@ -259,7 +259,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             #[doc = "Insert a document in the"]
             #[doc = #model_name_full]
             #[doc = "collection"]
-            pub async fn insert(&self, docs: &mut Vec<#model_ident>) -> anyhow::Result<()> {
+            pub async fn insert(&self, docs: &mut Vec<#model_ident>) -> mongodb::error::Result<()> {
                 // Iterate over the documents and add the `_id` field if it's missing
                 for doc in docs.iter_mut() {
                     if doc.id().is_none() {
@@ -273,9 +273,9 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             #[doc = "Update a document in the"]
             #[doc = #model_name_full]
             #[doc = "collection"]
-            pub async fn update(&self, doc: &#model_ident, filter: Option<mongodb::bson::Document>, update: mongodb::bson::Document) -> anyhow::Result<#model_ident> {
+            pub async fn update(&self, doc: &#model_ident, filter: Option<mongodb::bson::Document>, update: mongodb::bson::Document) -> mongodb::error::Result<#model_ident> {
                 if doc.id().is_none() {
-                    anyhow::bail!("Document must have an `_id` to be updated");
+                    return Err(mongodb::error::Error::custom("Document must have an `_id` to be updated"));
                 }
 
                 let filter = match filter {
@@ -294,12 +294,12 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
 
                 match self.col.find_one_and_update(filter, update).with_options(options).await? {
                     Some(result) => Ok(result),
-                    None => anyhow::bail!("Failed to update document"),
+                    None => Err(mongodb::error::Error::custom("Failed to update document")),
                 }
             }
 
             /// Internally used to save a document
-            async fn internal_save(&self, doc: &mut #model_ident, filter: Option<mongodb::bson::Document>) -> anyhow::Result<()> {
+            async fn internal_save(&self, doc: &mut #model_ident, filter: Option<mongodb::bson::Document>) -> mongodb::error::Result<()> {
                 let mut wc = mongodb::options::WriteConcern::default();
                 wc.journal = Some(true);
 
@@ -328,22 +328,27 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
                         match mongodb::bson::to_bson(&result)? {
                             mongodb::bson::Bson::Document(dd) => {
                                 if id_needs_update {
-                                    let resp_id = dd.get_object_id("_id")?;
+                                    let resp_id = dd.get_object_id("_id").map_err(|e| {
+                                        mongodb::error::Error::custom(format!(
+                                            "Failed to get the current `_id` from document: {}",
+                                            e
+                                        ))
+                                    })?;
                                     doc.set_id(resp_id);
                                 };
                                 Ok(())
                             }
-                            _ => anyhow::bail!("Failed to convert document into bson object")
+                            _ => Err(mongodb::error::Error::custom("Failed to convert document into bson object")),
                         }
                     }
-                    None => anyhow::bail!("Failed to save document"),
+                    None => Err(mongodb::error::Error::custom("Failed to save document")),
                 }
             }
 
             #[doc = "Save a document in the"]
             #[doc = #model_name_full]
             #[doc = "collection"]
-            pub async fn save(&self, doc: &mut #model_ident, filter: Option<mongodb::bson::Document>) -> anyhow::Result<()> {
+            pub async fn save(&self, doc: &mut #model_ident, filter: Option<mongodb::bson::Document>) -> mongodb::error::Result<()> {
                 doc.updated();
                 self.internal_save(doc, filter).await
             }
@@ -351,16 +356,16 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             #[doc = "Save a document in the"]
             #[doc = #model_name_full]
             #[doc = "collection without updating the `updated` field"]
-            pub async fn save_direct(&self, doc: &mut #model_ident, filter: Option<mongodb::bson::Document>) -> anyhow::Result<()> {
+            pub async fn save_direct(&self, doc: &mut #model_ident, filter: Option<mongodb::bson::Document>) -> mongodb::error::Result<()> {
                 self.internal_save(doc, filter).await
             }
 
             #[doc = "Delete a document in the"]
             #[doc = #model_name_full]
             #[doc = "collection"]
-            pub async fn delete(&self, doc: &#model_ident) -> anyhow::Result<mongodb::results::DeleteResult> {
+            pub async fn delete(&self, doc: &#model_ident) -> mongodb::error::Result<mongodb::results::DeleteResult> {
                 if doc.id().is_none() {
-                    anyhow::bail!("Document must have an `_id` to be deleted");
+                    return Err(mongodb::error::Error::custom("Document must have an `_id` to be deleted"));
                 }
 
                 let filter = mongodb::bson::doc! { "_id": doc.id().unwrap() };
@@ -370,14 +375,14 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             #[doc = "Delete documents in the"]
             #[doc = #model_name_full]
             #[doc = "collection by filter"]
-            pub async fn delete_by(&self, filter: mongodb::bson::Document) -> anyhow::Result<mongodb::results::DeleteResult> {
+            pub async fn delete_by(&self, filter: mongodb::bson::Document) -> mongodb::error::Result<mongodb::results::DeleteResult> {
                 Ok(self.col.delete_one(filter).await?)
             }
 
             #[doc = "Delete all documents in the"]
             #[doc = #model_name_full]
             #[doc = "collection"]
-            pub async fn delete_all(&self) -> anyhow::Result<()> {
+            pub async fn delete_all(&self) -> mongodb::error::Result<()> {
                 let col = self.col.clone();
                 let deref_col = ::std::sync::Arc::try_unwrap(col).unwrap_or_else(|arc| (*arc).clone());
                 Ok(deref_col.drop().await?)
