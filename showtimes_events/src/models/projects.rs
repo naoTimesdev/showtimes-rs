@@ -1,3 +1,5 @@
+//! A collection of projects events model
+
 use serde::{Deserialize, Serialize};
 use showtimes_derive::EventModel;
 
@@ -11,6 +13,7 @@ pub struct ProjectCreatedEvent {
 }
 
 impl ProjectCreatedEvent {
+    /// Create a new [`ProjectCreatedEvent`] with the given `id` and `title`.
     pub fn new(id: showtimes_shared::ulid::Ulid, title: impl Into<String>) -> Self {
         Self {
             id,
@@ -68,6 +71,7 @@ pub struct ProjectUpdatedEpisodeDataEvent {
 }
 
 impl ProjectUpdatedEpisodeDataEvent {
+    /// Create a new [`ProjectUpdatedEpisodeDataEvent`] with the given `number` for an addition operation.
     pub fn added(episode: u64) -> Self {
         Self {
             number: episode,
@@ -76,6 +80,7 @@ impl ProjectUpdatedEpisodeDataEvent {
         }
     }
 
+    /// Create a new [`ProjectUpdatedEpisodeDataEvent`] with the given `number` for a removal operation.
     pub fn removed(episode: u64) -> Self {
         Self {
             number: episode,
@@ -84,6 +89,7 @@ impl ProjectUpdatedEpisodeDataEvent {
         }
     }
 
+    /// Create a new [`ProjectUpdatedEpisodeDataEvent`] with the given `number` for an update operation.
     pub fn updated(episode: u64) -> Self {
         Self {
             number: episode,
@@ -117,6 +123,7 @@ pub struct ProjectUpdatedDataEvent {
 }
 
 impl ProjectUpdatedDataEvent {
+    /// Add a new [`ProjectUpdatedEpisodeDataEvent`] to the progress list.
     pub fn add_progress(&mut self, progress: ProjectUpdatedEpisodeDataEvent) {
         match &mut self.progress {
             Some(p) => p.push(progress),
@@ -124,6 +131,7 @@ impl ProjectUpdatedDataEvent {
         }
     }
 
+    /// Check if the event has any changes
     pub fn has_changes(&self) -> bool {
         self.title.is_some()
             || self.integrations.is_some()
@@ -147,6 +155,7 @@ pub struct ProjectUpdatedEvent {
 }
 
 impl ProjectUpdatedEvent {
+    /// Create a new [`ProjectUpdatedEvent`] with the given `id` and `before` and `after` data.
     pub fn new(
         id: showtimes_shared::ulid::Ulid,
         before: ProjectUpdatedDataEvent,
@@ -179,6 +188,7 @@ pub struct ProjectEpisodeUpdatedEvent {
 }
 
 impl ProjectEpisodeUpdatedEvent {
+    /// Create a new [`ProjectEpisodeUpdatedEvent`] with the given `id` and `number`.
     pub fn new(id: showtimes_shared::ulid::Ulid, number: u64, silent: bool) -> Self {
         Self {
             id,
@@ -190,14 +200,17 @@ impl ProjectEpisodeUpdatedEvent {
         }
     }
 
+    /// Push a previous role status
     pub fn push_before(&mut self, role: &showtimes_db::m::RoleStatus) {
         self.before.push(role.clone());
     }
 
+    /// Push a new role status
     pub fn push_after(&mut self, role: &showtimes_db::m::RoleStatus) {
         self.after.push(role.clone());
     }
 
+    /// Check if the event has any changes
     pub fn has_changes(&self) -> bool {
         !self.before().is_empty() || self.finished().is_some() || !self.after().is_empty()
     }
@@ -212,6 +225,7 @@ pub struct ProjectDeletedEvent {
 }
 
 impl ProjectDeletedEvent {
+    /// Create a new [`ProjectDeletedEvent`] with the given `id`.
     pub fn new(id: showtimes_shared::ulid::Ulid) -> Self {
         Self { id }
     }

@@ -1,3 +1,5 @@
+//! A collection of common model types, also contains the main [`SHEvent`] model.
+
 use clickhouse::Row;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -82,6 +84,7 @@ impl<T> SHEvent<T>
 where
     T: serde::Serialize + Send + Sync + Clone + 'static,
 {
+    /// Create a new [`SHEvent`] with the given `kind` and `data`
     pub fn new(kind: EventKind, data: T) -> Self {
         Self {
             id: showtimes_shared::ulid_serializer::default(),
@@ -97,22 +100,27 @@ where
         self
     }
 
+    /// Get the ID of the event
     pub fn id(&self) -> showtimes_shared::ulid::Ulid {
         self.id
     }
 
+    /// Get the kind of the event
     pub fn kind(&self) -> EventKind {
         self.kind
     }
 
+    /// Get the data of the event
     pub fn data(&self) -> &T {
         &self.data
     }
 
+    /// Get the actor of the event
     pub fn actor(&self) -> Option<&str> {
         self.actor.as_deref()
     }
 
+    /// Get the timestamp of the event
     pub fn timestamp(&self) -> ::time::OffsetDateTime {
         self.timestamp
     }

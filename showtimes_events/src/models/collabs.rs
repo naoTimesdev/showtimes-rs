@@ -1,3 +1,5 @@
+//! A collection of collaboration events model
+
 use serde::{Deserialize, Serialize};
 use showtimes_derive::EventModel;
 
@@ -35,6 +37,7 @@ pub struct CollabAcceptedEvent {
 }
 
 impl CollabAcceptedEvent {
+    /// Create a new collab accepted event
     pub fn new(id: showtimes_shared::ulid::Ulid, sync_id: showtimes_shared::ulid::Ulid) -> Self {
         Self { id, sync_id }
     }
@@ -69,6 +72,7 @@ pub struct CollabRetractedEvent {
 }
 
 impl CollabRetractedEvent {
+    /// Create a new collab retracted event
     pub fn new(id: showtimes_shared::ulid::Ulid) -> Self {
         Self { id }
     }
@@ -102,6 +106,7 @@ pub struct CollabDeletedEvent {
 }
 
 impl CollabDeletedEvent {
+    /// Create a new collab deleted event
     pub fn new(
         id: showtimes_shared::ulid::Ulid,
         target: &showtimes_db::m::ServerCollaborationSyncTarget,

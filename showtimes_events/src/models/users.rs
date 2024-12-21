@@ -1,3 +1,5 @@
+//! A collection of users events model
+
 use serde::{Deserialize, Serialize};
 use showtimes_derive::EventModel;
 
@@ -58,6 +60,7 @@ pub struct UserUpdatedEvent {
 }
 
 impl UserUpdatedEvent {
+    /// Create a new user updated event
     pub fn new(
         id: showtimes_shared::ulid::Ulid,
         before: UserUpdatedDataEvent,
@@ -76,6 +79,7 @@ pub struct UserDeletedEvent {
 }
 
 impl UserDeletedEvent {
+    /// Create a new user deleted event
     pub fn new(id: showtimes_shared::ulid::Ulid) -> Self {
         Self { id }
     }

@@ -1,3 +1,5 @@
+//! A collection of servers events model
+
 use serde::{Deserialize, Serialize};
 use showtimes_derive::EventModel;
 
@@ -54,6 +56,7 @@ pub struct ServerUpdatedEvent {
 }
 
 impl ServerUpdatedEvent {
+    /// Creates a new server updated event
     pub fn new(
         id: showtimes_shared::ulid::Ulid,
         before: ServerUpdatedDataEvent,
@@ -72,6 +75,7 @@ pub struct ServerDeletedEvent {
 }
 
 impl ServerDeletedEvent {
+    /// Creates a new server deleted event
     pub fn new(id: showtimes_shared::ulid::Ulid) -> Self {
         Self { id }
     }

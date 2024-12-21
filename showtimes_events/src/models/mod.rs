@@ -1,3 +1,5 @@
+//! The models for the events module
+
 pub mod collabs;
 pub mod common;
 pub mod projects;
