@@ -5,7 +5,6 @@ use serde::{ser::SerializeSeq, Deserialize};
 use uuid::{Timestamp, Uuid};
 
 pub mod config;
-pub mod markdown;
 pub use config::Config;
 
 /// Re-exports of the [`ulid`] crate

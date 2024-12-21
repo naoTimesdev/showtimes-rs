@@ -4,6 +4,7 @@
 
 use std::sync::LazyLock;
 
+use htmd::HtmlToMarkdown;
 use pulldown_cmark::Options;
 
 /// The following markdown options are enabled based on what Discord supports.
@@ -13,6 +14,89 @@ static MARKDOWN_OPTIONS: LazyLock<Options> = LazyLock::new(|| {
     opts.insert(Options::ENABLE_SMART_PUNCTUATION);
     opts
 });
+
+pub(crate) fn expand_url(url: &str, base_url: &url::Url) -> Result<String, url::ParseError> {
+    // expand relative URLs if possible
+    let joined = base_url.join(url)?;
+    Ok(joined.to_string())
+}
+
+/// Convert HTML to markdown
+pub fn html_to_markdown(html: &str, base_url: &url::Url) -> Result<String, std::io::Error> {
+    let base_url = base_url.clone();
+    let converter = HtmlToMarkdown::builder()
+        .options(htmd::options::Options {
+            hr_style: htmd::options::HrStyle::Dashes,
+            bullet_list_marker: htmd::options::BulletListMarker::Dash,
+            heading_style: htmd::options::HeadingStyle::Atx,
+            ..Default::default()
+        })
+        .skip_tags(vec!["script", "style"])
+        .add_handler(vec!["a", "img"], move |el: htmd::Element| {
+            let mut attrs = el.attrs.iter();
+            let src = attrs.find(|&attr| format!("{:?}", attr.name.expanded()) == "src");
+            let alt = attrs.find(|&attr| format!("{:?}", attr.name.expanded()) == "alt");
+            let href = attrs.find(|&attr| format!("{:?}", attr.name.expanded()) == "href");
+            let title = attrs.find(|&attr| format!("{:?}", attr.name.expanded()) == "title");
+
+            match el.tag {
+                "img" => match (src, alt) {
+                    (Some(src), Some(alt)) => {
+                        let src = src.value.to_string();
+                        let alt = alt.value.to_string();
+
+                        let expand_src = expand_url(&src, &base_url).unwrap_or(src);
+
+                        if let Some(title) = title {
+                            let title = title.value.to_string();
+                            Some(format!("![{alt}]({expand_src} \"{title}\")"))
+                        } else {
+                            Some(format!("![{alt}]({expand_src})"))
+                        }
+                    }
+                    (Some(src), None) => {
+                        let src = src.value.to_string();
+
+                        let expand_src = expand_url(&src, &base_url).unwrap_or(src);
+
+                        if let Some(title) = title {
+                            let title = title.value.to_string();
+                            Some(format!("![]({expand_src} \"{title}\")"))
+                        } else {
+                            Some(format!("![]({expand_src})"))
+                        }
+                    }
+                    _ => None,
+                },
+                "a" => match (href, title) {
+                    (Some(href), Some(title)) => {
+                        let href = href.value.to_string();
+                        let title = title.value.to_string();
+
+                        let expand_href = expand_url(&href, &base_url).unwrap_or(href);
+
+                        Some(format!("[{title}]({expand_href})"))
+                    }
+                    (Some(href), None) => {
+                        let href = href.value.to_string();
+                        let content = el.content;
+
+                        let expand_href = expand_url(&href, &base_url).unwrap_or(href);
+
+                        Some(format!("[{content}]({expand_href})"))
+                    }
+                    _ => None,
+                },
+                _ => None,
+            }
+        })
+        .add_handler(vec!["svg"], |_: htmd::Element| {
+            Some("[SVG Image]".to_string())
+        })
+        .build();
+
+    converter.convert(html)
+}
 
 /// Convert markdown to HTML
 pub fn markdown_to_html(markdown: &str) -> String {

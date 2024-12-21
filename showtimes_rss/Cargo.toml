@@ -1,0 +1,22 @@
+[package]
+name = "showtimes-rss"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "A RSS handler for Showtimes API"
+
+[dependencies]
+nom.workspace = true
+chrono.workspace = true
+
+reqwest.workspace = true
+feed-rs.workspace = true
+url.workspace = true
+
+pulldown-cmark.workspace = true
+pulldown-cmark-escape.workspace = true
+htmd.workspace = true
