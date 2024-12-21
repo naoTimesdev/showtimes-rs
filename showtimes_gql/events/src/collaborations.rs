@@ -1,3 +1,5 @@
+//! A collaboration sync or invite events interactor
+
 use async_graphql::{dataloader::DataLoader, Object, SimpleObject};
 
 use errors::GQLError;

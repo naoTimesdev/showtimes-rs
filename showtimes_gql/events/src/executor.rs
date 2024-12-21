@@ -1,3 +1,5 @@
+//! A collection of event executor functions for querying events from ClickHouse
+
 use async_graphql::OutputType;
 use serde::{de::DeserializeOwned, Serialize};
 use showtimes_gql_common::{errors::GQLError, queries::ServerQueryUser, GQLErrorCode, UlidGQL};

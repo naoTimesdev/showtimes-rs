@@ -1,3 +1,5 @@
+//! A collection of prelude/common types and traits
+
 use async_graphql::{Enum, OutputType, SimpleObject};
 use serde::{de::DeserializeOwned, Serialize};
 use showtimes_gql_common::{queries::ServerQueryUser, DateTimeGQL, UlidGQL};
@@ -20,6 +22,7 @@ pub trait QueryNew<
     O: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + std::fmt::Debug + 'static,
 >
 {
+    /// Create a new event data with specific user request.
     fn new(data: &O, user: ServerQueryUser) -> Self;
 }
 
@@ -104,6 +107,13 @@ impl<T> EventGQL<T>
 where
     T: OutputType,
 {
+    /// Creates a new event with the given data and metadata
+    ///
+    /// * `id`: The ULID of the event
+    /// * `data`: The actual event data that will be broadcasted
+    /// * `kind`: The kind of event that is being published
+    /// * `actor`: The user that initiated this event, or `None` if it is a system/owner initiated event
+    /// * `timestamp`: The timestamp of the event, it is assumed to be in the UTC timezone
     pub fn new(
         id: showtimes_shared::ulid::Ulid,
         data: T,

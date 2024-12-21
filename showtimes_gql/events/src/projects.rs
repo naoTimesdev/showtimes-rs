@@ -1,3 +1,5 @@
+//! A project events interactor
+
 use async_graphql::{dataloader::DataLoader, Enum, Object, SimpleObject};
 
 use errors::GQLError;
@@ -62,7 +64,7 @@ pub enum ProjectUpdatedEpisodeStatusGQL {
 
 /// A tiny information about episode update data event
 ///
-/// Used in conjuction with the [`ProjectEpisodeUpdatedEvent`]
+/// Used in conjuction with the [`ProjectUpdatedEpisodeStatusGQL`]
 #[derive(SimpleObject)]
 pub struct ProjectUpdatedEpisodeDataEventGQL {
     /// Episode number in the project

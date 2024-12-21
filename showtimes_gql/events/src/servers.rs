@@ -1,3 +1,5 @@
+//! A server events interactor
+
 use async_graphql::{dataloader::DataLoader, Object, SimpleObject};
 
 use errors::GQLError;
