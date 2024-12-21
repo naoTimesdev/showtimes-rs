@@ -10,7 +10,7 @@ use tokio::io::AsyncSeekExt;
 use showtimes_gql_common::{
     data_loader::{DiscordIdLoad, UserDataLoader},
     errors::GQLError,
-    GQLErrorCode, UserKindGQL,
+    GQLErrorCode, GQLErrorExt, UserKindGQL,
 };
 use showtimes_gql_models::users::{UserGQL, UserSessionGQL};
 
@@ -48,6 +48,19 @@ impl UserInputGQL {
             || self.kind.is_some()
             || self.reset_api_key.is_some()
             || self.avatar.is_some()
+    }
+
+    fn dump_query(&self, ctx: &mut async_graphql::ErrorExtensionValues) {
+        if let Some(ref username) = &self.username {
+            ctx.set("username", username.to_string());
+        }
+        if let Some(kind) = &self.kind {
+            ctx.set("kind", kind.to_name());
+        }
+        if let Some(reset_api_key) = &self.reset_api_key {
+            ctx.set("reset_api_key", reset_api_key.to_string());
+        }
+        ctx.set("avatar_change", self.avatar.is_some());
     }
 }
 
@@ -161,9 +174,9 @@ pub async fn mutate_users_update(
     let mut user_info = user_info.clone();
     let mut user_before = showtimes_events::m::UserUpdatedDataEvent::default();
     let mut user_after = showtimes_events::m::UserUpdatedDataEvent::default();
-    if let Some(username) = input.username {
+    if let Some(ref username) = input.username {
         user_before.set_name(&user_info.username);
-        user_info.username = username;
+        user_info.username = username.to_string();
         user_after.set_name(&user_info.username);
     }
     if let Some(kind) = input.kind {
@@ -263,8 +276,14 @@ pub async fn mutate_users_update(
 
     // Update the user
     let user_handler = UserHandler::new(db);
-    // TODO: Propagate error properly
-    user_handler.save(&mut user_info, None).await?;
+    user_handler.save(&mut user_info, None).await.extend_error(
+        GQLErrorCode::UserUpdateError,
+        |f_m| {
+            f_m.set("id", user_info.id.to_string());
+            f_m.set("actor", user.requester.id.to_string());
+            input.dump_query(f_m);
+        },
+    )?;
 
     let search_arc = meili.clone();
     let user_clone = user_info.clone();
@@ -324,14 +343,26 @@ pub async fn mutate_users_authenticate(
     let discord = ctx.data_unchecked::<Arc<DiscordClient>>();
 
     tracing::info!("Exchanging code {} for OAuth2 token...", &token);
-    // TODO: Propagate error properly
     let exchanged = discord
         .exchange_code(&token, &config.discord.redirect_url)
-        .await?;
+        .await
+        .map_err(|err| {
+            GQLError::new(err.to_string(), GQLErrorCode::SessionExchangeError).extend(|f| {
+                f.set("token", &token);
+                f.set("state", &state);
+            })
+        })?;
 
     tracing::info!("Success, getting user for code {}", &token);
-    // TODO: Propagate error properly
-    let user_info = discord.get_user(&exchanged.access_token).await?;
+    let user_info = discord
+        .get_user(&exchanged.access_token)
+        .await
+        .map_err(|err| {
+            GQLError::new(err.to_string(), GQLErrorCode::SessionUserInfoError).extend(|f| {
+                f.set("token", &token);
+                f.set("state", &state);
+            })
+        })?;
 
     // Load handler and data loader
     let handler = showtimes_db::UserHandler::new(ctx.data_unchecked::<DatabaseShared>());
@@ -362,37 +393,81 @@ pub async fn mutate_users_authenticate(
 
             after_user.set_discord_meta(&user.discord_meta);
 
-            // TODO: Propagate error properly
-            handler.save(&mut user, None).await?;
-
-            // TODO: Propagate error properly
-            let (oauth_user, refresh_token) = showtimes_session::create_session(
-                user.id,
-                // TODO: Propagate error properly
-                config.jwt.get_expiration().try_into()?,
-                &config.jwt.secret,
+            handler.save(&mut user, None).await.extend_error(
+                GQLErrorCode::UserUpdateError,
+                |f| {
+                    f.set("id", user.id.to_string());
+                    f.set("token", &token);
+                    f.set("state", &state);
+                    f.set("is_new", false);
+                },
             )?;
 
+            let expiry_u64 = config.jwt.get_expiration();
+
+            let (oauth_user, refresh_token) = showtimes_session::create_session(
+                user.id,
+                expiry_u64.try_into().map_err(|_| {
+                    GQLError::new(
+                        format!("Failed to convert {} into timestamp", expiry_u64),
+                        GQLErrorCode::SessionCreateError,
+                    )
+                    .extend(|f| {
+                        f.set("id", user.id.to_string());
+                        f.set("token", &token);
+                        f.set("state", &state);
+                        f.set("is_new", false);
+                        f.set("expiry", expiry_u64);
+                    })
+                })?,
+                &config.jwt.secret,
+            )
+            .extend_error(GQLErrorCode::SessionCreateError, |f| {
+                f.set("id", user.id.to_string());
+                f.set("token", &token);
+                f.set("state", &state);
+                f.set("is_new", false);
+            })?;
+
             // Emit event
-            // TODO: Propagate error properly
             event_manager
                 .create_event(
                     showtimes_events::m::EventKind::UserUpdated,
                     showtimes_events::m::UserUpdatedEvent::new(user.id, before_user, after_user),
                     Some(user.id.to_string()),
                 )
-                .await?;
+                .await
+                .extend_error(GQLErrorCode::UserEventCreateError, |f| {
+                    f.set("id", user.id.to_string());
+                    f.set("token", &token);
+                    f.set("state", &state);
+                    f.set("is_new", false);
+                    f.set(
+                        "mode",
+                        showtimes_events::m::EventKind::UserUpdated.to_name(),
+                    );
+                })?;
 
             let mut sess_mutex = sess_manager.lock().await;
 
-            // TODO: Propagate error properly
             sess_mutex
                 .set_session(oauth_user.get_token(), oauth_user.get_claims())
-                .await?;
-            // TODO: Propagate error properly
+                .await
+                .extend_error(GQLErrorCode::SessionStoreError, |f| {
+                    f.set("id", user.id.to_string());
+                    f.set("token", &token);
+                    f.set("state", &state);
+                    f.set("is_new", false);
+                })?;
             sess_mutex
                 .set_refresh_session(&refresh_token, oauth_user.get_token())
-                .await?;
+                .await
+                .extend_error(GQLErrorCode::SessionRefreshStoreError, |f| {
+                    f.set("id", user.id.to_string());
+                    f.set("token", &token);
+                    f.set("state", &state);
+                    f.set("is_new", false);
+                })?;
             drop(sess_mutex);
 
             Ok(
@@ -418,37 +493,81 @@ pub async fn mutate_users_authenticate(
             };
 
             let mut user = showtimes_db::m::User::new(user_info.username, discord_user);
-            // TODO: Propagate error properly
-            handler.save(&mut user, None).await?;
+            handler.save(&mut user, None).await.extend_error(
+                GQLErrorCode::UserCreateError,
+                |f| {
+                    f.set("id", user.id.to_string());
+                    f.set("token", &token);
+                    f.set("state", &state);
+                    f.set("is_new", true);
+                },
+            )?;
 
             // Emit event
-            // TODO: Propagate error properly
             event_manager
                 .create_event(
                     showtimes_events::m::EventKind::UserCreated,
                     showtimes_events::m::UserCreatedEvent::from(&user),
                     Some(user.id.to_string()),
                 )
-                .await?;
+                .await
+                .extend_error(GQLErrorCode::UserEventCreateError, |f| {
+                    f.set("id", user.id.to_string());
+                    f.set("token", &token);
+                    f.set("state", &state);
+                    f.set("is_new", true);
+                    f.set(
+                        "mode",
+                        showtimes_events::m::EventKind::UserCreated.to_name(),
+                    );
+                })?;
 
-            // TODO: Propagate error properly
+            let expiry_u64 = config.jwt.get_expiration();
+
             let (oauth_user, refresh_token) = showtimes_session::create_session(
                 user.id,
-                // TODO: Propagate error properly
-                config.jwt.get_expiration().try_into()?,
+                expiry_u64.try_into().map_err(|_| {
+                    GQLError::new(
+                        format!("Failed to convert {} into timestamp", expiry_u64),
+                        GQLErrorCode::SessionCreateError,
+                    )
+                    .extend(|f| {
+                        f.set("id", user.id.to_string());
+                        f.set("token", &token);
+                        f.set("state", &state);
+                        f.set("is_new", false);
+                        f.set("expiry", expiry_u64);
+                    })
+                })?,
                 &config.jwt.secret,
-            )?;
+            )
+            .extend_error(GQLErrorCode::SessionCreateError, |f| {
+                f.set("id", user.id.to_string());
+                f.set("token", &token);
+                f.set("state", &state);
+                f.set("is_new", true);
+            })?;
 
             let mut sess_mutex = sess_manager.lock().await;
 
-            // TODO: Propagate error properly
             sess_mutex
                 .set_session(oauth_user.get_token(), oauth_user.get_claims())
-                .await?;
-            // TODO: Propagate error properly
+                .await
+                .extend_error(GQLErrorCode::SessionStoreError, |f| {
+                    f.set("id", user.id.to_string());
+                    f.set("token", &token);
+                    f.set("state", &state);
+                    f.set("is_new", true);
+                })?;
             sess_mutex
                 .set_refresh_session(&refresh_token, oauth_user.get_token())
-                .await?;
+                .await
+                .extend_error(GQLErrorCode::SessionRefreshStoreError, |f| {
+                    f.set("id", user.id.to_string());
+                    f.set("token", &token);
+                    f.set("state", &state);
+                    f.set("is_new", true);
+                })?;
             drop(sess_mutex);
 
             Ok(

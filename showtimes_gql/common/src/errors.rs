@@ -80,6 +80,8 @@ pub enum GQLErrorCode {
     InvalidToken = 130,
     /// Expired token provided
     ExpiredToken = 131,
+    /// Internal server error
+    InternalServerError = 140,
 
     // --> Event related
     /// Failed to advance or request next batch of events
@@ -116,6 +118,14 @@ pub enum GQLErrorCode {
     SessionCreateError = 601,
     /// Failed to delete session
     SessionDeleteError = 602,
+    /// Failed to exchange login token with Discord
+    SessionExchangeError = 610,
+    /// Failed to get user info from Discord
+    SessionUserInfoError = 611,
+    /// Failed to store session to database
+    SessionStoreError = 620,
+    /// Failed to store refresh session to database
+    SessionRefreshStoreError = 621,
 
     // --> User related
     /// Failed when requesting user
@@ -132,14 +142,20 @@ pub enum GQLErrorCode {
     UserInsufficientPrivilege = 1005,
     /// User is owner and cannot be modified or do anything "user"-like
     UserSuperuserMode = 1006,
+    /// Failed to create user
+    UserCreateError = 1010,
+    /// Failed to create user in search database
+    UserCreateSearchError = 1011,
     /// Failed to update user
-    UserUpdateError = 1010,
+    UserUpdateError = 1012,
     /// Failed to update user in search database
-    UserUpdateSearchError = 1011,
+    UserUpdateSearchError = 1013,
     /// Failed to delete user
-    UserDeleteError = 1012,
+    UserDeleteError = 1014,
     /// Failed to delete user in search database
-    UserDeleteSearchError = 1013,
+    UserDeleteSearchError = 1015,
+    /// Failed to create event and store it to database
+    UserEventCreateError = 1016,
 
     // --> Server related
     /// Failed when requesting server
@@ -148,14 +164,18 @@ pub enum GQLErrorCode {
     ServerNotFound = 2001,
     /// Server already exists
     ServerAlreadyExists = 2002,
+    /// Failed to create server
+    ServerCreateError = 2010,
+    /// Failed to create server in search database
+    ServerCreateSearchError = 2011,
     /// Failed to update server
-    ServerUpdateError = 2010,
+    ServerUpdateError = 2012,
     /// Failed to update server in search database
-    ServerUpdateSearchError = 2011,
+    ServerUpdateSearchError = 2013,
     /// Failed to delete server
-    ServerDeleteError = 2012,
+    ServerDeleteError = 2014,
     /// Failed to delete server in search database
-    ServerDeleteSearchError = 2013,
+    ServerDeleteSearchError = 2015,
     /// Server fetch disabled
     ServerFetchDisabled = 2020,
 
@@ -172,14 +192,18 @@ pub enum GQLErrorCode {
     ProjectArchived = 3004,
     /// Project role does not exist
     ProjectRoleNotFound = 3005,
+    /// Failed to create project
+    ProjectCreateError = 3010,
+    /// Failed to create project in search database
+    ProjectCreateSearchError = 3011,
     /// Failed to update project
-    ProjectUpdateError = 3010,
+    ProjectUpdateError = 3012,
     /// Failed to update project in search database
-    ProjectUpdateSearchError = 3011,
+    ProjectUpdateSearchError = 3013,
     /// Failed to delete project
-    ProjectDeleteError = 3012,
+    ProjectDeleteError = 3014,
     /// Failed to delete project in search database
-    ProjectDeleteSearchError = 3013,
+    ProjectDeleteSearchError = 3015,
     /// Project fetch disabled
     ProjectFetchDisabled = 3020,
 
@@ -190,14 +214,18 @@ pub enum GQLErrorCode {
     ServerSyncNotFound = 4001,
     /// Server collab already exists
     ServerSyncAlreadyExists = 4002,
+    /// Failed to create server collab
+    ServerSyncCreateError = 4010,
+    /// Failed to create server collab in search database
+    ServerSyncCreateSearchError = 4011,
     /// Failed to update server collab
-    ServerSyncUpdateError = 4010,
+    ServerSyncUpdateError = 4012,
     /// Failed to update server collab in search database
-    ServerSyncUpdateSearchError = 4011,
+    ServerSyncUpdateSearchError = 4013,
     /// Failed to delete server collab
-    ServerSyncDeleteError = 4012,
+    ServerSyncDeleteError = 4014,
     /// Failed to delete server collab in search database
-    ServerSyncDeleteSearchError = 4013,
+    ServerSyncDeleteSearchError = 4015,
 
     // --> Server collab ivite related
     /// Failed when requesting server collab invite
@@ -206,14 +234,18 @@ pub enum GQLErrorCode {
     ServerInviteNotFound = 5001,
     /// Server collab invite already exists
     ServerInviteAlreadyExists = 5002,
+    /// Failed to update create collab invite
+    ServerInviteCreateError = 5010,
+    /// Failed to update create collab invite in search database
+    ServerInviteCreateSearchError = 5011,
     /// Failed to update server collab invite
-    ServerInviteUpdateError = 5010,
+    ServerInviteUpdateError = 5012,
     /// Failed to update server collab invite in search database
-    ServerInviteUpdateSearchError = 5011,
+    ServerInviteUpdateSearchError = 5013,
     /// Failed to delete server collab invite
-    ServerInviteDeleteError = 5012,
+    ServerInviteDeleteError = 5014,
     /// Failed to delete server collab invite in search database
-    ServerInviteDeleteSearchError = 5013,
+    ServerInviteDeleteSearchError = 5015,
 
     // -> Metadata related
     /// Generic metadata error

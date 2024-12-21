@@ -160,7 +160,7 @@ pub async fn mutate_collaborations_initiate(
         .save(&mut collab_invite, None)
         .await
         .map_err(|e| {
-            GQLError::new(e.to_string(), GQLErrorCode::ServerInviteUpdateError).extend(|f| {
+            GQLError::new(e.to_string(), GQLErrorCode::ServerInviteCreateError).extend(|f| {
                 f.set("id", collab_invite.id.to_string());
                 input.dump_query(f);
             })
@@ -327,7 +327,7 @@ pub async fn mutate_collaborations_accept(
 
         // Save to DB
         sync_handler.save(&mut sync, None).await.map_err(|e| {
-            GQLError::new(e.to_string(), GQLErrorCode::ServerSyncUpdateError).extend(|f| {
+            GQLError::new(e.to_string(), GQLErrorCode::ServerSyncCreateError).extend(|f| {
                 f.set("id", sync.id.to_string());
                 f.set("invite_id", invite.to_string());
                 f.set("from", "invite_accept");
