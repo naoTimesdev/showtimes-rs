@@ -514,7 +514,11 @@ async fn fetch_metadata_via_anilist(
 
             // Check the episode range if all exists
             let first_ep = merged_episodes[0].clone();
-            let last_ep = merged_episodes.clone().last().unwrap().clone();
+            let last_ep = merged_episodes
+                .clone()
+                .last()
+                .expect("No last episode even though it should exist")
+                .clone();
             if first_ep.number > 1 {
                 // Extrapolate backward, use this episode start as all the previous episodes
                 // This handle weird situation with something like Frieren in Anilist
@@ -2254,7 +2258,9 @@ pub async fn mutate_projects_episode_add_auto(
         // Add episodes from the last episode
         let mut sorted_episodes = project.progress.clone();
         sorted_episodes.sort();
-        let last_episode = sorted_episodes.last().unwrap();
+        let last_episode = sorted_episodes
+            .last()
+            .expect("No episodes exist on this project");
         let last_air_date = last_episode.aired;
         let new_episodes = ((last_episode.number + 1)..=(last_episode.number + count))
             .enumerate()
@@ -2299,6 +2305,17 @@ pub async fn mutate_projects_episode_add_auto(
     let mut all_events_content = vec![];
     let mut all_search_contents = vec![];
 
+    if prj_info.progress.is_empty() {
+        return GQLError::new(
+            "Project has no episodes",
+            GQLErrorCode::ProjectEmptyEpisodes,
+        )
+        .extend(|e| {
+            e.set("id", id.to_string());
+        })
+        .into();
+    }
+
     // Save the project
     let project_event = update_project_inner(&mut prj_info, count);
     // TODO: Propagate error properly
@@ -2312,6 +2329,18 @@ pub async fn mutate_projects_episode_add_auto(
     // TODO: Validate propagate error
     let mut other_projects = fetch_project_collaborators(ctx, &prj_info).await?;
     for project in other_projects.iter_mut() {
+        if project.progress.is_empty() {
+            return GQLError::new(
+                "Collab project has no episodes",
+                GQLErrorCode::ProjectEmptyEpisodes,
+            )
+            .extend(|e| {
+                e.set("id", project.id.to_string());
+                e.set("original", id.to_string());
+            })
+            .into();
+        }
+
         let project_event = update_project_inner(project, count);
         // Save other project
         // TODO: Propagate error properly

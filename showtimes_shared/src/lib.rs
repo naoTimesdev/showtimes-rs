@@ -406,8 +406,13 @@ pub mod unix_timestamp_opt_serializer {
         match i64::deserialize(deserializer) {
             Ok(s) => {
                 // unwrap now!
-                let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(s, 0).unwrap();
-                Ok(Some(dt))
+                match chrono::DateTime::<chrono::Utc>::from_timestamp(s, 0) {
+                    Some(dt) => Ok(Some(dt)),
+                    None => Err(serde::de::Error::custom(format!(
+                        "invalid timestamp: {}",
+                        s
+                    ))),
+                }
             }
             Err(_) => Ok(None),
         }

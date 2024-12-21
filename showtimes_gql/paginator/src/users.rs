@@ -181,7 +181,11 @@ pub async fn query_users_paginated(
 
     // If all_users is equal to per_page, then there is a next page
     let last_srv = if all_users.len() > per_page as usize {
-        Some(all_users.pop().unwrap())
+        Some(
+            all_users
+                .pop()
+                .expect("This should not error since len > per_page"),
+        )
     } else {
         None
     };

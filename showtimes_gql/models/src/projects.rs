@@ -246,6 +246,7 @@ impl ProjectGQL {
         let actual_progress: Vec<ProjectProgressGQL> = if let Some(limit) = limit_latest {
             // Shift amount to the right
             let unreleased_idx = progress.iter().position(|p| !p.finished);
+            let last_progress = progress.last();
 
             match unreleased_idx {
                 Some(idx) => {
@@ -254,7 +255,12 @@ impl ProjectGQL {
                     let results = progress[idx..end_idx].to_vec();
 
                     if return_last && results.is_empty() {
-                        vec![progress.last().unwrap().clone()]
+                        // Return the last one
+                        if let Some(progress) = last_progress {
+                            vec![progress.clone()]
+                        } else {
+                            vec![]
+                        }
                     } else {
                         results
                     }
@@ -262,7 +268,11 @@ impl ProjectGQL {
                 None => {
                     if return_last {
                         // Return the last one
-                        vec![progress.last().unwrap().clone()]
+                        if let Some(progress) = last_progress {
+                            vec![progress.clone()]
+                        } else {
+                            vec![]
+                        }
                     } else {
                         vec![]
                     }

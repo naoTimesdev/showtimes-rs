@@ -25,7 +25,7 @@ impl TMDbProvider {
             "showtimes-rs-metadata/{}",
             env!("CARGO_PKG_VERSION")
         ))
-        .unwrap();
+        .expect("Failed to build the User-Agent header for TMDb API");
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             reqwest::header::ACCEPT,

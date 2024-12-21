@@ -134,9 +134,9 @@ async fn entrypoint() -> anyhow::Result<()> {
                 &s3.endpoint_url,
                 &s3.region,
                 Some(s3_path_style),
-            );
+            )?;
 
-            let s3_fs = showtimes_fs::s3::S3Fs::new(s3_bucket, s3_credentials);
+            let s3_fs = showtimes_fs::s3::S3Fs::new(s3_bucket, s3_credentials)?;
 
             showtimes_fs::FsPool::S3Fs(s3_fs)
         }

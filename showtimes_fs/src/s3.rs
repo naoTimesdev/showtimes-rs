@@ -39,20 +39,20 @@ impl S3Fs {
     /// # Parameters
     /// * `bucket`: The bucket information.
     /// * `credentials`: The credentials provider.
-    pub fn new(bucket: Bucket, credentials: S3FsCredentials) -> Self {
+    pub fn new(bucket: Bucket, credentials: S3FsCredentials) -> FsResult<Self> {
         let ua = format!("showtimes-fs-rs/{}", env!("CARGO_PKG_VERSION"));
         let client = reqwest::ClientBuilder::new()
             .user_agent(ua)
             .http2_adaptive_window(true)
             .use_rustls_tls()
             .build()
-            .unwrap();
+            .map_err(|e| e.to_fserror(FsErrorSource::Local))?;
 
-        Self {
+        Ok(Self {
             client: Arc::new(client),
             bucket,
             credentials,
-        }
+        })
     }
 
     /// Create a new instance of [`Bucket`]
@@ -61,18 +61,14 @@ impl S3Fs {
         endpoint: impl Into<String>,
         region: impl Into<String>,
         path_style: Option<S3PathStyle>,
-    ) -> Bucket {
+    ) -> FsResult<Bucket> {
         let path_style = path_style.unwrap_or(S3PathStyle::VirtualHost);
         let endpoint: String = endpoint.into();
         let name: String = name.into();
         let region: String = region.into();
-        Bucket::new(
-            reqwest::Url::parse(&endpoint).unwrap(),
-            path_style,
-            name,
-            region,
-        )
-        .unwrap()
+        let endpoint =
+            reqwest::Url::parse(&endpoint).map_err(|e| fs_error!(Local, e.to_string()))?;
+        Bucket::new(endpoint, path_style, name, region).map_err(|e| fs_error!(Local, e.to_string()))
     }
 
     pub(crate) async fn init(&self) -> FsResult<()> {

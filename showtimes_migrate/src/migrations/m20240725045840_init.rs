@@ -130,8 +130,9 @@ impl Migration for M20240725045840Init {
                 );
 
                 let credentials = S3FsCredentials::new(&access_key, &secret_key);
-                let bucket_info = S3Fs::make_bucket(&bucket, &endpoint_url, &region, s3_path_style);
-                showtimes_fs::FsPool::S3Fs(S3Fs::new(bucket_info, credentials))
+                let bucket_info =
+                    S3Fs::make_bucket(&bucket, &endpoint_url, &region, s3_path_style)?;
+                showtimes_fs::FsPool::S3Fs(S3Fs::new(bucket_info, credentials)?)
             }
             (_, _, _, _, _, Some(directory)) => {
                 let dir_path = std::path::PathBuf::from(directory);

@@ -188,7 +188,11 @@ pub async fn query_servers_paginated(
 
     // If all_servers is equal to per_page, then there is a next page
     let last_srv = if all_servers.len() > per_page as usize {
-        Some(all_servers.pop().unwrap())
+        Some(
+            all_servers
+                .pop()
+                .expect("This should not error since len > per_page"),
+        )
     } else {
         None
     };

@@ -123,7 +123,11 @@ where
     ) -> Self {
         // Convert the timestamp to a chrono date time
         let ts_unix = timestamp.unix_timestamp();
-        let chrono_ts = chrono::DateTime::<chrono::Utc>::from_timestamp(ts_unix, 0).unwrap();
+        let chrono_ts =
+            chrono::DateTime::<chrono::Utc>::from_timestamp(ts_unix, 0).unwrap_or_else(|| {
+                // current time
+                chrono::Utc::now()
+            });
 
         Self {
             id: UlidGQL::from(id),

@@ -29,7 +29,7 @@ impl VndbProvider {
             "showtimes-rs-metadata/{}",
             env!("CARGO_PKG_VERSION")
         ))
-        .unwrap();
+        .expect("Failed to build the User-Agent header for VNDB API");
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             reqwest::header::ACCEPT,

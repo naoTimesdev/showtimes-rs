@@ -379,7 +379,11 @@ pub async fn mutate_users_authenticate(
             before_user.set_discord_meta(&user.discord_meta);
             // Update the user token
             user.discord_meta.access_token = exchanged.access_token;
-            user.discord_meta.refresh_token = exchanged.refresh_token.unwrap();
+            if let Some(refresh_token) = &exchanged.refresh_token {
+                user.discord_meta.refresh_token = refresh_token.to_string();
+            } else {
+                user.discord_meta.refresh_token = String::new();
+            }
             user.discord_meta.expires_at =
                 chrono::Utc::now().timestamp() + exchanged.expires_in as i64;
 
@@ -488,7 +492,7 @@ pub async fn mutate_users_authenticate(
                 username: user_info.username.clone(),
                 avatar: user_info.avatar,
                 access_token: exchanged.access_token,
-                refresh_token: exchanged.refresh_token.unwrap(),
+                refresh_token: exchanged.refresh_token.unwrap_or_default(),
                 expires_at,
             };
 

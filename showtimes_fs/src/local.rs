@@ -7,7 +7,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{
     errors::{FsErrorExt, FsErrorSource, FsResult},
-    fs_bail, make_file_path, FsFileKind, FsFileObject,
+    fs_bail, fs_error, make_file_path, FsFileKind, FsFileObject,
 };
 
 /// A local disk client for accessing filesystem.
@@ -70,7 +70,9 @@ impl LocalFs {
         let fs_meta = FsFileObject {
             filename: key.clone(),
             content_type: content_type.to_string(),
-            size: item.len().try_into().unwrap(),
+            size: item.len().try_into().map_err(|_| {
+                fs_error!(Local, "Failed to convert file size to i64: {}", item.len())
+            })?,
             last_modified,
         };
 

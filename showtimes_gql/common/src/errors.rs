@@ -192,6 +192,8 @@ pub enum GQLErrorCode {
     ProjectArchived = 3004,
     /// Project role does not exist
     ProjectRoleNotFound = 3005,
+    /// Project episodes is empty
+    ProjectEmptyEpisodes = 3006,
     /// Failed to create project
     ProjectCreateError = 3010,
     /// Failed to create project in search database

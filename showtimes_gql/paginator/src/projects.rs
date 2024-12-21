@@ -327,8 +327,8 @@ pub async fn query_projects_paginated(
             ),
         }
     } else {
-        let count_query = fetch_docs.first().unwrap().clone();
         // Guaranteed to have at least one document
+        let count_query = fetch_docs.first().unwrap().clone();
         let mut base_query = count_query.clone();
         match queries.cursor {
             Some(cursor) => {
@@ -397,7 +397,11 @@ pub async fn query_projects_paginated(
 
     // If all_servers is equal to per_page, then there is a next page
     let last_srv = if all_servers.len() > per_page as usize {
-        Some(all_servers.pop().unwrap())
+        Some(
+            all_servers
+                .pop()
+                .expect("This should not error since len > per_page"),
+        )
     } else {
         None
     };

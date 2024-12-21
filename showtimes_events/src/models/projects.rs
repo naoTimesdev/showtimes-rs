@@ -133,6 +133,12 @@ impl ProjectUpdatedDataEvent {
 
     /// Check if the event has any changes
     pub fn has_changes(&self) -> bool {
+        let has_progress = if let Some(progress) = &self.progress {
+            !progress.is_empty()
+        } else {
+            false
+        };
+
         self.title.is_some()
             || self.integrations.is_some()
             || self.assignees.is_some()
@@ -140,7 +146,7 @@ impl ProjectUpdatedDataEvent {
             || self.poster_image.is_some()
             || self.aliases.is_some()
             || self.status.is_some()
-            || (self.progress.is_some() && !self.progress.as_ref().unwrap().is_empty())
+            || has_progress
     }
 }
 

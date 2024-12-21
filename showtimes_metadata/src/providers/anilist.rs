@@ -10,7 +10,7 @@ use crate::{
     errors::{DetailedSerdeError, MetadataResult},
     models::{
         AnilistAiringSchedulePaged, AnilistError, AnilistGraphQLResponseError, AnilistMedia,
-        AnilistPagedData, AnilistResponse, AnilistSingleMedia,
+        AnilistPageInfo, AnilistPagedData, AnilistResponse, AnilistSingleMedia,
     },
 };
 
@@ -61,7 +61,7 @@ impl AnilistProvider {
             "showtimes-rs-metadata/{}",
             env!("CARGO_PKG_VERSION")
         ))
-        .unwrap();
+        .expect("Failed to build the User-Agent header for Anilist API");
         let mut headers = reqwest::header::HeaderMap::new();
         headers.insert(
             reqwest::header::ACCEPT,
@@ -210,9 +210,11 @@ impl AnilistProvider {
         });
 
         let res = self.query::<AnilistPagedData>(queries, &variables).await?;
-        let media_data = res.data.page.nodes.media().unwrap();
-
-        Ok(media_data.clone())
+        if let Some(media) = res.data.page.nodes.media() {
+            Ok(media.to_vec())
+        } else {
+            Ok(vec![])
+        }
     }
 
     /// Get specific media information
@@ -305,12 +307,23 @@ impl AnilistProvider {
         });
 
         let res = self.query::<AnilistPagedData>(queries, &variables).await?;
-        let air_schedules = res.data.page.nodes.airing_schedules().unwrap();
 
-        Ok(AnilistAiringSchedulePaged {
-            airing_schedules: air_schedules.clone(),
-            page_info: res.data.page.page_info,
-        })
+        if let Some(air_schedules) = res.data.page.nodes.airing_schedules() {
+            Ok(AnilistAiringSchedulePaged {
+                airing_schedules: air_schedules.to_vec(),
+                page_info: res.data.page.page_info,
+            })
+        } else {
+            Ok(AnilistAiringSchedulePaged {
+                airing_schedules: vec![],
+                page_info: AnilistPageInfo {
+                    total: 0,
+                    per_page: 50,
+                    current_page: 1,
+                    has_next_page: false,
+                },
+            })
+        }
     }
 }
 

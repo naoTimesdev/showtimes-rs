@@ -99,7 +99,7 @@ mod plain_text {
     where
         I: Iterator<Item = pulldown_cmark::Event<'a>>,
     {
-        write_plain_text_fmt(s, iter).unwrap()
+        if let Ok(()) = write_plain_text_fmt(s, iter) {}
     }
 
     fn write_plain_text_fmt<'a, I, W>(writer: W, iter: I) -> std::fmt::Result
