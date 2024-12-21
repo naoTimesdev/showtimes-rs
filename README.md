@@ -5,17 +5,16 @@ A big rewrite in progress...
 ## Requirements
 
 The following project was built with the following requirements in mind:
-- Rust `1.80.0` or newer
+- Rust `1.81.0` or newer
 - MongoDB 6.x or newer
-- Redis/Valkey 7.x or newer (Redis 7.4+ CE is NOT supported/recommended)
+- Redis/Valkey 7.x or newer (Redis (Labs) 7.4+ CE is NOT supported/recommended)
 - Meilisearch 1.8.x or newer
 - ClickHouse 24.x
 - S3-compatible storage (e.g. MinIO, AWS S3, Wasabi, etc.) [`Optional`]
 
 ### MSRV
 
-The minimum supported Rust version is `1.80.0` since we utilize the new [`LazyLock`](https://blog.rust-lang.org/2024/07/25/Rust-1.80.0.html) feature that 
-recently was stabilized in Rust `1.80.0`.
+The minimum supported Rust version is `1.81.0`
 
 ## Usages
 1. Clone the repository
@@ -25,6 +24,7 @@ recently was stabilized in Rust `1.80.0`.
    - Or use the `--profile production` flag for a more optimized build
 5. Run the binary with: `./target/release/showtimes`
    - Or in Windows: `.\target\release\showtimes.exe`
+   - For production build, use `./target/production/showtimes` (or `.\target\production\showtimes.exe`)
 6. Access the API at `http://127.0.0.1:5560` by default
 
 ## License
