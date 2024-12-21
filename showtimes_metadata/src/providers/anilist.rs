@@ -129,7 +129,7 @@ impl AnilistProvider {
             .json(&json_data)
             .send()
             .await
-            .map_err(|e| AnilistError::Request(e))?;
+            .map_err(AnilistError::Request)?;
 
         let rate_limit: u32 = parse_header_num(req.headers(), "x-ratelimit-limit")?;
         let rate_remaining: u32 = parse_header_num(req.headers(), "x-ratelimit-remaining")?;
@@ -147,16 +147,17 @@ impl AnilistProvider {
         let status = req.status();
         let headers = req.headers().clone();
         let url = req.url().clone();
-        let raw_text = req.text().await.map_err(|e| AnilistError::Request(e))?;
+        let raw_text = req.text().await.map_err(AnilistError::Request)?;
 
         // Try parsing as errors
-        match serde_json::from_str::<AnilistGraphQLResponseError>(&raw_text) {
-            Ok(error) => return Err(AnilistError::GraphQL(error).into()),
-            Err(_) => {}
+        if let Ok(error) = serde_json::from_str::<AnilistGraphQLResponseError>(&raw_text) {
+            return Err(AnilistError::GraphQL(error).into());
         }
 
         let json_data: AnilistResponse<T> = serde_json::from_str(&raw_text).map_err(|e| {
-            AnilistError::Serde(DetailedSerdeError::new(e, status, &headers, &url, raw_text))
+            AnilistError::Serde(Box::new(DetailedSerdeError::new(
+                e, status, &headers, &url, raw_text,
+            )))
         })?;
 
         Ok(json_data)

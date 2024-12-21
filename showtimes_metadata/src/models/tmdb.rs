@@ -279,12 +279,18 @@ pub enum TMDbError {
     /// Error related to request
     Request(reqwest::Error),
     /// Error related to deserialization
-    Serde(DetailedSerdeError),
+    Serde(Box<DetailedSerdeError>),
+}
+
+impl TMDbError {
+    pub(crate) fn new_serde(err: DetailedSerdeError) -> Self {
+        TMDbError::Serde(Box::new(err))
+    }
 }
 
 impl From<DetailedSerdeError> for TMDbError {
     fn from(value: DetailedSerdeError) -> Self {
-        TMDbError::Serde(value)
+        TMDbError::Serde(Box::new(value))
     }
 }
 

@@ -165,16 +165,22 @@ pub enum VNDBError {
     /// Error related to request
     Request(reqwest::Error),
     /// Error related to deserialization
-    Serde(DetailedSerdeError),
+    Serde(Box<DetailedSerdeError>),
     /// Invalid ID provided
     InvalidId(String),
     /// Conversion to string failure from header
     HeaderToString(String),
 }
 
+impl VNDBError {
+    pub(crate) fn new_serde(e: DetailedSerdeError) -> Self {
+        Self::Serde(Box::new(e))
+    }
+}
+
 impl From<DetailedSerdeError> for VNDBError {
     fn from(value: DetailedSerdeError) -> Self {
-        VNDBError::Serde(value)
+        VNDBError::Serde(Box::new(value))
     }
 }
 

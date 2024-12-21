@@ -31,7 +31,7 @@ pub(crate) fn expand_showmodel(ast: &syn::DeriveInput) -> TokenStream {
                 // Check if the field has the `#[serde(skip_serializing_if = "Object::is_none")]` attribute
                 let has_skip_serializing = id_field.attrs.iter().any(|attr| {
                     attr.path().is_ident("serde")
-                        && attr.parse_args::<syn::Meta>().map_or(false, |meta| {
+                        && attr.parse_args::<syn::Meta>().is_ok_and(|meta| {
                             if let syn::Meta::NameValue(meta) = meta {
                                 if let syn::Expr::Lit(lit) = &meta.value {
                                     if let syn::Lit::Str(litstr) = &lit.lit {
@@ -216,16 +216,14 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             #[doc = #model_name_full]
             #[doc = "collection"]
             pub async fn find_by_oid(&self, id: &mongodb::bson::oid::ObjectId) -> mongodb::error::Result<Option<#model_ident>> {
-                let result = self.col.find_one(mongodb::bson::doc! { "_id": id }).await?;
-                Ok(result)
+                self.col.find_one(mongodb::bson::doc! { "_id": id }).await
             }
 
             #[doc = "Find a document by Id in the"]
             #[doc = #model_name_full]
             #[doc = "collection"]
             pub async fn find_by_id(&self, id: &str) -> mongodb::error::Result<Option<#model_ident>> {
-                let result = self.col.find_one(mongodb::bson::doc! { "id": id }).await?;
-                Ok(result)
+                self.col.find_one(mongodb::bson::doc! { "id": id }).await
             }
 
             #[doc = "Find document by a filter in the"]
@@ -235,8 +233,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
                 &self,
                 filter: mongodb::bson::Document,
             ) -> mongodb::error::Result<Option<#model_ident>> {
-                let result = self.col.find_one(filter).await?;
-                Ok(result)
+                self.col.find_one(filter).await
             }
 
             #[doc = "Find all documents by a filter in the"]
@@ -369,14 +366,14 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
                 }
 
                 let filter = mongodb::bson::doc! { "_id": doc.id().unwrap() };
-                Ok(self.col.delete_one(filter).await?)
+                self.col.delete_one(filter).await
             }
 
             #[doc = "Delete documents in the"]
             #[doc = #model_name_full]
             #[doc = "collection by filter"]
             pub async fn delete_by(&self, filter: mongodb::bson::Document) -> mongodb::error::Result<mongodb::results::DeleteResult> {
-                Ok(self.col.delete_one(filter).await?)
+                self.col.delete_one(filter).await
             }
 
             #[doc = "Delete all documents in the"]
@@ -385,7 +382,7 @@ pub(crate) fn expand_handler(input: &CreateHandler) -> TokenStream {
             pub async fn delete_all(&self) -> mongodb::error::Result<()> {
                 let col = self.col.clone();
                 let deref_col = ::std::sync::Arc::try_unwrap(col).unwrap_or_else(|arc| (*arc).clone());
-                Ok(deref_col.drop().await?)
+                deref_col.drop().await
             }
         }
     };

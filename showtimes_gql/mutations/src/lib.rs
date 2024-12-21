@@ -33,9 +33,9 @@ pub struct MutationRoot;
 #[Object]
 impl MutationRoot {
     /// Authorize Discord OAuth2 token and state that was returned from the OAuth2 redirect
-    async fn auth<'a>(
+    async fn auth(
         &self,
-        ctx: &'a Context<'_>,
+        ctx: &Context<'_>,
         #[graphql(desc = "The OAuth2 token/code returned from Discord")] token: String,
         #[graphql(desc = "The OAuth2 state")] state: String,
     ) -> async_graphql::Result<UserSessionGQL> {
@@ -44,9 +44,9 @@ impl MutationRoot {
 
     /// Disconnect/logout from Showtimes, this can also be used to revoke OAuth2 token
     #[graphql(guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)")]
-    async fn disconnect<'a>(
+    async fn disconnect(
         &self,
-        ctx: &'a Context<'_>,
+        ctx: &Context<'_>,
         #[graphql(desc = "Revoke specific token, this only works for Owner auth")] token: Option<
             String,
         >,

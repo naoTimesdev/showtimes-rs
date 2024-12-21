@@ -64,7 +64,7 @@ impl VndbProvider {
             .json(&params)
             .send()
             .await
-            .map_err(|e| VNDBError::Request(e))?;
+            .map_err(VNDBError::Request)?;
 
         // is json
         let is_json = match req.headers().get(reqwest::header::CONTENT_TYPE) {
@@ -81,14 +81,14 @@ impl VndbProvider {
         let status = req.status();
         let headers = req.headers().clone();
         let url = req.url().clone();
-        let raw_text = req.text().await.map_err(|e| VNDBError::Request(e))?;
+        let raw_text = req.text().await.map_err(VNDBError::Request)?;
 
         if !is_json {
             return Err(VNDBError::Response(raw_text.clone()).into());
         }
 
         let res = serde_json::from_str::<VndbResult>(&raw_text).map_err(|err| {
-            VNDBError::Serde(DetailedSerdeError::new(
+            VNDBError::new_serde(DetailedSerdeError::new(
                 err, status, &headers, &url, raw_text,
             ))
         })?;

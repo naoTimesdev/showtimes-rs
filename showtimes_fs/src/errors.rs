@@ -87,10 +87,10 @@ impl FsErrorExt for quick_xml::DeError {
 #[macro_export(local_inner_macros)]
 macro_rules! fs_bail {
     ($source:ident, $message:expr, $($arg:tt)*) => {
-        return Err(crate::errors::FsError::new(std::format!($message, $($arg)*), crate::errors::FsErrorSource::$source))
+        return Err($crate::errors::FsError::new(std::format!($message, $($arg)*), $crate::errors::FsErrorSource::$source))
     };
     ($source:ident, $message:expr) => {
-        return Err(crate::errors::FsError::new($message, crate::errors::FsErrorSource::$source))
+        return Err($crate::errors::FsError::new($message, $crate::errors::FsErrorSource::$source))
     }
 }
 
@@ -98,9 +98,9 @@ macro_rules! fs_bail {
 #[macro_export(local_inner_macros)]
 macro_rules! fs_error {
     ($source:ident, $message:expr, $($arg:tt)*) => {
-        crate::errors::FsError::new(std::format!($message, $($arg)*), crate::errors::FsErrorSource::$source)
+        $crate::errors::FsError::new(std::format!($message, $($arg)*), $crate::errors::FsErrorSource::$source)
     };
     ($source:ident, $message:expr) => {
-        crate::errors::FsError::new($message, crate::errors::FsErrorSource::$source)
+        $crate::errors::FsError::new($message, $crate::errors::FsErrorSource::$source)
     }
 }

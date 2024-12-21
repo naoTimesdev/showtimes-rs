@@ -33,7 +33,7 @@ pub fn get_dominant_colors(image_bytes: &[u8]) -> Result<Vec<u32>, MetadataError
     let mut lab_pixels: Vec<Lab<D65, f32>> = Vec::new();
 
     let img = image::load_from_memory(image_bytes)
-        .map_err(|e| MetadataImageError::LoadError(e))?
+        .map_err(MetadataImageError::LoadError)?
         .into_rgba8();
     let img_vec: &[Srgba<u8>] = img.as_raw().components_as();
 
@@ -97,7 +97,7 @@ fn from_hex(input: &str) -> Result<u8, std::num::ParseIntError> {
 }
 
 fn is_hex_digit(c: char) -> bool {
-    c.is_digit(16)
+    c.is_ascii_hexdigit()
 }
 
 fn hex_primary(input: &str) -> IResult<&str, u8> {

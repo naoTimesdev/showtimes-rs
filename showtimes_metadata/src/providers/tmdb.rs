@@ -62,23 +62,23 @@ impl TMDbProvider {
             req = req.query(&[(*key, *value)]);
         }
 
-        let send_req = req.send().await.map_err(|e| TMDbError::Request(e))?;
+        let send_req = req.send().await.map_err(TMDbError::Request)?;
 
         let status = send_req.status();
         let headers = send_req.headers().clone();
         let url = send_req.url().clone();
-        let raw_text = send_req.text().await.map_err(|e| TMDbError::Request(e))?;
+        let raw_text = send_req.text().await.map_err(TMDbError::Request)?;
 
         if status.is_success() {
             let success = serde_json::from_str::<T>(&raw_text).map_err(|e| {
-                TMDbError::Serde(DetailedSerdeError::new(e, status, &headers, &url, raw_text))
+                TMDbError::new_serde(DetailedSerdeError::new(e, status, &headers, &url, raw_text))
             })?;
 
             Ok(success)
         } else {
             // parse the error
             let error = serde_json::from_str::<TMDbErrorResponse>(&raw_text).map_err(|e| {
-                TMDbError::Serde(DetailedSerdeError::new(e, status, &headers, &url, raw_text))
+                TMDbError::new_serde(DetailedSerdeError::new(e, status, &headers, &url, raw_text))
             })?;
 
             Err(TMDbError::Response(error).into())

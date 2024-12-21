@@ -423,11 +423,11 @@ impl S3Fs {
         Ok(())
     }
 
-    pub(crate) async fn file_stream_download<'wlife, W: AsyncWriteExt + Unpin + Send>(
+    pub(crate) async fn file_stream_download<W: AsyncWriteExt + Unpin + Send>(
         &self,
         base_key: impl Into<String> + std::marker::Send,
         filename: impl Into<String> + std::marker::Send,
-        writer: &'wlife mut W,
+        writer: &mut W,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
     ) -> FsResult<()> {

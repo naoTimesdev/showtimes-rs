@@ -363,7 +363,7 @@ pub enum AnilistError {
     /// Error related to request
     Request(reqwest::Error),
     /// Error related to deserialization
-    Serde(DetailedSerdeError),
+    Serde(Box<DetailedSerdeError>),
     /// Conversion to string failure from header
     HeaderToString(String),
     /// String conversion failure from header
@@ -372,7 +372,7 @@ pub enum AnilistError {
 
 impl From<DetailedSerdeError> for AnilistError {
     fn from(value: DetailedSerdeError) -> Self {
-        AnilistError::Serde(value)
+        AnilistError::Serde(Box::new(value))
     }
 }
 
