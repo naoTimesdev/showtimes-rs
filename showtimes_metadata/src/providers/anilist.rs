@@ -58,7 +58,7 @@ impl AnilistProvider {
     /// * `wait_limit` - Whether to wait for the rate limit to reset
     pub fn new(wait_limit: bool) -> Self {
         let ua_bind = reqwest::header::HeaderValue::from_str(&format!(
-            "showtimes-rs-metadata/{}",
+            "showtimes-rs-metadata/{} (+https://github.com/naoTimesdev/showtimes-rs)",
             env!("CARGO_PKG_VERSION")
         ))
         .expect("Failed to build the User-Agent header for Anilist API");

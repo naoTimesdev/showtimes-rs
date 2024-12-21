@@ -40,7 +40,10 @@ impl S3Fs {
     /// * `bucket`: The bucket information.
     /// * `credentials`: The credentials provider.
     pub fn new(bucket: Bucket, credentials: S3FsCredentials) -> FsResult<Self> {
-        let ua = format!("showtimes-fs-rs/{}", env!("CARGO_PKG_VERSION"));
+        let ua = format!(
+            "showtimes-fs-rs/{} (+https://github.com/naoTimesdev/showtimes-rs)",
+            env!("CARGO_PKG_VERSION")
+        );
         let client = reqwest::ClientBuilder::new()
             .user_agent(ua)
             .http2_adaptive_window(true)

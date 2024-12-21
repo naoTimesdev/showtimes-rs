@@ -26,7 +26,7 @@ impl VndbProvider {
     /// * `token` - The VNDB API token
     pub fn new(token: impl Into<String>) -> Self {
         let ua_bind = reqwest::header::HeaderValue::from_str(&format!(
-            "showtimes-rs-metadata/{}",
+            "showtimes-rs-metadata/{} (+https://github.com/naoTimesdev/showtimes-rs)",
             env!("CARGO_PKG_VERSION")
         ))
         .expect("Failed to build the User-Agent header for VNDB API");
