@@ -2,7 +2,10 @@
 
 use std::{sync::Arc, time::Duration};
 
-use crate::{make_file_path, FsFileKind, FsFileObject};
+use crate::{
+    errors::{FsErrorExt, FsErrorSource, FsResult},
+    fs_bail, fs_error, make_file_path, FsFileKind, FsFileObject,
+};
 use futures_util::TryStreamExt;
 use rusty_s3::{
     actions::{
@@ -72,7 +75,7 @@ impl S3Fs {
         .unwrap()
     }
 
-    pub(crate) async fn init(&self) -> anyhow::Result<()> {
+    pub(crate) async fn init(&self) -> FsResult<()> {
         // Check if the bucket exists
         tracing::debug!(
             "Initializing, checking if bucket exists: {}",
@@ -81,7 +84,12 @@ impl S3Fs {
         let head_action = HeadBucket::new(&self.bucket, Some(&self.credentials));
         let signed_url = head_action.sign(ONE_HOUR);
 
-        let response = self.client.head(signed_url).send().await?;
+        let response = self
+            .client
+            .head(signed_url)
+            .send()
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
 
         // Check status code
         if response.status().is_success() {
@@ -97,16 +105,23 @@ impl S3Fs {
                 tracing::debug!("Bucket {} not found, creating", self.bucket.name());
                 let create_action = CreateBucket::new(&self.bucket, &self.credentials);
                 let signed_url = create_action.sign(ONE_HOUR);
-                let response = self.client.put(signed_url).send().await?;
+                let response = self
+                    .client
+                    .put(signed_url)
+                    .send()
+                    .await
+                    .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
 
-                response.error_for_status()?;
+                response
+                    .error_for_status()
+                    .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
 
                 tracing::debug!("Bucket {} created", self.bucket.name());
 
                 Ok(())
             } else {
                 tracing::error!("Failed to check bucket: {}", response.status());
-                anyhow::bail!("Failed to check bucket: {}", response.status());
+                fs_bail!(S3, "Failed to check bucket: {}", response.status());
             }
         }
     }
@@ -117,7 +132,7 @@ impl S3Fs {
         filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<FsFileObject> {
+    ) -> FsResult<FsFileObject> {
         let filename: String = filename.into();
         let key = make_file_path(&base_key.into(), &filename, parent_id, kind.clone());
 
@@ -129,8 +144,10 @@ impl S3Fs {
             .client
             .head(signed_url)
             .send()
-            .await?
-            .error_for_status()?;
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?
+            .error_for_status()
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
 
         let content_length: i64 = response
             .headers()
@@ -181,7 +198,7 @@ impl S3Fs {
         filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<bool> {
+    ) -> FsResult<bool> {
         let base_key: String = base_key.into();
         let filename: String = filename.into();
         let key = make_file_path(&base_key, &filename, parent_id, kind.clone());
@@ -198,7 +215,7 @@ impl S3Fs {
         stream: &mut R,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<FsFileObject>
+    ) -> FsResult<FsFileObject>
     where
         R: AsyncReadExt + AsyncSeekExt + Send + Unpin + 'static,
     {
@@ -224,15 +241,24 @@ impl S3Fs {
         key: &str,
         content_type: &str,
         stream: &mut R,
-    ) -> anyhow::Result<()>
+    ) -> FsResult<()>
     where
         R: AsyncReadExt + AsyncSeekExt + Send + Unpin + 'static,
     {
         // Seek to the end of the file to get its size in bytes
-        stream.seek(std::io::SeekFrom::End(0)).await?;
-        let max_position = stream.stream_position().await?;
+        stream
+            .seek(std::io::SeekFrom::End(0))
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
+        let max_position = stream
+            .stream_position()
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
         // Seek to the start of the file again
-        stream.seek(std::io::SeekFrom::Start(0)).await?;
+        stream
+            .seek(std::io::SeekFrom::Start(0))
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
 
         tracing::debug!("Preparing to upload file: {}", key);
         // Create a multipart upload request
@@ -245,12 +271,18 @@ impl S3Fs {
             .post(start_url)
             .header("content-type", content_type)
             .send()
-            .await?
-            .error_for_status()?;
-        let start_body = start_resp.text().await?;
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?
+            .error_for_status()
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
+        let start_body = start_resp
+            .text()
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
 
         // Parse the response to get the upload ID
-        let multipart = CreateMultipartUpload::parse_response(&start_body)?;
+        let multipart = CreateMultipartUpload::parse_response(&start_body)
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
 
         tracing::debug!("Got multipart upload id: {}", multipart.upload_id());
         tracing::debug!(
@@ -267,26 +299,37 @@ impl S3Fs {
         let is_small_file = max_position <= CHUNK_SIZE as u64;
 
         // Upload the file in chunks of 4MB each
-        while stream.stream_position().await? <= max_position {
+        while stream
+            .stream_position()
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?
+            <= max_position
+        {
             // Read a chunk of the file
             let mut chunks_buffer = Vec::with_capacity(CHUNK_SIZE); // 4MB
 
             if is_small_file {
                 // We have to read until the end
-                stream.read_to_end(&mut chunks_buffer).await?;
+                stream
+                    .read_to_end(&mut chunks_buffer)
+                    .await
+                    .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
             } else {
                 match stream.read_exact(&mut chunks_buffer).await {
                     Ok(_) => (),
                     Err(e) => {
                         // Depending on the error, we silently ignore it.
                         if e.kind() != std::io::ErrorKind::UnexpectedEof {
-                            return Err(e.into());
+                            return Err(e.to_fserror(FsErrorSource::S3));
                         }
                     }
                 }
             }
 
-            let position = stream.stream_position().await?;
+            let position = stream
+                .stream_position()
+                .await
+                .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
 
             if chunks_buffer.is_empty() && position >= max_position {
                 // We reached the end of the file and no data was read
@@ -314,22 +357,36 @@ impl S3Fs {
                 .put(part_url)
                 .body(chunks_buffer)
                 .send()
-                .await?
-                .error_for_status()?;
+                .await
+                .map_err(|e| e.to_fserror(FsErrorSource::S3))?
+                .error_for_status()
+                .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
 
             // Get the ETag from the response
             let temp_etag = part_response
                 .headers()
                 .get(reqwest::header::ETAG)
                 .ok_or_else(|| {
-                    anyhow::anyhow!(
+                    fs_error!(
+                        S3,
                         "Failed to get etag from part upload response number {}",
                         part_number
                     )
                 })?;
 
             // Store the ETag
-            etag_data.push(temp_etag.to_str()?.to_string());
+            etag_data.push(
+                temp_etag
+                    .to_str()
+                    .map_err(|_| {
+                        fs_error!(
+                            S3,
+                            "Failed to convert etag value to string for part #{}",
+                            part_number
+                        )
+                    })?
+                    .to_string(),
+            );
             part_number += 1;
         }
 
@@ -357,8 +414,10 @@ impl S3Fs {
                 .post(complete_url)
                 .body(complete_action.body())
                 .send()
-                .await?
-                .error_for_status()?;
+                .await
+                .map_err(|e| e.to_fserror(FsErrorSource::S3))?
+                .error_for_status()
+                .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
         }
 
         Ok(())
@@ -371,7 +430,7 @@ impl S3Fs {
         writer: &'wlife mut W,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<()> {
+    ) -> FsResult<()> {
         let filename: String = filename.into();
         let key = make_file_path(&base_key.into(), &filename, parent_id, kind.clone());
 
@@ -379,12 +438,24 @@ impl S3Fs {
         let signed_url = action.sign(ONE_HOUR);
 
         tracing::debug!("Downloading file stream for: {}", &key);
-        let response = self.client.get(signed_url).send().await?;
+        let response = self
+            .client
+            .get(signed_url)
+            .send()
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
 
         let mut stream = response.bytes_stream();
 
-        while let Some(chunk) = stream.try_next().await? {
-            writer.write_all(&chunk).await?;
+        while let Some(chunk) = stream
+            .try_next()
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?
+        {
+            writer
+                .write_all(&chunk)
+                .await
+                .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
         }
 
         Ok(())
@@ -396,7 +467,7 @@ impl S3Fs {
         filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<()> {
+    ) -> FsResult<()> {
         let filename: String = filename.into();
         let key = make_file_path(&base_key.into(), &filename, parent_id, kind.clone());
 
@@ -408,8 +479,10 @@ impl S3Fs {
         self.client
             .delete(signed_url)
             .send()
-            .await?
-            .error_for_status()?;
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?
+            .error_for_status()
+            .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
 
         Ok(())
     }
@@ -419,7 +492,7 @@ impl S3Fs {
         base_key: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<()> {
+    ) -> FsResult<()> {
         let mut last_key: Option<String> = None;
         let mut stop = false;
         let prefix = make_file_path(&base_key.into(), "", parent_id, kind);
@@ -445,11 +518,17 @@ impl S3Fs {
                 .client
                 .get(signed_url)
                 .send()
-                .await?
-                .error_for_status()?;
-            let text_data = response.text().await?;
+                .await
+                .map_err(|e| e.to_fserror(FsErrorSource::S3))?
+                .error_for_status()
+                .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
+            let text_data = response
+                .text()
+                .await
+                .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
 
-            let parsed = ListObjectsV2::parse_response(&text_data)?;
+            let parsed = ListObjectsV2::parse_response(&text_data)
+                .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
 
             let delete_keys: Vec<ObjectIdentifier> = parsed
                 .contents
@@ -477,8 +556,10 @@ impl S3Fs {
                 .header("Content-MD5", content_md5)
                 .body(body)
                 .send()
-                .await?
-                .error_for_status()?;
+                .await
+                .map_err(|e| e.to_fserror(FsErrorSource::S3))?
+                .error_for_status()
+                .map_err(|e| e.to_fserror(FsErrorSource::S3))?;
 
             stop = parsed.start_after.is_none();
             last_key = parsed.start_after;

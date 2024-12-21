@@ -1,8 +1,10 @@
 #![warn(missing_docs, clippy::empty_docs, rustdoc::broken_intra_doc_links)]
 #![doc = include_str!("../README.md")]
 
+use errors::FsResult;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
+pub mod errors;
 pub mod local;
 pub mod s3;
 
@@ -76,7 +78,7 @@ impl FsPool {
     /// Initialize the filesystem.
     ///
     /// This can be used to test if the filesystem is working correctly.
-    pub async fn init(&self) -> anyhow::Result<()> {
+    pub async fn init(&self) -> FsResult<()> {
         match self {
             Self::LocalFs(fs) => fs.init().await,
             Self::S3Fs(fs) => fs.init().await,
@@ -89,7 +91,7 @@ impl FsPool {
         filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<FsFileObject> {
+    ) -> FsResult<FsFileObject> {
         match self {
             Self::LocalFs(fs) => fs.file_stat(base_key, filename, parent_id, kind).await,
             Self::S3Fs(fs) => fs.file_stat(base_key, filename, parent_id, kind).await,
@@ -102,7 +104,7 @@ impl FsPool {
         filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<bool> {
+    ) -> FsResult<bool> {
         match self {
             Self::LocalFs(fs) => fs.file_exists(base_key, filename, parent_id, kind).await,
             Self::S3Fs(fs) => fs.file_exists(base_key, filename, parent_id, kind).await,
@@ -116,7 +118,7 @@ impl FsPool {
         mut stream: R,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<FsFileObject>
+    ) -> FsResult<FsFileObject>
     where
         R: AsyncReadExt + AsyncSeekExt + Send + Unpin + 'static,
     {
@@ -139,7 +141,7 @@ impl FsPool {
         writer: &mut W,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<()>
+    ) -> FsResult<()>
     where
         W: AsyncWriteExt + Unpin + Send,
     {
@@ -161,7 +163,7 @@ impl FsPool {
         filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<()> {
+    ) -> FsResult<()> {
         match self {
             Self::LocalFs(fs) => fs.file_delete(base_key, filename, parent_id, kind).await,
             Self::S3Fs(fs) => fs.file_delete(base_key, filename, parent_id, kind).await,
@@ -174,7 +176,7 @@ impl FsPool {
         base_key: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<()> {
+    ) -> FsResult<()> {
         match self {
             Self::LocalFs(fs) => fs.directory_delete(base_key, parent_id, kind).await,
             Self::S3Fs(fs) => fs.directory_delete(base_key, parent_id, kind).await,

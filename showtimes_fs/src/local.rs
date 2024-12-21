@@ -5,7 +5,10 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::{make_file_path, FsFileKind, FsFileObject};
+use crate::{
+    errors::{FsErrorExt, FsErrorSource, FsResult},
+    fs_bail, make_file_path, FsFileKind, FsFileObject,
+};
 
 /// A local disk client for accessing filesystem.
 #[derive(Debug, Clone)]
@@ -25,15 +28,17 @@ impl LocalFs {
         Self { directory }
     }
 
-    pub(crate) async fn init(&self) -> anyhow::Result<()> {
+    pub(crate) async fn init(&self) -> FsResult<()> {
         // Test if the directory exists
         tracing::debug!(
             "Initializing, checking if the directory exists: {:?}",
             &self.directory
         );
-        let item = tokio::fs::metadata(&self.directory).await?;
+        let item = tokio::fs::metadata(&self.directory)
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::Local))?;
         if !item.is_dir() {
-            anyhow::bail!("The provided `directory` is not a directory");
+            fs_bail!(Local, "The provided `directory` is not a directory");
         }
 
         Ok(())
@@ -45,12 +50,14 @@ impl LocalFs {
         filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<FsFileObject> {
+    ) -> FsResult<FsFileObject> {
         let key = make_file_path(&base_key.into(), &filename.into(), parent_id, kind);
         let path = self.directory.join(&key);
 
         tracing::debug!("Checking file stat for: {}", &key);
-        let item = tokio::fs::metadata(&path).await?;
+        let item = tokio::fs::metadata(&path)
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::Local))?;
         let content_type = mime_guess::from_path(path).first_or_octet_stream();
         let last_modified = match item.modified() {
             Ok(time) => {
@@ -78,7 +85,7 @@ impl LocalFs {
         filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<bool> {
+    ) -> FsResult<bool> {
         let key = make_file_path(&base_key.into(), &filename.into(), parent_id, kind.clone());
         let path = self.directory.join(&key);
 
@@ -95,7 +102,7 @@ impl LocalFs {
         stream: &mut R,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<FsFileObject>
+    ) -> FsResult<FsFileObject>
     where
         R: AsyncReadExt + Send + Unpin + 'static,
     {
@@ -105,8 +112,12 @@ impl LocalFs {
         let path = self.directory.join(&key);
 
         tracing::debug!("Sending file stream into: {}", &key);
-        let mut file = tokio::fs::File::create(&path).await?;
-        tokio::io::copy(stream, &mut file).await?;
+        let mut file = tokio::fs::File::create(&path)
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::Local))?;
+        tokio::io::copy(stream, &mut file)
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::Local))?;
 
         self.file_stat(base_key, filename, parent_id, kind).await
     }
@@ -118,7 +129,7 @@ impl LocalFs {
         writer: &mut W,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<()>
+    ) -> FsResult<()>
     where
         W: AsyncWriteExt + Unpin + Send,
     {
@@ -126,11 +137,18 @@ impl LocalFs {
         let path = self.directory.join(&key);
 
         tracing::debug!("Downloading file stream for: {}", &key);
-        let mut file = tokio::fs::File::open(&path).await?;
-        tokio::io::copy(&mut file, writer).await?;
+        let mut file = tokio::fs::File::open(&path)
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::Local))?;
+        tokio::io::copy(&mut file, writer)
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::Local))?;
 
         tracing::debug!("Download complete for: {}", &key);
-        writer.flush().await?;
+        writer
+            .flush()
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::Local))?;
 
         Ok(())
     }
@@ -141,12 +159,14 @@ impl LocalFs {
         filename: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<()> {
+    ) -> FsResult<()> {
         let key = make_file_path(&base_key.into(), &filename.into(), parent_id, kind.clone());
         let path = self.directory.join(&key);
 
         tracing::debug!("Deleting file: {}", &key);
-        tokio::fs::remove_file(&path).await?;
+        tokio::fs::remove_file(&path)
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::Local))?;
 
         Ok(())
     }
@@ -156,12 +176,14 @@ impl LocalFs {
         base_key: impl Into<String> + std::marker::Send,
         parent_id: Option<&str>,
         kind: Option<FsFileKind>,
-    ) -> anyhow::Result<()> {
+    ) -> FsResult<()> {
         let key = make_file_path(&base_key.into(), "", parent_id, kind);
         let path = self.directory.join(&key);
 
         tracing::debug!("Deleting directory: {}", &key);
-        tokio::fs::remove_dir_all(&path).await?;
+        tokio::fs::remove_dir_all(&path)
+            .await
+            .map_err(|e| e.to_fserror(FsErrorSource::Local))?;
 
         Ok(())
     }

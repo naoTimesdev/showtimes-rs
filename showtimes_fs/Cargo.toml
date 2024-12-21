@@ -10,8 +10,9 @@ rust-version.workspace = true
 description = "File storage handler for Showtimes API"
 
 [dependencies]
-anyhow.workspace = true
 chrono.workspace = true
+# Need to expose this for rusty-s3
+quick-xml = "0.37.1"
 
 tracing.workspace = true
 
