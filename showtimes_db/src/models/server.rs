@@ -354,3 +354,61 @@ impl ServerCollaborationInvite {
         }
     }
 }
+
+/// A model to hold premium usages informaiton
+#[derive(Debug, Clone, Serialize, Deserialize, showtimes_derive::ShowModelHandler)]
+#[col_name("ShowtimesServerPremium")]
+pub struct ServerPremium {
+    /// The premium ID
+    #[serde(with = "ulid_serializer")]
+    pub id: showtimes_shared::ulid::Ulid,
+    /// The target server
+    #[serde(with = "ulid_serializer")]
+    pub target: showtimes_shared::ulid::Ulid,
+    /// The premium end date
+    #[serde(with = "chrono_datetime_as_bson_datetime")]
+    pub ends_at: chrono::DateTime<chrono::Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    _id: Option<mongodb::bson::oid::ObjectId>,
+    #[serde(
+        with = "chrono_datetime_as_bson_datetime",
+        default = "chrono::Utc::now"
+    )]
+    pub created: chrono::DateTime<chrono::Utc>,
+    #[serde(
+        with = "chrono_datetime_as_bson_datetime",
+        default = "chrono::Utc::now"
+    )]
+    pub updated: chrono::DateTime<chrono::Utc>,
+}
+
+impl ServerPremium {
+    /// Create a new instance of [`ServerPremium`].
+    pub fn new(
+        target: showtimes_shared::ulid::Ulid,
+        ends_at: chrono::DateTime<chrono::Utc>,
+    ) -> Self {
+        ServerPremium {
+            id: ulid_serializer::default(),
+            target,
+            ends_at,
+            _id: None,
+            created: chrono::Utc::now(),
+            updated: chrono::Utc::now(),
+        }
+    }
+
+    /// Extend the end date to the given date.
+    pub fn extend_at(&mut self, ends_at: chrono::DateTime<chrono::Utc>) -> &mut Self {
+        self.ends_at = ends_at;
+        self
+    }
+
+    /// Extend the end date by the given duration.
+    ///
+    /// Returns `self` for chainability.
+    pub fn extend_by(&mut self, duration: chrono::Duration) -> &mut Self {
+        self.ends_at = self.ends_at + duration;
+        self
+    }
+}

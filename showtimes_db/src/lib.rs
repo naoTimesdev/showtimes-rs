@@ -62,6 +62,8 @@ pub async fn create_connection(url: &str) -> Result<Connection, mongodb::error::
 create_handler!(m::Project, ProjectHandler);
 create_handler!(m::User, UserHandler);
 create_handler!(m::Server, ServerHandler);
+create_handler!(m::ServerPremium, ServerPremiumHandler);
 create_handler!(m::ServerCollaborationSync, CollaborationSyncHandler);
 create_handler!(m::ServerCollaborationInvite, CollaborationInviteHandler);
+create_handler!(m::RSSFeed, RSSFeedHandler);
 create_handler!(m::Migration, MigrationHandler);

@@ -176,6 +176,20 @@ pub async fn parse_feed<'a>(
                 hash_entries.insert("published", published.into());
             }
 
+            let parsed_links: Vec<String> = entry
+                .links
+                .iter()
+                .filter_map(|link| markdown::expand_url(&link.href, &base_url).ok())
+                .collect();
+
+            if let Some(link) = parsed_links.first() {
+                hash_entries.insert("link", link.to_string().into());
+            }
+
+            if parsed_links.len() >= 2 {
+                hash_entries.insert("links", parsed_links.into());
+            }
+
             if let Some(content) = &entry.content {
                 if let Some(content_body) = &content.body {
                     let parsed = markdown::html_to_markdown(content_body, &base_url);
@@ -220,7 +234,8 @@ pub async fn parse_feed<'a>(
                 .collect();
 
             if !authors.is_empty() {
-                hash_entries.insert("authors", authors.into());
+                hash_entries.insert("authors", authors.clone().into());
+                hash_entries.insert("creators", authors.into());
             }
 
             let categories: Vec<String> = entry

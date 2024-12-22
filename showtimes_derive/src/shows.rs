@@ -5,6 +5,7 @@ use syn::{spanned::Spanned, Lit};
 
 pub(crate) fn expand_showmodel(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
+    let name_str = name.to_string();
 
     // run only on struct
     match &ast.data {
@@ -102,8 +103,23 @@ pub(crate) fn expand_showmodel(ast: &syn::DeriveInput) -> TokenStream {
         }
     };
 
+    let col_struct = if col_name != name_str {
+        let col_ident = syn::Ident::new(&col_name, proc_macro2::Span::call_site());
+        quote::quote! {
+            /// A simple model ident so we don't duplicate the collection name
+            #[expect(unused)]
+            pub(crate) struct #col_ident {
+                _priv: (),
+            }
+        }
+    } else {
+        quote::quote! {}
+    };
+
     // Generate the implementation of the trait
     let expanded = quote::quote! {
+        #col_struct
+
         impl ShowModelHandler for #name {
             fn id(&self) -> Option<mongodb::bson::oid::ObjectId> {
                 self._id.clone()

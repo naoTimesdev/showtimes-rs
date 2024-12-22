@@ -4,7 +4,6 @@ A RSS handler for Showtimes.
 
 The crates includes:
 - Template Formatter
-- RSS scheduler
 - RSS parser
 - Markdown processor (MD -> Text, MD -> HTML)
 
