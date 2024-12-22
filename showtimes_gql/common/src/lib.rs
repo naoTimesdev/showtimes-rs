@@ -232,11 +232,12 @@ impl From<&showtimes_db::m::ImageMetadata> for ImageMetadataGQL {
 }
 
 /// The list of possible integrations types.
-#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, EnumName)]
 #[graphql(
     remote = "showtimes_db::m::IntegrationType",
     rename_items = "SCREAMING_SNAKE_CASE"
 )]
+#[enum_name(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum IntegrationTypeGQL {
     // Related to Discord
     /// A Discord Role ID
@@ -245,31 +246,39 @@ pub enum IntegrationTypeGQL {
     DiscordUser,
     /// A Discord Text Channel ID
     #[graphql(name = "DISCORD_TEXT_CHANNEL")]
+    #[enum_name(rename = "DISCORD_TEXT_CHANNEL")]
     DiscordChannel,
     /// A Discord Guild ID
     DiscordGuild,
     // Related to FansubDB
     /// Your group FansubDB ID
     #[graphql(name = "FANSUBDB_ID")]
+    #[enum_name(rename = "FANSUBDB_ID")]
     FansubDB,
     /// A FansubDB Project ID
     #[graphql(name = "FANSUBDB_PROJECT_ID")]
+    #[enum_name(rename = "FANSUBDB_PROJECT_ID")]
     FansubDBProject,
     /// A FansubDB Shows ID
     #[graphql(name = "FANSUBDB_SHOWS_ID")]
+    #[enum_name(rename = "FANSUBDB_SHOWS_ID")]
     FansubDBShows,
     // Related to Providers
     /// Anilist ID
     #[graphql(name = "PVD_ANILIST")]
+    #[enum_name(rename = "PVD_ANILIST")]
     ProviderAnilist,
     /// MyAnimeList ID from Anilist
     #[graphql(name = "PVD_ANILIST_MAL")]
+    #[enum_name(rename = "PVD_ANILIST_MAL")]
     ProviderAnilistMal,
     /// VNDB ID
     #[graphql(name = "PVD_VNDB")]
+    #[enum_name(rename = "PVD_VNDB")]
     ProviderVndb,
     /// TMDB ID
     #[graphql(name = "PVD_TMDB")]
+    #[enum_name(rename = "PVD_TMDB")]
     ProviderTmdb,
 }
 

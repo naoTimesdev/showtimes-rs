@@ -3048,6 +3048,7 @@ dependencies = [
  "image",
  "reqwest",
  "showtimes-db",
+ "showtimes-derive",
  "showtimes-events",
  "showtimes-fs",
  "showtimes-gql-common",

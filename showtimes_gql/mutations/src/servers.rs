@@ -7,7 +7,8 @@ use showtimes_search::SearchClientShared;
 use tokio::io::AsyncSeekExt;
 
 use showtimes_gql_common::{
-    data_loader::ServerDataLoader, errors::GQLError, GQLErrorCode, OkResponse, UlidGQL, UserKindGQL,
+    data_loader::ServerDataLoader, errors::GQLError, GQLErrorCode, GQLErrorExt, OkResponse,
+    UlidGQL, UserKindGQL,
 };
 use showtimes_gql_models::servers::ServerGQL;
 
@@ -32,6 +33,40 @@ pub struct ServerCreateInputGQL {
     owners: Option<Vec<ServerOwnerInputGQL>>,
 }
 
+impl ServerCreateInputGQL {
+    /// Dump the input into a new server
+    fn dump_query(&self, f_mut: &mut async_graphql::ErrorExtensionValues) {
+        f_mut.set("name", &self.name);
+        f_mut.set("has_avatar", self.avatar.is_some());
+        if let Some(owners) = &self.owners {
+            f_mut.set(
+                "owners",
+                owners
+                    .iter()
+                    .map(|d| {
+                        let mut f_new = async_graphql::indexmap::IndexMap::new();
+                        d.dump_query(&mut f_new);
+                        async_graphql::Value::Object(f_new)
+                    })
+                    .collect::<Vec<async_graphql::Value>>(),
+            );
+        }
+        if let Some(integrations) = &self.integrations {
+            f_mut.set(
+                "integrations",
+                integrations
+                    .iter()
+                    .map(|d| {
+                        let mut f_new = async_graphql::indexmap::IndexMap::new();
+                        d.dump_query(&mut f_new);
+                        async_graphql::Value::Object(f_new)
+                    })
+                    .collect::<Vec<async_graphql::Value>>(),
+            );
+        }
+    }
+}
+
 /// The server input object on what to update
 ///
 /// All fields are optional
@@ -52,6 +87,26 @@ impl ServerUpdateInputGQL {
     fn is_any_set(&self) -> bool {
         self.name.is_some() || self.integrations.is_some() || self.avatar.is_some()
     }
+
+    fn dump_query(&self, f_mut: &mut async_graphql::ErrorExtensionValues) {
+        if let Some(name) = &self.name {
+            f_mut.set("name", name);
+        }
+        f_mut.set("has_avatar", self.avatar.is_some());
+        if let Some(integrations) = &self.integrations {
+            f_mut.set(
+                "integrations",
+                integrations
+                    .iter()
+                    .map(|d| {
+                        let mut f_new = async_graphql::indexmap::IndexMap::new();
+                        d.dump_query(&mut f_new);
+                        async_graphql::Value::Object(f_new)
+                    })
+                    .collect::<Vec<async_graphql::Value>>(),
+            );
+        }
+    }
 }
 
 /// A server owner information input object
@@ -63,6 +118,20 @@ pub struct ServerOwnerInputGQL {
     kind: UserKindGQL,
     /// Additional information for this user
     extras: Option<Vec<String>>,
+}
+
+impl ServerOwnerInputGQL {
+    /// Dump the input into a new server
+    fn dump_query(
+        &self,
+        f_mut: &mut async_graphql::indexmap::IndexMap<async_graphql::Name, async_graphql::Value>,
+    ) {
+        f_mut.insert(async_graphql::Name::new("id"), self.id.to_string().into());
+        f_mut.insert(async_graphql::Name::new("name"), self.kind.to_name().into());
+        if let Some(extras) = &self.extras {
+            f_mut.insert(async_graphql::Name::new("extras"), extras.to_vec().into());
+        }
+    }
 }
 
 pub async fn mutate_servers_create(
@@ -92,7 +161,7 @@ pub async fn mutate_servers_create(
 
     let mut server = showtimes_db::m::Server::new(&input.name, current_user);
 
-    if let Some(integrations) = input.integrations {
+    if let Some(integrations) = &input.integrations {
         for integration in integrations {
             match integration.action {
                 IntegrationActionGQL::Add => {
@@ -209,8 +278,14 @@ pub async fn mutate_servers_create(
 
     // Commit to database
     let srv_handler = ServerHandler::new(db);
-    // TODO: Propagate error properly
-    srv_handler.save_direct(&mut server, None).await?;
+    srv_handler
+        .save_direct(&mut server, None)
+        .await
+        .extend_error(GQLErrorCode::ServerCreateError, |f_mut| {
+            f_mut.set("id", server.id.to_string());
+            f_mut.set("user", user.id.to_string());
+            input.dump_query(f_mut);
+        })?;
 
     // Commit to search engine
     let server_clone = server.clone();
@@ -309,16 +384,22 @@ pub async fn mutate_servers_update(
     let mut server_before = showtimes_events::m::ServerUpdatedDataEvent::default();
     let mut server_after = showtimes_events::m::ServerUpdatedDataEvent::default();
 
-    if let Some(name) = input.name {
+    if let Some(name) = &input.name {
         server_before.set_name(&server_mut.name);
-        server_mut.name = name;
+        server_mut.name = name.to_string();
         server_after.set_name(&server_mut.name);
     }
 
     server_before.set_integrations(&server_mut.integrations);
 
     let mut any_integrations_changes = false;
-    for (idx, integration) in input.integrations.unwrap_or_default().iter().enumerate() {
+    for (idx, integration) in input
+        .integrations
+        .clone()
+        .unwrap_or_default()
+        .iter()
+        .enumerate()
+    {
         match (integration.action, integration.original_id.clone()) {
             (IntegrationActionGQL::Add, _) => {
                 // Check if the integration already exists
@@ -469,8 +550,14 @@ pub async fn mutate_servers_update(
 
     // Update the user
     let srv_handler = ServerHandler::new(db);
-    // TODO: Propagate error properly
-    srv_handler.save(&mut server_mut, None).await?;
+    srv_handler.save(&mut server_mut, None).await.extend_error(
+        GQLErrorCode::ServerUpdateError,
+        |f_mut| {
+            f_mut.set("id", server_mut.id.to_string());
+            f_mut.set("actor", user.id.to_string());
+            input.dump_query(f_mut);
+        },
+    )?;
 
     // Update index
     let server_clone = server_mut.clone();
@@ -518,12 +605,15 @@ pub async fn mutate_servers_delete(
 
     // Unlink Collab sync and invite
     let collab_handler = showtimes_db::CollaborationSyncHandler::new(db);
-    // TODO: Propagate error properly
     let collab_info = collab_handler
         .find_all_by(doc! {
             "projects.server": server.id.to_string()
         })
-        .await?;
+        .await
+        .extend_error(GQLErrorCode::ServerSyncRequestFails, |f_mut| {
+            f_mut.set("id", id.to_string());
+            f_mut.set("server_id", server.id.to_string());
+        })?;
 
     let mut collab_deleted: Vec<String> = vec![];
     let mut collab_deleted_events: Vec<showtimes_events::m::CollabDeletedEvent> = vec![];
@@ -536,8 +626,13 @@ pub async fn mutate_servers_delete(
             // If only 1 or zero, delete this link
             if collab_mut.length() < 2 {
                 // Delete from DB
-                // TODO: Propagate error properly
-                collab_handler.delete(&collab).await?;
+                collab_handler.delete(&collab).await.extend_error(
+                    GQLErrorCode::ServerSyncDeleteError,
+                    |f| {
+                        f.set("id", collab.id.to_string());
+                        f.set("server_target", server.id.to_string());
+                    },
+                )?;
 
                 // Delete from search engine
                 collab_deleted_events.push(showtimes_events::m::CollabDeletedEvent::new(
@@ -548,8 +643,13 @@ pub async fn mutate_servers_delete(
 
                 collab_deleted.push(collab.id.to_string());
             } else {
-                // TODO: Propagate error properly
-                collab_handler.save(&mut collab_mut, None).await?;
+                collab_handler
+                    .save(&mut collab_mut, None)
+                    .await
+                    .extend_error(GQLErrorCode::ServerSyncUpdateError, |f| {
+                        f.set("id", collab.id.to_string());
+                        f.set("server_target", server.id.to_string());
+                    })?;
 
                 collab_updated_events.push(showtimes_events::m::CollabDeletedEvent::new(
                     collab.id,
@@ -634,7 +734,6 @@ pub async fn mutate_servers_delete(
     }
 
     let collab_invite_handler = showtimes_db::CollaborationInviteHandler::new(db);
-    // TODO: Propagate error properly
     let collab_invite_info = collab_invite_handler
         .find_all_by(doc! {
             "$or": [
@@ -646,7 +745,10 @@ pub async fn mutate_servers_delete(
                 }
             ]
         })
-        .await?;
+        .await
+        .extend_error(GQLErrorCode::ServerInviteRequestFails, |f| {
+            f.set("server_id", server.id.to_string());
+        })?;
 
     let all_invite_ids = collab_invite_info
         .iter()
@@ -655,14 +757,17 @@ pub async fn mutate_servers_delete(
 
     if !all_invite_ids.is_empty() {
         // Delete from DB
-        // TODO: Propagate error properly
         collab_invite_handler
             .delete_by(doc! {
                 "id": {
                     "$in": all_invite_ids.clone()
                 }
             })
-            .await?;
+            .await
+            .extend_error(GQLErrorCode::ServerInviteDeleteError, |f| {
+                f.set("invite_ids", all_invite_ids.clone());
+                f.set("server_id", server.id.to_string());
+            })?;
 
         // Delete from search engine
         let index_invite = meili.index(showtimes_search::models::ServerCollabInvite::index_name());
@@ -704,12 +809,14 @@ pub async fn mutate_servers_delete(
 
     // Delete projects
     let project_handler = showtimes_db::ProjectHandler::new(db);
-    // TODO: Propagate error properly
     let project_info = project_handler
         .find_all_by(doc! {
             "creator": server.id.to_string()
         })
-        .await?;
+        .await
+        .extend_error(GQLErrorCode::ProjectRequestFails, |f| {
+            f.set("creator", server.id.to_string());
+        })?;
 
     let all_project_ids = project_info
         .iter()
@@ -718,14 +825,17 @@ pub async fn mutate_servers_delete(
 
     if !all_project_ids.is_empty() {
         // Delete from DB
-        // TODO: Propagate error properly
         project_handler
             .delete_by(doc! {
                 "id": {
                     "$in": all_project_ids.clone()
                 }
             })
-            .await?;
+            .await
+            .extend_error(GQLErrorCode::ProjectDeleteError, |f| {
+                f.set("project_ids", all_project_ids.clone());
+                f.set("server_id", server.id.to_string());
+            })?;
 
         // Delete from search engine
         let index_project = meili.index(showtimes_search::models::Project::index_name());
@@ -766,15 +876,23 @@ pub async fn mutate_servers_delete(
     }
 
     // Delete assets
-    // TODO: Propagate error properly
     storages
         .directory_delete(server.id, None, Some(showtimes_fs::FsFileKind::Images))
-        .await?;
+        .await
+        .extend_error(GQLErrorCode::ImageBulkDeleteError, |f| {
+            f.set("id", server.id.to_string());
+            f.set("actor", user.id.to_string());
+        })?;
 
     // Delete from DB
     let srv_handler = ServerHandler::new(db);
-    // TODO: Propagate error properly
-    srv_handler.delete(&server).await?;
+    srv_handler
+        .delete(&server)
+        .await
+        .extend_error(GQLErrorCode::ServerDeleteError, |f| {
+            f.set("id", server.id.to_string());
+            f.set("actor", user.id.to_string());
+        })?;
 
     // Delete from search engine
     let srv_clone = server.clone();

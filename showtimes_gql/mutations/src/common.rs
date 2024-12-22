@@ -1,8 +1,9 @@
 use async_graphql::{CustomValidator, Enum, InputObject};
+use showtimes_derive::EnumName;
 use showtimes_gql_common::{errors::GQLError, GQLErrorExt, IntegrationTypeGQL};
 
 /// The list of possible integrations actions.
-#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, EnumName)]
 #[graphql(rename_items = "SCREAMING_SNAKE_CASE")]
 pub enum IntegrationActionGQL {
     /// Add
@@ -19,7 +20,7 @@ pub enum IntegrationActionGQL {
 /// - `originalId` is required for `UPDATE` action
 /// - When removing and no ID is found, it will be ignored
 /// - When adding, if the ID is found, it will be ignored
-#[derive(InputObject)]
+#[derive(InputObject, Clone)]
 pub struct IntegrationInputGQL {
     /// The integration ID or name
     pub(crate) id: String,
@@ -48,6 +49,21 @@ impl IntegrationInputGQL {
             )
         } else {
             Ok(())
+        }
+    }
+
+    pub(crate) fn dump_query(
+        &self,
+        f_mut: &mut async_graphql::indexmap::IndexMap<async_graphql::Name, async_graphql::Value>,
+    ) {
+        f_mut.insert(async_graphql::Name::new("id"), self.id.clone().into());
+        f_mut.insert(async_graphql::Name::new("kind"), self.kind.to_name().into());
+        f_mut.insert(
+            async_graphql::Name::new("action"),
+            self.action.to_name().into(),
+        );
+        if let Some(original_id) = &self.original_id {
+            f_mut.insert(async_graphql::Name::new("originalId"), original_id.into());
         }
     }
 }

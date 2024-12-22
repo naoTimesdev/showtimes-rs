@@ -76,6 +76,10 @@ pub enum GQLErrorCode {
     IOError = 110,
     /// Image upload error
     ImageUploadError = 120,
+    /// Image delete error
+    ImageDeleteError = 121,
+    /// Image folder delete error
+    ImageBulkDeleteError = 122,
     /// Invalid token provided
     InvalidToken = 130,
     /// Expired token provided

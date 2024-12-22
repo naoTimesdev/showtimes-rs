@@ -28,6 +28,7 @@ showtimes-fs = { path = "../../showtimes_fs" }
 showtimes-metadata = { path = "../../showtimes_metadata" }
 showtimes-search = { path = "../../showtimes_search" }
 showtimes-session = { path = "../../showtimes_session" }
+showtimes-derive = { path = "../../showtimes_derive" }
 
 # GQL related
 showtimes-gql-common = { path = "../common" }
