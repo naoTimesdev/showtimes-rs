@@ -1,6 +1,7 @@
 # Host and port for the server
 host = "127.0.0.1"
 port = 5560
+tokio-port = 5562
 # Master key for the server
 master_key = "masterkey"
 log-directory = ""

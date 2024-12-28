@@ -148,6 +148,11 @@ pub struct Config {
     /// Default to `5560`
     #[serde(default)]
     pub port: Option<u16>,
+    /// The port to bind the metrics/tokio-console server
+    ///
+    /// Default to `5562`
+    #[serde(rename = "tokio-port", default)]
+    pub tokio_port: Option<u16>,
     /// The master key for the server
     pub master_key: String,
     /// The log directory for the server
@@ -186,6 +191,10 @@ impl Config {
 
         if self.port.is_none() {
             self.port = Some(5560);
+        }
+
+        if self.tokio_port.is_none() {
+            self.tokio_port = Some(5562);
         }
 
         if self.jwt.expiration.is_none() {

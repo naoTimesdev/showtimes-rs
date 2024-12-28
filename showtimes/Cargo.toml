@@ -19,6 +19,7 @@ urlencoding.workspace = true
 # Async/Tokio
 tokio.workspace = true
 futures-util.workspace = true
+console-subscriber.workspace = true
 
 # Web server
 axum.workspace = true
