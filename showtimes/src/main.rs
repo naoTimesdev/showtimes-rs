@@ -7,12 +7,12 @@ use routes::graphql::{GRAPHQL_ROUTE, GRAPHQL_WS_ROUTE};
 use serde_json::json;
 use showtimes_fs::s3::S3FsCredentials;
 use showtimes_shared::Config;
-use tasks::{spawn_with, RSSTasks};
+// use tasks::{spawn_with, RSSTasks};
 use tokio::{
     net::TcpListener,
     sync::{Mutex, Notify},
-    task::JoinSet,
-    time::timeout,
+    // task::JoinSet,
+    // time::timeout,
 };
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -276,10 +276,10 @@ async fn entrypoint() -> anyhow::Result<()> {
     });
 
     // Spawn background tasks...
-    tracing::info!("⚡ Starting background tasks...");
-    let mut tasks = JoinSet::new();
-    let rss_task = RSSTasks::new(shared_state.clone());
-    spawn_with(rss_task, Arc::clone(&shutdown_notify), &mut tasks);
+    // tracing::info!("⚡ Starting background tasks...");
+    // let mut tasks = JoinSet::new();
+    // let rss_task = RSSTasks::new(shared_state.clone());
+    // spawn_with(rss_task, Arc::clone(&shutdown_notify), &mut tasks);
 
     // Signal handling
     let ctrl_c_sig = async {
@@ -317,26 +317,26 @@ async fn entrypoint() -> anyhow::Result<()> {
     shutdown_notify.notify_waiters();
 
     // Wait for all tasks to complete
-    tracing::info!("Waiting for background tasks to complete...");
-    let task_shutdown_result = std::time::Duration::from_secs(5);
-    let shutdown_result = timeout(task_shutdown_result, async {
-        while let Some(res) = tasks.join_next().await {
-            res.unwrap();
-        }
-    })
-    .await;
+    // tracing::info!("Waiting for background tasks to complete...");
+    // let task_shutdown_result = std::time::Duration::from_secs(5);
+    // let shutdown_result = timeout(task_shutdown_result, async {
+    //     while let Some(res) = tasks.join_next().await {
+    //         res.unwrap();
+    //     }
+    // })
+    // .await;
 
-    match shutdown_result {
-        Ok(_) => {
-            tracing::info!("All background tasks have completed and shut down gracefully.");
-        }
-        Err(_) => {
-            tracing::warn!(
-                "Some background tasks failed to complete in time, forcefully shutting down."
-            );
-            tasks.shutdown().await;
-        }
-    }
+    // match shutdown_result {
+    //     Ok(_) => {
+    //         tracing::info!("All background tasks have completed and shut down gracefully.");
+    //     }
+    //     Err(_) => {
+    //         tracing::warn!(
+    //             "Some background tasks failed to complete in time, forcefully shutting down."
+    //         );
+    //         tasks.shutdown().await;
+    //     }
+    // }
 
     // Wait for the server to shutdown
     tracing::info!("Waiting for the server to shutdown...");
