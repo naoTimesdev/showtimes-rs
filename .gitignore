@@ -21,6 +21,7 @@ cobertura.xml
 config.toml
 config.toml.development
 config.toml.production
+!/.cargo/config.toml
 
 # Others
 _dumps/

@@ -39,8 +39,8 @@ anyhow = "1"
 tosho-macros = "0.3"
 
 # Serde
-serde = { version = "1.0.216", features = ["derive"] }
-serde_json = "1.0.133"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.134"
 serde_repr = "0.1.19"
 
 # Parsing data
@@ -57,6 +57,7 @@ tokio-stream = "0.1.17"
 futures-util = { version = "0.3.31", default-features = false, features = ["std"] }
 futures-channel = { version = "0.3.31", default-features = false, features = ["std"] }
 async-trait = "0.1.83"
+console-subscriber = "0.4.1"
 
 # File server
 mime_guess = "2.0.5"
@@ -101,14 +102,14 @@ jsonwebtoken = { version = "9.3.0", default-features = false }
 
 # FansubRSS/Network
 url = { version = "2.5.4", features = ["serde"] }
-reqwest = { version = "0.12.9", default-features = false, features = [
+reqwest = { version = "0.12.11", default-features = false, features = [
     "charset",
     "macos-system-configuration",
     "rustls-tls",
     "http2",
     "json"
 ] }
-feed-rs = { version = "2.3.0", features = ["sanitize"] }
+feed-rs = { version = "2.3.1", features = ["sanitize"] }
 pulldown-cmark = { version = "0.12.2", default-features = false, features = ["html"] }
 pulldown-cmark-escape = "0.11.0"
 htmd = "0.1.6"
