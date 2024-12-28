@@ -135,6 +135,20 @@ pub struct ClickHouseEvent {
     pub password: Option<String>,
 }
 
+/// RSS configuration
+#[derive(Debug, Clone, Deserialize)]
+pub struct RSS {
+    /// Enabled the rss feature
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// The interval of the standard fetcher in seconds
+    #[serde(default)]
+    pub standard: Option<u32>,
+    /// The interval of the premium fetcher in seconds
+    #[serde(default)]
+    pub premium: Option<u32>,
+}
+
 /// The full configuration for Showtimes
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
@@ -174,6 +188,8 @@ pub struct Config {
     pub storages: Storages,
     /// The JWT session configuration
     pub jwt: JwtSession,
+    /// RSS configuration
+    pub rss: RSS,
 }
 
 /// This macro wraps [`ConfigVerifyError`] and the error item &str into a String
@@ -305,6 +321,25 @@ impl Config {
             bail_verify!(Required, "Storage")
         }
 
+        // Verify RSS
+        if self.rss.enabled {
+            if let Some(standard) = &self.rss.standard {
+                if *standard < 30 {
+                    return Err(
+                        ConfigVerifyError::MinimumAmount("Standard RSS".to_string(), 30).into(),
+                    );
+                }
+            }
+
+            if let Some(premium) = &self.rss.premium {
+                if *premium < 30 {
+                    return Err(
+                        ConfigVerifyError::MinimumAmount("Premium RSS".to_string(), 30).into(),
+                    );
+                }
+            }
+        }
+
         Ok(())
     }
 }
@@ -332,6 +367,8 @@ pub enum ConfigVerifyError {
     NoDefault(String),
     /// Field is not changed from default, we need to change it or set it to null to disable.
     NoDefaultOrNull(String),
+    /// Minimum amount is not satisfied
+    MinimumAmount(String, usize),
 }
 
 impl From<toml::de::Error> for ConfigError {
@@ -374,9 +411,18 @@ impl std::fmt::Display for ConfigVerifyError {
                 "{} is not changed from default, please change it or set to `null` if not used!",
                 item
             ),
+            ConfigVerifyError::MinimumAmount(item, amount) => write!(
+                f,
+                "Minimum amount of '{}' {} is not satisfied, please change it!",
+                item, amount
+            ),
         }
     }
 }
 
 impl std::error::Error for ConfigError {}
 impl std::error::Error for ConfigVerifyError {}
+
+fn default_true() -> bool {
+    true
+}

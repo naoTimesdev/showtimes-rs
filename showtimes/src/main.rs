@@ -8,12 +8,7 @@ use serde_json::json;
 use showtimes_fs::s3::S3FsCredentials;
 use showtimes_shared::Config;
 // use tasks::{spawn_with, RSSTasks};
-use tokio::{
-    net::TcpListener,
-    sync::{Mutex, Notify},
-    // task::JoinSet,
-    // time::timeout,
-};
+use tokio::{net::TcpListener, sync::Mutex};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -254,95 +249,19 @@ async fn entrypoint() -> anyhow::Result<()> {
     ))
     .await?;
 
-    let shutdown_notify = Arc::new(Notify::new());
-    let (shutdown_tx, mut shutdown_rx) = tokio::sync::mpsc::channel(1);
-
     // Spawn the axum server
-    let server = tokio::spawn(async move {
-        let local_addr = listener.local_addr().unwrap();
-        tracing::info!("🌍 Fast serving at http://{}", local_addr);
-        tracing::info!(
-            "🌍 GraphQL playground: http://{}{}",
-            local_addr,
-            GRAPHQL_ROUTE
-        );
+    let local_addr = listener.local_addr()?;
+    tracing::info!("🌍 Fast serving at http://{}", local_addr);
+    tracing::info!(
+        "🌍 GraphQL playground: http://{}{}",
+        local_addr,
+        GRAPHQL_ROUTE
+    );
 
-        axum::serve(listener, app)
-            .with_graceful_shutdown(async move {
-                shutdown_tx.send(()).await.unwrap();
-            })
-            .await
-            .unwrap();
-    });
-
-    // Spawn background tasks...
-    // tracing::info!("⚡ Starting background tasks...");
-    // let mut tasks = JoinSet::new();
-    // let rss_task = RSSTasks::new(shared_state.clone());
-    // spawn_with(rss_task, Arc::clone(&shutdown_notify), &mut tasks);
-
-    // Signal handling
-    let ctrl_c_sig = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
-    };
-
-    #[cfg(unix)]
-    let terminate_sig = async {
-        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate_sig = std::future::pending::<()>();
-
-    // Wait for a shutdown signal
-    tokio::select! {
-        _ = ctrl_c_sig => {
-            tracing::info!("Received Ctrl-C, shutting down...");
-        }
-        _ = terminate_sig => {
-            tracing::info!("Received SIGTERM, shutting down...");
-        }
-        _ = shutdown_rx.recv() => {
-            tracing::info!("Received shutdown signal from tasks, shutting down...");
-        }
-    }
-
-    // Initiate shutdown
-    tracing::info!("Initiating shutdown...");
-    shutdown_notify.notify_waiters();
-
-    // Wait for all tasks to complete
-    // tracing::info!("Waiting for background tasks to complete...");
-    // let task_shutdown_result = std::time::Duration::from_secs(5);
-    // let shutdown_result = timeout(task_shutdown_result, async {
-    //     while let Some(res) = tasks.join_next().await {
-    //         res.unwrap();
-    //     }
-    // })
-    // .await;
-
-    // match shutdown_result {
-    //     Ok(_) => {
-    //         tracing::info!("All background tasks have completed and shut down gracefully.");
-    //     }
-    //     Err(_) => {
-    //         tracing::warn!(
-    //             "Some background tasks failed to complete in time, forcefully shutting down."
-    //         );
-    //         tasks.shutdown().await;
-    //     }
-    // }
-
-    // Wait for the server to shutdown
-    tracing::info!("Waiting for the server to shutdown...");
-    server.await.unwrap();
-
-    tracing::info!("Bye!");
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .unwrap();
 
     Ok(())
 }
@@ -367,4 +286,32 @@ async fn index_favicons() -> impl IntoResponse {
         .header(axum::http::header::ETAG, etag)
         .body(axum::body::Body::from(ASSET_ICON))
         .unwrap()
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            tracing::info!("Received Ctrl-C, shutting down...");
+        }
+        _ = terminate => {
+            tracing::info!("Received SIGTERM, shutting down...");
+        }
+    }
 }

@@ -1,6 +1,7 @@
 # Host and port for the server
 host = "127.0.0.1"
 port = 5560
+# Where to run the tokio-console monitoring, this will run only on localhost
 tokio-port = 5562
 # Master key for the server
 master_key = "masterkey"
@@ -49,6 +50,13 @@ redirect_url = "https://your.naotimes.ui.instance/callback/discord"
 vndb = "your-valid-token-for-vndb"
 # TMDB Token
 tmdb = "your-valid-access-token-for-tmdb"
+
+# Configuration for FansubRSS/Showtimes RSS
+[rss]
+enabled = true
+# Interval of the feed fetcher in seconds
+standard = 300
+premium = 120
 
 [storages]
 # Disable the proxy that can mirror S3 data, not recommended if you use local

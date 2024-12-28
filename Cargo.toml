@@ -54,6 +54,7 @@ toml = { version = "0.8.19", default-features = false, features = ["parse", "pre
 # Async/Futures
 tokio = { version = "1.42.0", features = ["full", "tracing"] }
 tokio-stream = "0.1.17"
+tokio-cron-scheduler = "0.13.0"
 futures-util = { version = "0.3.31", default-features = false, features = ["std"] }
 futures-channel = { version = "0.3.31", default-features = false, features = ["std"] }
 async-trait = "0.1.83"
