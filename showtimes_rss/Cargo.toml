@@ -12,6 +12,7 @@ description = "A RSS handler for Showtimes API"
 [dependencies]
 nom.workspace = true
 chrono.workspace = true
+serde.workspace = true
 
 reqwest.workspace = true
 feed-rs.workspace = true

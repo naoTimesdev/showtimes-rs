@@ -3,11 +3,13 @@
 pub mod collabs;
 pub mod common;
 pub mod projects;
+pub mod rss;
 pub mod servers;
 pub mod users;
 
 pub use collabs::*;
 pub use common::*;
 pub use projects::*;
+pub use rss::*;
 pub use servers::*;
 pub use users::*;

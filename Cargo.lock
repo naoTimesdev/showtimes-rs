@@ -2992,6 +2992,7 @@ dependencies = [
  "serde_repr",
  "showtimes-db",
  "showtimes-derive",
+ "showtimes-rss",
  "showtimes-shared",
  "slab",
  "time",
@@ -3177,6 +3178,7 @@ dependencies = [
  "pulldown-cmark",
  "pulldown-cmark-escape",
  "reqwest",
+ "serde",
  "url",
 ]
 

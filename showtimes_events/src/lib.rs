@@ -8,6 +8,7 @@ pub mod brokers;
 pub mod models;
 mod streams;
 pub use brokers::MemoryBroker;
+use brokers::RSSBroker;
 pub use clickhouse::error::Error as ClickHouseError;
 use clickhouse::Client;
 pub use models as m;
@@ -17,6 +18,7 @@ pub type SharedSHClickHouse = Arc<SHClickHouse>;
 
 const DATABASE_NAME: &str = "nt_showtimes";
 pub(crate) const TABLE_NAME: &str = "events";
+pub(crate) const RSS_TABLE_NAME: &str = "rss_feed";
 
 /// The main ClickHouse client handler for Showtimes
 pub struct SHClickHouse {
@@ -59,6 +61,7 @@ impl SHClickHouse {
 
     /// Create the necessary tables in the database
     pub async fn create_tables(&self) -> Result<(), clickhouse::error::Error> {
+        // Events table
         self.client
             .query(&format!(
                 r#"
@@ -90,6 +93,24 @@ impl SHClickHouse {
                 TABLE_NAME
             ))
             .execute()
+            .await?;
+
+        // RSS table
+        self.client
+            .query(&format!(
+                r#"
+                CREATE TABLE IF NOT EXISTS {} (
+                    id UUID,
+                    feed_id UUID,
+                    server_id UUID,
+                    entries String,
+                    timestamp DateTime
+                ) ENGINE = MergeTree()
+                ORDER BY (timestamp)
+                "#,
+                RSS_TABLE_NAME,
+            ))
+            .execute()
             .await
     }
 
@@ -97,6 +118,11 @@ impl SHClickHouse {
     pub async fn drop_tables(&self) -> Result<(), clickhouse::error::Error> {
         self.client
             .query(&format!("DROP TABLE IF EXISTS {}", TABLE_NAME))
+            .execute()
+            .await?;
+
+        self.client
+            .query(&format!("DROP TABLE IF EXISTS {}", RSS_TABLE_NAME))
             .execute()
             .await
     }
@@ -192,12 +218,58 @@ impl SHClickHouse {
         })
     }
 
+    /// Create a new RSS event with multiple data, this will also forward the event to the broker
+    /// for other services to consume, similar to [`SHClickHouse::create_event`] but with multiple data
+    ///
+    /// # Arguments
+    /// * `data` - The data of the RSS event
+    pub async fn create_rss_many<T>(
+        &self,
+        data: Vec<crate::m::RSSEvent>,
+    ) -> Result<(), clickhouse::error::Error> {
+        push_rss(&self.client, &data).await?;
+
+        for ev in data {
+            // Publish one by one
+            RSSBroker::publish(ev.feed_id(), ev);
+        }
+
+        Ok(())
+    }
+
+    /// A similar function to [`SHClickHouse::create_rss_many`] but will run
+    /// on non-blocking manner or in another thread
+    pub fn create_rss_many_async<T>(
+        &self,
+        data: Vec<crate::m::RSSEvent>,
+    ) -> tokio::task::JoinHandle<Result<(), clickhouse::error::Error>>
+    where
+        T: serde::Serialize + Send + Sync + Clone + Debug + 'static,
+    {
+        let client = self.client.clone();
+        tokio::task::spawn(async move {
+            push_rss(&client, &data).await?;
+
+            for ev in data {
+                // Publish one by one
+                RSSBroker::publish(ev.feed_id(), ev);
+            }
+
+            Ok(())
+        })
+    }
+
     /// Query the events from the database with proper pagination
     pub fn query<T>(&self, kind: m::EventKind) -> streams::SHClickStream<T>
     where
         T: serde::de::DeserializeOwned + Send + Sync + Clone + Unpin + std::fmt::Debug + 'static,
     {
         streams::SHClickStream::init(self.client.clone(), kind)
+    }
+
+    /// Query the RSS events from the database with proper pagination
+    pub fn query_rss(&self, feed_id: showtimes_shared::ulid::Ulid) -> streams::SHRSSClickStream {
+        streams::SHRSSClickStream::init(self.client.clone(), feed_id)
     }
 }
 
@@ -248,6 +320,30 @@ where
         data.len(),
         TABLE_NAME,
         DATABASE_NAME,
+    );
+    insert.end().await?;
+
+    Ok(())
+}
+
+async fn push_rss(
+    client: &Client,
+    data: &[crate::m::RSSEvent],
+) -> Result<(), clickhouse::error::Error> {
+    tracing::debug!(
+        "Preparing to push RSS event to ClickHouse (table = {}, db = {})",
+        RSS_TABLE_NAME,
+        DATABASE_NAME
+    );
+    let mut insert = client.insert(RSS_TABLE_NAME)?;
+    for d in data {
+        insert.write(d).await?;
+    }
+    tracing::debug!(
+        "Inserting RSS event with {} event(s) (table = {}, db = {})",
+        data.len(),
+        RSS_TABLE_NAME,
+        DATABASE_NAME
     );
     insert.end().await?;
 

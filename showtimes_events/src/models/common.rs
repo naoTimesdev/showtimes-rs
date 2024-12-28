@@ -61,7 +61,7 @@ pub struct SHEvent<T: Send + Sync + Clone> {
     id: showtimes_shared::ulid::Ulid,
     /// The event kind
     kind: EventKind,
-    /// The event data itself, on Clickhouse this will be stored as a
+    /// The event data itself, on Clickhouse this will be stored as a string
     #[serde(
         bound(
             deserialize = "T: DeserializeOwned + Send + Sync + Clone + Debug",
@@ -145,7 +145,10 @@ where
     serializer.serialize_str(&s)
 }
 
-fn serialize_ulid<S>(ulid: &showtimes_shared::ulid::Ulid, serializer: S) -> Result<S::Ok, S::Error>
+pub(crate) fn serialize_ulid<S>(
+    ulid: &showtimes_shared::ulid::Ulid,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
@@ -153,7 +156,9 @@ where
     clickhouse::serde::uuid::serialize(&to_uuid, serializer)
 }
 
-fn deserialize_ulid<'de, D>(deserializer: D) -> Result<showtimes_shared::ulid::Ulid, D::Error>
+pub(crate) fn deserialize_ulid<'de, D>(
+    deserializer: D,
+) -> Result<showtimes_shared::ulid::Ulid, D::Error>
 where
     D: serde::Deserializer<'de>,
 {

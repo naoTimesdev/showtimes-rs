@@ -13,6 +13,7 @@ use nom::{
     sequence::delimited,
     IResult,
 };
+use serde::{ser::SerializeSeq, Deserialize, Serialize};
 
 /// A simple tempate error
 #[derive(Debug)]
@@ -256,7 +257,7 @@ pub fn format_text<T: ToString>(
 
 /// A vector that stores strings and provides a more convenient
 /// interface for pushing strings into it.
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct VecString {
     /// The internal vector
     internal: Vec<String>,
@@ -322,6 +323,30 @@ impl std::fmt::Display for VecString {
 impl From<Vec<String>> for VecString {
     fn from(value: Vec<String>) -> Self {
         Self::from_vec(value)
+    }
+}
+
+impl Serialize for VecString {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(self.internal.len()))?;
+        for element in &self.internal {
+            seq.serialize_element(element)?;
+        }
+        seq.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for VecString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let seq = <Vec<String> as Deserialize>::deserialize(deserializer)?;
+
+        Ok(Self::from_vec(seq))
     }
 }
 

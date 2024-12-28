@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use feed_rs::model::{MediaContent, MediaThumbnail};
 use markdown::expand_url;
+use serde::{Deserialize, Serialize};
 pub use template::{format_text, VecString};
 
 fn create_client() -> Result<reqwest::Client, reqwest::Error> {
@@ -53,6 +54,7 @@ pub async fn test_feed_validity(feed_url: impl AsRef<str>) -> Result<bool, RSSEr
 }
 
 /// The feed value information
+#[derive(Clone, Debug)]
 pub enum FeedValue {
     /// Value is a string
     String(String),
@@ -86,10 +88,69 @@ impl From<DateTime<Utc>> for FeedValue {
     }
 }
 
+impl Serialize for FeedValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            FeedValue::String(s) => serializer.serialize_str(s),
+            FeedValue::Collection(s) => s.serialize(serializer),
+            FeedValue::Timestamp(s) => s.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for FeedValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct FeedValueVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for FeedValueVisitor {
+            type Value = FeedValue;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a string or a sequence of strings")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                // Try RFC3339 first
+                if let Ok(dt) = value.parse::<DateTime<Utc>>() {
+                    Ok(FeedValue::from(dt))
+                } else {
+                    // Fallback to string
+                    Ok(FeedValue::from(value.to_string()))
+                }
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut strings = Vec::new();
+                while let Some(s) = seq.next_element::<String>()? {
+                    strings.push(s);
+                }
+                Ok(FeedValue::from(strings))
+            }
+        }
+
+        deserializer.deserialize_any(FeedValueVisitor)
+    }
+}
+
 /// A map of feed entries
 ///
 /// The key is the name of the field and the value is the field value
 pub type FeedEntry<'a> = HashMap<&'a str, FeedValue>;
+
+/// A map of feed entries
+pub type FeedEntryCloned = HashMap<String, FeedValue>;
 
 /// A vector of feed entries
 pub type FeedEntries<'a> = Vec<FeedEntry<'a>>;
@@ -404,3 +465,9 @@ impl std::fmt::Debug for RSSError {
 }
 
 impl std::error::Error for RSSError {}
+
+/// Converts a `FeedEntry` into a `FeedEntryCloned`, which is a clone of its key and value.
+/// This is useful if you want to store the feed entry in a struct and need to clone it.
+pub fn transform_to_cloned_feed<'a>(feed: FeedEntry<'a>) -> FeedEntryCloned {
+    feed.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
+}
