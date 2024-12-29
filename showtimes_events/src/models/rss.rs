@@ -90,7 +90,7 @@ impl RSSEvent {
     }
 
     /// Get the hash ID of the event
-    pub fn hash(&self) -> &str {
+    pub fn hash_key(&self) -> &str {
         &self.hash
     }
 

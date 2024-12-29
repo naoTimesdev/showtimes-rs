@@ -200,7 +200,7 @@ pub fn parse_template(text_template: &str) -> Result<Vec<TemplateToken<'_>>, Tem
 pub(crate) fn format_template<'a, T: ToString>(
     tokens: &[TemplateToken<'a>],
     args: &[T],
-    kwargs: &BTreeMap<&'a str, T>,
+    kwargs: &BTreeMap<String, T>,
 ) -> String {
     let mut index = 0;
     let mut result = String::new();
@@ -224,7 +224,8 @@ pub(crate) fn format_template<'a, T: ToString>(
                         res
                     }
                     Template::Named(key) => {
-                        let res = kwargs.get(key).map(ToString::to_string);
+                        let k_str = key.to_string();
+                        let res = kwargs.get(k_str.as_str()).map(ToString::to_string);
                         res.unwrap_or(format!("{{{}}}", key))
                     }
                 };
@@ -250,7 +251,7 @@ pub(crate) fn format_template<'a, T: ToString>(
 pub fn format_text<T: ToString>(
     template: &str,
     args: &[T],
-    kwargs: &BTreeMap<&str, T>,
+    kwargs: &BTreeMap<String, T>,
 ) -> Result<String, TemplateError> {
     Ok(format_template(&parse_template(template)?, args, kwargs))
 }
@@ -396,7 +397,7 @@ mod tests {
         ];
 
         let mut tree_map = BTreeMap::new();
-        tree_map.insert("syntax", "xdd");
+        tree_map.insert("syntax".to_string(), "xdd");
         let result = format_template(&parsed, &["nice guy"], &tree_map);
 
         assert_eq!(

@@ -715,6 +715,9 @@ impl Loader<Ulid> for RSSFeedLoader {
     }
 }
 
+/// A data loader key for the RSS feed
+///
+/// Based on the server ULID
 #[derive(Clone)]
 pub struct RSSFeedServer(Ulid);
 

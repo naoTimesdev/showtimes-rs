@@ -50,6 +50,25 @@ impl RSSFeedEmbedDisplay {
     }
 }
 
+impl Default for RSSFeedEmbedDisplay {
+    /// Create the default embed display for the RSS feed.
+    fn default() -> Self {
+        Self {
+            title: None,
+            description: None,
+            url: None,
+            thumbnail: None,
+            image: None,
+            footer: None,
+            footer_image: None,
+            author: Some("naoTimes Feed".to_string()),
+            author_image: Some("https://naoti.me/assets/img/nt256.png".to_string()),
+            color: None,
+            timestamped: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RSSFeedDisplay {
     /// The default message for the RSS feed.
@@ -71,6 +90,10 @@ impl RSSFeedDisplay {
             message: Some(message.into()),
             embed: Some(embed),
         }
+    }
+
+    pub fn default_message() -> &'static str {
+        DEFAULT_MESSAGE_DISPLAY
     }
 }
 

@@ -6,12 +6,13 @@ use collaborations::{
     CollabAcceptedEventDataGQL, CollabCreatedEventDataGQL, CollabDeletedEventDataGQL,
     CollabRejectedEventDataGQL, CollabRetractedEventDataGQL,
 };
-use executor::{query_events, query_events_with_user};
+use executor::{query_events, query_events_with_user, query_rss_events};
 use prelude::EventGQL;
 use projects::{
     ProjectCreatedEventDataGQL, ProjectDeletedEventDataGQL, ProjectEpisodeUpdatedEventDataGQL,
     ProjectUpdatedEventDataGQL,
 };
+use rss::RSSEventGQL;
 use servers::{ServerCreatedEventDataGQL, ServerDeletedEventDataGQL, ServerUpdatedEventDataGQL};
 use users::{UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDataGQL};
 
@@ -20,6 +21,7 @@ mod executor;
 pub mod collaborations;
 pub mod prelude;
 pub mod projects;
+pub mod rss;
 pub mod servers;
 pub mod users;
 
@@ -258,5 +260,15 @@ impl QueryEventsRoot {
             showtimes_events::m::EventKind::CollaborationDeleted,
         )
         .await
+    }
+
+    /// A list of new RSS events, use `watchRSS` to get a real-time stream instead.
+    async fn rss(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        #[graphql(desc = "The RSS feed ID to query")] feed_id: showtimes_gql_common::UlidGQL,
+        #[graphql(desc = "The starting ID to query")] id: showtimes_gql_common::UlidGQL,
+    ) -> async_graphql::Result<Vec<RSSEventGQL>> {
+        query_rss_events(ctx, feed_id, id).await
     }
 }

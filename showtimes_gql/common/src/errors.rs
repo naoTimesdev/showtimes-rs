@@ -90,6 +90,8 @@ pub enum GQLErrorCode {
     // --> Event related
     /// Failed to advance or request next batch of events
     EventAdvanceFailure = 200,
+    /// Failed to advance or request next batch of RSS events
+    EventRSSAdvanceFailure = 201,
 
     // --> Task scheduler related
     /// Failed when requesting task scheduler
@@ -284,6 +286,28 @@ pub enum GQLErrorCode {
     MetadataUnableToParseDate = 6031,
     /// Metadata no start date
     MetadataNoStartDate = 6032,
+
+    // -> RSS related
+    /// Failed when requesting RSS feed
+    RSSFeedRequestFails = 7000,
+    /// RSS feed not found in database
+    RSSFeedNotFound = 7001,
+    /// RSS feed already exists
+    RSSFeedAlreadyExists = 7002,
+    /// Failed to create RSS feed
+    RSSFeedCreateError = 7010,
+    /// Failed to create RSS feed in search database
+    RSSFeedCreateSearchError = 7011,
+    /// Failed to update RSS feed
+    RSSFeedUpdateError = 7012,
+    /// Failed to update RSS feed in search database
+    RSSFeedUpdateSearchError = 7013,
+    /// Failed to delete RSS feed
+    RSSFeedDeleteError = 7014,
+    /// Failed to delete RSS feed in search database
+    RSSFeedDeleteSearchError = 7015,
+    /// Failed to render RSS feed message
+    RSSFeedRenderError = 7020,
 }
 
 impl GQLErrorCode {
@@ -341,8 +365,14 @@ pub enum GQLDataLoaderWhere {
     ServerSyncLoaderCollect,
     /// Server collab invite loader (ULID ID)
     ServerSyncInviteLoaderId,
-    /// Server collab invite  loader db collection
+    /// Server collab invite loader db collection
     ServerSyncInviteLoaderCollect,
+    /// RSS feed loader (ULID ID)
+    RSSFeedLoaderId,
+    /// RSS feed loader (Server ID)
+    RSSFeedLoaderServerId,
+    /// RSS feed loader db collection
+    RSSFeedLoaderCollect,
 }
 
 impl From<GQLErrorCode> for async_graphql::Value {

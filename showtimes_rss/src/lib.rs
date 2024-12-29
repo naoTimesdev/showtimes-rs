@@ -145,6 +145,19 @@ impl<'de> Deserialize<'de> for FeedValue {
     }
 }
 
+impl std::fmt::Display for FeedValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FeedValue::String(s) => write!(f, "{}", s),
+            FeedValue::Collection(s) => write!(f, "{}", s),
+            FeedValue::Timestamp(s) => {
+                // Use similar format to RFC3339
+                write!(f, "{}", s.format("%a, %d %b %Y %H:%M:%S %Z"))
+            }
+        }
+    }
+}
+
 /// A map of feed entries
 ///
 /// The key is the name of the field and the value is the field value

@@ -3174,6 +3174,7 @@ dependencies = [
  "showtimes-events",
  "showtimes-gql-common",
  "showtimes-gql-models",
+ "showtimes-rss",
  "showtimes-shared",
  "time",
 ]
