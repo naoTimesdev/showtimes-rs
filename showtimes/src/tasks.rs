@@ -76,7 +76,7 @@ async fn rss_single_task(
         feed.creator
     );
 
-    if new_entries.len() > 0 {
+    if !new_entries.is_empty() {
         // Re-lock
         let mut rss_manager = state.rss_manager.lock().await;
         rss_manager.push_entries(feed.id, &new_entries).await?;

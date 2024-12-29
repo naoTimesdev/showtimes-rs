@@ -781,9 +781,7 @@ impl Loader<RSSFeedServer> for RSSFeedLoader {
         let mut mapped_res: HashMap<RSSFeedServer, Vec<showtimes_db::m::RSSFeed>> = HashMap::new();
 
         for rss in all_results {
-            let entry = mapped_res
-                .entry(RSSFeedServer(rss.creator))
-                .or_insert_with(Vec::new);
+            let entry = mapped_res.entry(RSSFeedServer(rss.creator)).or_default();
 
             entry.push(rss);
         }

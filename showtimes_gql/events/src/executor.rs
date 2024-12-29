@@ -124,11 +124,7 @@ pub(crate) async fn query_rss_events(
             })
         })?;
 
-        results.extend(
-            event_batch
-                .into_iter()
-                .map(|event| RSSEventGQL::from(event)),
-        );
+        results.extend(event_batch.into_iter().map(RSSEventGQL::from));
     }
 
     Ok(results)

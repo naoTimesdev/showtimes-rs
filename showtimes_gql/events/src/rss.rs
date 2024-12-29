@@ -234,7 +234,7 @@ fn render_single(
     entries: &BTreeMap<String, showtimes_rss::FeedValue>,
 ) -> async_graphql::Result<RSSEventFormatValueGQL> {
     let args = vec![];
-    let markdown = showtimes_rss::format_text(data, &args, &entries).extend_error(
+    let markdown = showtimes_rss::format_text(data, &args, entries).extend_error(
         GQLErrorCode::RSSFeedRenderError,
         |f| {
             f.set("template", data);

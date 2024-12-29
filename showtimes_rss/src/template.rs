@@ -197,8 +197,8 @@ pub fn parse_template(text_template: &str) -> Result<Vec<TemplateToken<'_>>, Tem
     Ok(tokens)
 }
 
-pub(crate) fn format_template<'a, T: ToString>(
-    tokens: &[TemplateToken<'a>],
+pub(crate) fn format_template<T: ToString>(
+    tokens: &[TemplateToken<'_>],
     args: &[T],
     kwargs: &BTreeMap<String, T>,
 ) -> String {

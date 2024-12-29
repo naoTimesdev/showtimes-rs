@@ -408,7 +408,7 @@ impl ServerPremium {
     ///
     /// Returns `self` for chainability.
     pub fn extend_by(&mut self, duration: chrono::Duration) -> &mut Self {
-        self.ends_at = self.ends_at + duration;
+        self.ends_at += duration;
         self
     }
 }

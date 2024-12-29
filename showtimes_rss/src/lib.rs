@@ -485,8 +485,8 @@ impl std::error::Error for RSSError {}
 
 /// Converts a `FeedEntry` into a `FeedEntryCloned`, which is a clone of its key and value.
 /// This is useful if you want to store the feed entry in a struct and need to clone it.
-pub fn transform_to_cloned_feed<'a>(feed: &FeedEntry<'a>) -> FeedEntryCloned {
-    feed.into_iter()
+pub fn transform_to_cloned_feed(feed: &FeedEntry<'_>) -> FeedEntryCloned {
+    feed.iter()
         .map(|(k, v)| (k.to_string(), v.clone()))
         .collect()
 }

@@ -48,7 +48,7 @@ impl RSSManager {
         feed: impl Into<String>,
         entry: &FeedEntry<'a>,
     ) -> RedisResult<()> {
-        let entry_key = make_entry_key(&entry);
+        let entry_key = make_entry_key(entry);
         let rss_key = format!("{}:{}", RSS_MANAGER_BASE, feed.into());
 
         self.connection.sadd(rss_key, entry_key).await
@@ -130,7 +130,7 @@ impl RSSManager {
 /// Create a new entry key from a [`FeedEntry`].
 ///
 /// This will be either `id` or `link`, two of them are guaranteed to exist.
-pub fn make_entry_key<'a>(feed: &FeedEntry<'a>) -> String {
+pub fn make_entry_key(feed: &FeedEntry<'_>) -> String {
     // This is a guarantee!
     let id = feed.get("id");
     let url = feed.get("link");
