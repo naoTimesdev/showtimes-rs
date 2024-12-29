@@ -1011,6 +1011,7 @@ pub async fn mutate_projects_create(
     project.integrations = metadata.integrations;
 
     // Upload the poster
+    let mut poster_color_collect: Option<u32> = None;
     let poster_url = match (input.poster, metadata.poster_url) {
         (Some(poster), _) => {
             let info_up = poster.value(ctx).map_err(|err| {
@@ -1042,6 +1043,7 @@ pub async fn mutate_projects_create(
                         e.set("original_code", format!("{}", err.kind()));
                     })
                 })?;
+
             // Seek back to the start of the file
             file_target
                 .seek(std::io::SeekFrom::Start(0))
@@ -1054,6 +1056,35 @@ pub async fn mutate_projects_create(
                     .extend(|e| {
                         e.set("id", project.id.to_string());
                         e.set("where", "project");
+                        e.set("when", "before_colors");
+                        e.set("original", format!("{err}"));
+                        e.set("original_code", format!("{}", err.kind()));
+                    })
+                })?;
+
+            let mut copy_target = Vec::new();
+            if (tokio::io::copy(&mut file_target, &mut copy_target).await).is_ok() {
+                // Read the colors
+                if let Ok(colors) = showtimes_metadata::image::get_dominant_colors(&copy_target) {
+                    if let Some(color) = colors.first() {
+                        poster_color_collect = Some(*color);
+                    }
+                }
+            }
+
+            // Seek back to the start of the file
+            file_target
+                .seek(std::io::SeekFrom::Start(0))
+                .await
+                .map_err(|err| {
+                    GQLError::new(
+                        format!("Failed to seek to image to start: {err}"),
+                        GQLErrorCode::IOError,
+                    )
+                    .extend(|e| {
+                        e.set("id", project.id.to_string());
+                        e.set("where", "project");
+                        e.set("when", "after_colors");
                         e.set("original", format!("{err}"));
                         e.set("original_code", format!("{}", err.kind()));
                     })
@@ -1092,6 +1123,15 @@ pub async fn mutate_projects_create(
         }
         (None, Some(poster)) => {
             let cover_bytes = download_cover(&poster).await?;
+
+            // We ignore errors
+            let dominant_colors = showtimes_metadata::image::get_dominant_colors(&cover_bytes)
+                .ok()
+                .unwrap_or_default();
+
+            if let Some(first_col) = dominant_colors.first() {
+                poster_color_collect = Some(*first_col);
+            }
 
             let cover_format = poster.split('.').last().unwrap_or("jpg");
 
@@ -1137,8 +1177,12 @@ pub async fn mutate_projects_create(
         ),
     };
 
-    project.poster =
-        showtimes_db::m::Poster::new_with_color(poster_url, input.poster_color.unwrap_or(16614485));
+    project.poster = showtimes_db::m::Poster::new_with_color(
+        poster_url,
+        input
+            .poster_color
+            .unwrap_or_else(|| poster_color_collect.unwrap_or(16614485)),
+    );
 
     // Create event commit tasks
     let event_ch = ctx
