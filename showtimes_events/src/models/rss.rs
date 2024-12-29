@@ -45,7 +45,7 @@ impl RSSEvent {
     pub fn from_entry(
         feed: showtimes_shared::ulid::Ulid,
         server: showtimes_shared::ulid::Ulid,
-        entry: FeedEntry,
+        entry: &FeedEntry,
     ) -> Self {
         let default_time = ::time::OffsetDateTime::now_utc();
         let published_at = if let Some(FeedValue::Timestamp(published_at)) =

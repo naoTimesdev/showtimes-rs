@@ -239,13 +239,10 @@ impl SHClickHouse {
 
     /// A similar function to [`SHClickHouse::create_rss_many`] but will run
     /// on non-blocking manner or in another thread
-    pub fn create_rss_many_async<T>(
+    pub fn create_rss_many_async(
         &self,
         data: Vec<crate::m::RSSEvent>,
-    ) -> tokio::task::JoinHandle<Result<(), clickhouse::error::Error>>
-    where
-        T: serde::Serialize + Send + Sync + Clone + Debug + 'static,
-    {
+    ) -> tokio::task::JoinHandle<Result<(), clickhouse::error::Error>> {
         let client = self.client.clone();
         tokio::task::spawn(async move {
             push_rss(&client, &data).await?;

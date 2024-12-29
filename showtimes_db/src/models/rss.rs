@@ -98,6 +98,10 @@ pub struct RSSFeed {
     pub enabled: bool,
     /// The display information for the RSS feed
     pub display: RSSFeedDisplay,
+    /// Last modified date
+    pub last_mod: Option<String>,
+    /// Last E-Tag of the RSS feed
+    pub etag: Option<String>,
     /// The feed creator (server ID)
     #[serde(with = "ulid_serializer")]
     pub creator: showtimes_shared::ulid::Ulid,

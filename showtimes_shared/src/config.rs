@@ -147,6 +147,12 @@ pub struct RSS {
     /// The interval of the premium fetcher in seconds
     #[serde(default)]
     pub premium: Option<u32>,
+    /// The limit of the standard feed that can be stored in the database
+    #[serde(default)]
+    pub standard_limit: Option<u32>,
+    /// The limit of the premium feed that can be stored in the database
+    #[serde(default)]
+    pub premium_limit: Option<u32>,
 }
 
 /// The full configuration for Showtimes
@@ -336,6 +342,26 @@ impl Config {
                     return Err(
                         ConfigVerifyError::MinimumAmount("Premium RSS".to_string(), 30).into(),
                     );
+                }
+            }
+
+            if let Some(standard_limit) = &self.rss.standard_limit {
+                if *standard_limit < 1 {
+                    return Err(ConfigVerifyError::MinimumAmount(
+                        "Standard RSS limit".to_string(),
+                        1,
+                    )
+                    .into());
+                }
+            }
+
+            if let Some(premium_limit) = &self.rss.premium_limit {
+                if *premium_limit < 1 {
+                    return Err(ConfigVerifyError::MinimumAmount(
+                        "Premium RSS limit".to_string(),
+                        1,
+                    )
+                    .into());
                 }
             }
         }

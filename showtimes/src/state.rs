@@ -18,6 +18,8 @@ pub struct ShowtimesState {
     pub schema: crate::routes::graphql::ShowtimesGQLSchema,
     /// The redis session handler
     pub session: showtimes_session::manager::SharedSessionManager,
+    /// The redis RSS manager handler
+    pub rss_manager: showtimes_rss::manager::SharedRSSManager,
     /// External metadata providers (Anilist)
     pub anilist_provider: Arc<Mutex<showtimes_metadata::AnilistProvider>>,
     /// External metadata providers (TMDb)

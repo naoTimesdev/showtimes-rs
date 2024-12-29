@@ -57,6 +57,8 @@ enabled = true
 # Interval of the feed fetcher in seconds
 standard = 300
 premium = 120
+standard_limit = 2
+premium_limit = 5
 
 [storages]
 # Disable the proxy that can mirror S3 data, not recommended if you use local

@@ -1,6 +1,7 @@
 #![warn(missing_docs, clippy::empty_docs, rustdoc::broken_intra_doc_links)]
 #![doc = include_str!("../README.md")]
 
+pub mod manager;
 pub mod markdown;
 pub mod template;
 
@@ -221,7 +222,9 @@ pub async fn parse_feed<'a>(
                 .and_then(|b| url::Url::parse(&b).ok())
                 .unwrap_or(real_url.clone());
 
+            let mut can_be_added = false;
             if !entry.id.is_empty() {
+                can_be_added = true;
                 hash_entries.insert("id", entry.id.clone().into());
             }
 
@@ -244,6 +247,7 @@ pub async fn parse_feed<'a>(
                 .collect();
 
             if let Some(link) = parsed_links.first() {
+                can_be_added = true;
                 hash_entries.insert("link", link.to_string().into());
             }
 
@@ -399,10 +403,10 @@ pub async fn parse_feed<'a>(
                 hash_entries.insert("media_thumbnail", expanded.into());
             }
 
-            if hash_entries.is_empty() {
-                None
-            } else {
+            if can_be_added {
                 Some(hash_entries)
+            } else {
+                None
             }
         })
         .collect();
@@ -468,6 +472,8 @@ impl std::error::Error for RSSError {}
 
 /// Converts a `FeedEntry` into a `FeedEntryCloned`, which is a clone of its key and value.
 /// This is useful if you want to store the feed entry in a struct and need to clone it.
-pub fn transform_to_cloned_feed<'a>(feed: FeedEntry<'a>) -> FeedEntryCloned {
-    feed.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
+pub fn transform_to_cloned_feed<'a>(feed: &FeedEntry<'a>) -> FeedEntryCloned {
+    feed.into_iter()
+        .map(|(k, v)| (k.to_string(), v.clone()))
+        .collect()
 }

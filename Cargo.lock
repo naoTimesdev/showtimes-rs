@@ -3054,8 +3054,11 @@ dependencies = [
  "async-graphql-axum",
  "axum",
  "axum-extra",
+ "chrono",
  "console-subscriber",
  "futures-util",
+ "redis",
+ "reqwest",
  "serde",
  "serde_json",
  "showtimes-db",
@@ -3066,6 +3069,7 @@ dependencies = [
  "showtimes-gql-queries",
  "showtimes-gql-subscriptions",
  "showtimes-metadata",
+ "showtimes-rss",
  "showtimes-search",
  "showtimes-session",
  "showtimes-shared",
@@ -3078,6 +3082,7 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "urlencoding",
+ "uuid",
 ]
 
 [[package]]
@@ -3303,8 +3308,10 @@ dependencies = [
  "nom",
  "pulldown-cmark",
  "pulldown-cmark-escape",
+ "redis",
  "reqwest",
  "serde",
+ "tokio",
  "url",
 ]
 

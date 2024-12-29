@@ -1,5 +1,7 @@
 //! The manager for session, powered via Redis/Valkey
 
+use std::sync::Arc;
+
 use jsonwebtoken::errors::ErrorKind;
 use redis::cmd;
 use redis::AsyncCommands;
@@ -79,9 +81,8 @@ impl From<SessionKind> for ShowtimesAudience {
 
 impl SessionManager {
     /// Create a new session manager.
-    pub async fn new(url: impl Into<String>, secret: impl Into<String>) -> RedisResult<Self> {
+    pub async fn new(client: &Arc<redis::Client>, secret: impl Into<String>) -> RedisResult<Self> {
         let client_name = format!("showtimes-rs/{}", env!("CARGO_PKG_VERSION"));
-        let client = redis::Client::open(url.into()).unwrap();
 
         let mut con = client.get_multiplexed_async_connection().await?;
         // Test the connection

@@ -1,14 +1,16 @@
 #![doc = include_str!("../README.md")]
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use axum::{response::IntoResponse, routing::get, Router};
 use routes::graphql::{GRAPHQL_ROUTE, GRAPHQL_WS_ROUTE};
 use serde_json::json;
 use showtimes_fs::s3::S3FsCredentials;
 use showtimes_shared::Config;
+use tasks::{shutdown_all_tasks, tasks_rss_premium, tasks_rss_standard};
 // use tasks::{spawn_with, RSSTasks};
 use tokio::{net::TcpListener, sync::Mutex};
+use tokio_cron_scheduler::{Job, JobScheduler};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -104,10 +106,13 @@ async fn entrypoint() -> anyhow::Result<()> {
 
     // Start loading database, storage, and other services
     tracing::info!("🔌 Loading services...");
+    tracing::info!("🔌📒 Loading Redis cache...");
+    let redis_conn = Arc::new(redis::Client::open(config.database.redis.clone())?);
     tracing::info!("🔌🔒 Loading session manager...");
     let session_manager =
-        showtimes_session::manager::SessionManager::new(&config.database.redis, &config.jwt.secret)
-            .await?;
+        showtimes_session::manager::SessionManager::new(&redis_conn, &config.jwt.secret).await?;
+    tracing::info!("🔌📰 Loading RSS manager...");
+    let rss_manager = showtimes_rss::manager::RSSManager::new(&redis_conn).await?;
 
     tracing::info!("🔌📅 Loading database...");
     let mongo_conn = showtimes_db::create_connection(&config.database.mongodb).await?;
@@ -194,6 +199,7 @@ async fn entrypoint() -> anyhow::Result<()> {
         config: Arc::new(config.clone()),
         schema,
         session: Arc::new(Mutex::new(session_manager)),
+        rss_manager: Arc::new(Mutex::new(rss_manager)),
         anilist_provider: Arc::new(Mutex::new(anilist_provider)),
         tmdb_provider,
         vndb_provider,
@@ -242,12 +248,58 @@ async fn entrypoint() -> anyhow::Result<()> {
         )
         .with_state(Arc::clone(&shared_state));
 
+    tracing::info!("🌐 Creating HTTP listener...");
     let listener = TcpListener::bind(format!(
         "{}:{}",
         config.host.clone().unwrap_or("127.0.0.1".to_string()),
         config.port.unwrap_or(5560),
     ))
     .await?;
+
+    // Start tasks
+    tracing::info!("⚡ Starting task scheduler...");
+    let mut active_jobs: Vec<uuid::Uuid> = Vec::new();
+    let mut scheduler = JobScheduler::new().await?;
+    if config.rss.enabled {
+        let standard_dur = Duration::from_secs(config.rss.standard.unwrap_or(60 * 5).into());
+        let premium_dur = Duration::from_secs(config.rss.premium.unwrap_or(60 * 2).into());
+
+        let cloned_state = Arc::clone(&shared_state);
+        let job_rss_standard = Job::new_repeated_async(standard_dur, move |_uuid, _lock| {
+            Box::pin({
+                let value = cloned_state.clone();
+                async move {
+                    match tasks_rss_standard(value).await {
+                        Ok(_) => (),
+                        Err(e) => {
+                            tracing::error!("RSS standard task failed: {}", e);
+                        }
+                    }
+                }
+            })
+        })?;
+
+        let cloned_state = Arc::clone(&shared_state);
+        let job_rss_premium = Job::new_repeated_async(premium_dur, move |_uuid, _lock| {
+            Box::pin({
+                let value = cloned_state.clone();
+                async move {
+                    match tasks_rss_premium(value).await {
+                        Ok(_) => (),
+                        Err(e) => {
+                            tracing::error!("RSS premium task failed: {}", e);
+                        }
+                    }
+                }
+            })
+        })?;
+
+        let rss_std_uuid = scheduler.add(job_rss_standard).await?;
+        let rss_premi_uuid = scheduler.add(job_rss_premium).await?;
+
+        active_jobs.push(rss_std_uuid);
+        active_jobs.push(rss_premi_uuid);
+    }
 
     // Spawn the axum server
     let local_addr = listener.local_addr()?;
@@ -262,6 +314,10 @@ async fn entrypoint() -> anyhow::Result<()> {
         .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
+
+    // Stop tasks
+    tracing::info!("🔕 Shutting down task scheduler...");
+    shutdown_all_tasks(&mut scheduler, &active_jobs).await?;
 
     Ok(())
 }

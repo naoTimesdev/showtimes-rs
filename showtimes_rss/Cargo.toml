@@ -21,3 +21,6 @@ url.workspace = true
 pulldown-cmark.workspace = true
 pulldown-cmark-escape.workspace = true
 htmd.workspace = true
+
+tokio.workspace = true
+redis.workspace = true
