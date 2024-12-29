@@ -3,7 +3,7 @@
 
 use std::sync::LazyLock;
 
-use executor::{EventWatcher, EventWatcherWithUser};
+use executor::{stream_rss_events, EventWatcher, EventWatcherWithUser};
 use futures_util::Stream;
 
 use async_graphql::{Context, Subscription};
@@ -18,6 +18,7 @@ use showtimes_gql_events::projects::{
     ProjectCreatedEventDataGQL, ProjectDeletedEventDataGQL, ProjectEpisodeUpdatedEventDataGQL,
     ProjectUpdatedEventDataGQL,
 };
+use showtimes_gql_events::rss::RSSEventGQL;
 use showtimes_gql_events::servers::{
     ServerCreatedEventDataGQL, ServerDeletedEventDataGQL, ServerUpdatedEventDataGQL,
 };
@@ -281,5 +282,19 @@ impl SubscriptionRoot {
             showtimes_events::m::EventKind::CollaborationDeleted,
         )
         .stream(ctx, id)
+    }
+
+    /// Watch for RSS entry feed event for specific RSS feed
+    #[graphql(
+        name = "watchRSS",
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+    )]
+    async fn watch_rss_entry(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The RSS feed to query")] feed_id: showtimes_gql_common::UlidGQL,
+        #[graphql(desc = "The starting ID to query")] id: Option<showtimes_gql_common::UlidGQL>,
+    ) -> impl Stream<Item = RSSEventGQL> {
+        stream_rss_events(ctx, feed_id, id)
     }
 }
