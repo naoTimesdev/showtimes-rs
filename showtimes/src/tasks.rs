@@ -23,6 +23,12 @@ async fn rss_single_task(
     state: Arc<crate::state::ShowtimesState>,
     handler: Arc<showtimes_db::RSSFeedHandler>,
 ) -> anyhow::Result<()> {
+    tracing::debug!(
+        "Spawning task for RSS feed: {} (for {})",
+        &feed.url,
+        feed.creator
+    );
+
     let mut header_maps = reqwest::header::HeaderMap::new();
     if let Some(last_mod) = &feed.last_mod {
         header_maps.insert(
@@ -40,6 +46,12 @@ async fn rss_single_task(
     let feed_data: showtimes_rss::FeedParsed<'_> =
         parse_feed(feed.url.to_string(), Some(header_maps)).await?;
 
+    tracing::debug!(
+        "Parsed a total of {} entries for RSS feed: {} (for {})",
+        feed_data.entries.len(),
+        &feed.url,
+        feed.creator
+    );
     let mut rss_manager = state.rss_manager.lock().await;
     let existing_keys = rss_manager.keys_exist(feed.id, &feed_data.entries).await?;
 
@@ -56,6 +68,13 @@ async fn rss_single_task(
         })
         .cloned()
         .collect::<Vec<_>>();
+
+    tracing::debug!(
+        "Pushing {} new entries for RSS feed: {} (for {})",
+        new_entries.len(),
+        &feed.url,
+        feed.creator
+    );
 
     if new_entries.len() > 0 {
         // Re-lock
@@ -86,6 +105,7 @@ async fn rss_single_task(
     }
 
     if changed {
+        tracing::debug!("Updating RSS feed: {} (for {})", &feed.url, feed.creator);
         handler.save(&mut cloned_feed, None).await?;
     }
 
@@ -136,6 +156,7 @@ async fn tasks_rss_common(
         }
     };
 
+    tracing::debug!("Running RSS fetch with query: {:?}", &query_feeds);
     let result_feeds = handler_rss.find_all_by(query_feeds).await?;
 
     // Map to HashMap for each "server"/"creator"
@@ -155,14 +176,24 @@ async fn tasks_rss_common(
             let cloned_handler = Arc::clone(&handler_rss);
             let feed = feed.clone();
             tokio::task::spawn_local(async move {
+                let feed_url = feed.url.clone();
+                let creator = feed.creator.to_string();
                 let res = rss_single_task(feed, cloned_state, cloned_handler).await;
                 match res {
-                    Ok(_) => {}
+                    Ok(_) => {
+                        tracing::debug!(
+                            "Finished task for RSS feed: {} (for {})",
+                            &feed_url,
+                            &creator
+                        );
+                    }
                     Err(e) => {
                         tracing::error!(
-                            "Error processing RSS feed: {} (is_premium? {})",
+                            "Error processing RSS feed `{}`: {} (is_premium? {}, for {})",
+                            &feed_url,
                             e,
-                            is_premium
+                            is_premium,
+                            &creator
                         );
                     }
                 }
@@ -176,11 +207,13 @@ async fn tasks_rss_common(
 pub async fn tasks_rss_standard(
     state: Arc<crate::state::ShowtimesState>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    tracing::debug!("Running tasks_rss_standard");
     tasks_rss_common(state, false).await
 }
 
 pub async fn tasks_rss_premium(
     state: Arc<crate::state::ShowtimesState>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    tracing::debug!("Running tasks_rss_premium");
     tasks_rss_common(state, true).await
 }
