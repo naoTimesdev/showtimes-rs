@@ -257,7 +257,7 @@ async fn entrypoint() -> anyhow::Result<()> {
     .await?;
 
     // Start tasks
-    tracing::info!("⚡ Starting task scheduler...");
+    tracing::info!("⚡ Preparing task scheduler...");
     let mut active_jobs: Vec<uuid::Uuid> = Vec::new();
     let mut scheduler = JobScheduler::new().await?;
     if config.rss.enabled {
@@ -300,6 +300,9 @@ async fn entrypoint() -> anyhow::Result<()> {
         active_jobs.push(rss_std_uuid);
         active_jobs.push(rss_premi_uuid);
     }
+
+    tracing::info!("⚡ Starting task scheduler...");
+    scheduler.start().await?;
 
     // Spawn the axum server
     let local_addr = listener.local_addr()?;
