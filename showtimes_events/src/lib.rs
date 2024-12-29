@@ -103,6 +103,7 @@ impl SHClickHouse {
                     id UUID,
                     feed_id UUID,
                     server_id UUID,
+                    hash String,
                     entries String,
                     timestamp DateTime
                 ) ENGINE = MergeTree()

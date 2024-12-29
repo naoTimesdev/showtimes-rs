@@ -29,6 +29,10 @@ pub struct RSSEvent {
         serialize_with = "serialize_ulid"
     )]
     server_id: showtimes_shared::ulid::Ulid,
+    /// The hash ID of the entry
+    ///
+    /// This is not the actual hash, but rather the ID or URL of the entry.
+    hash: String,
     /// The event data itself, on Clickhouse this will be stored as a string
     entries: FeedEntryCloned,
     /// The timestamp of the event
@@ -58,11 +62,13 @@ impl RSSEvent {
         };
 
         let clone_entry = transform_to_cloned_feed(entry);
+        let hash_id = showtimes_rss::manager::make_entry_key_cloned(&clone_entry);
 
         Self {
             id: showtimes_shared::ulid_serializer::default(),
             feed_id: feed,
             server_id: server,
+            hash: hash_id,
             entries: clone_entry,
             timestamp: published_at,
         }
@@ -81,6 +87,11 @@ impl RSSEvent {
     /// Get the server ID of the event
     pub fn server_id(&self) -> showtimes_shared::ulid::Ulid {
         self.server_id
+    }
+
+    /// Get the hash ID of the event
+    pub fn hash(&self) -> &str {
+        &self.hash
     }
 
     /// Get the data/entry of the event
