@@ -48,6 +48,14 @@ pub fn create_schema(db_pool: &DatabaseShared) -> ShowtimesGQLSchema {
             data_loader::ServerSyncLoader::new(db_pool),
             tokio::spawn,
         ))
+        .data(showtimes_gql_common::DataLoader::new(
+            data_loader::ServerInviteLoader::new(db_pool),
+            tokio::spawn,
+        ))
+        .data(showtimes_gql_common::DataLoader::new(
+            data_loader::RSSFeedLoader::new(db_pool),
+            tokio::spawn,
+        ))
         .finish()
 }
 

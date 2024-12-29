@@ -667,6 +667,128 @@ impl Loader<Ulid> for ServerInviteLoader {
     }
 }
 
+/// A data loader for the RSS feed model
+pub struct RSSFeedLoader {
+    col: showtimes_db::RSSFeedHandler,
+}
+
+impl RSSFeedLoader {
+    /// Create a new server sync data loader
+    pub fn new(col: &DatabaseShared) -> Self {
+        let col = showtimes_db::RSSFeedHandler::new(col);
+        RSSFeedLoader { col }
+    }
+}
+
+impl Loader<Ulid> for RSSFeedLoader {
+    type Value = showtimes_db::m::RSSFeed;
+    type Error = FieldError;
+
+    async fn load(&self, keys: &[Ulid]) -> Result<HashMap<Ulid, Self::Value>, Self::Error> {
+        let keys_to_string = keys.iter().map(|k| k.to_string()).collect::<Vec<_>>();
+        let result = self
+            .col
+            .get_collection()
+            .find(doc! {
+                "id": { "$in": keys_to_string.clone() }
+            })
+            .await
+            .extend_error(GQLErrorCode::RSSFeedRequestFails, |e| {
+                e.set("ids", keys_to_string.clone());
+                e.set("where", GQLDataLoaderWhere::RSSFeedLoaderId);
+            })?;
+
+        let all_results = result
+            .try_collect::<Vec<showtimes_db::m::RSSFeed>>()
+            .await
+            .extend_error(GQLErrorCode::RSSFeedRequestFails, |e| {
+                e.set("ids", keys_to_string.clone());
+                e.set("where", GQLDataLoaderWhere::RSSFeedLoaderCollect);
+                e.set("where_req", GQLDataLoaderWhere::RSSFeedLoaderId);
+            })?;
+        let mapped_res: HashMap<Ulid, showtimes_db::m::RSSFeed> = all_results
+            .iter()
+            .map(|rss| (rss.id, rss.clone()))
+            .collect();
+
+        Ok(mapped_res)
+    }
+}
+
+#[derive(Clone)]
+pub struct RSSFeedServer(Ulid);
+
+impl std::hash::Hash for RSSFeedServer {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state)
+    }
+}
+
+impl std::cmp::PartialEq for RSSFeedServer {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl std::cmp::Eq for RSSFeedServer {}
+
+impl Deref for RSSFeedServer {
+    type Target = Ulid;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<Ulid> for RSSFeedServer {
+    fn from(id: Ulid) -> Self {
+        RSSFeedServer(id)
+    }
+}
+
+impl Loader<RSSFeedServer> for RSSFeedLoader {
+    type Value = Vec<showtimes_db::m::RSSFeed>;
+    type Error = FieldError;
+
+    async fn load(
+        &self,
+        keys: &[RSSFeedServer],
+    ) -> Result<HashMap<RSSFeedServer, Self::Value>, Self::Error> {
+        let keys_to_string = keys.iter().map(|k| k.0.to_string()).collect::<Vec<_>>();
+        let result = self
+            .col
+            .get_collection()
+            .find(doc! {
+                "creator": { "$in": keys_to_string.clone() }
+            })
+            .await
+            .extend_error(GQLErrorCode::RSSFeedRequestFails, |e| {
+                e.set("creator", keys_to_string.clone());
+                e.set("where", GQLDataLoaderWhere::RSSFeedLoaderId);
+            })?;
+
+        let all_results: Vec<showtimes_db::m::RSSFeed> = result
+            .try_collect::<Vec<showtimes_db::m::RSSFeed>>()
+            .await
+            .extend_error(GQLErrorCode::RSSFeedRequestFails, |e| {
+                e.set("creator", keys_to_string.clone());
+                e.set("where", GQLDataLoaderWhere::RSSFeedLoaderCollect);
+                e.set("where_req", GQLDataLoaderWhere::RSSFeedLoaderId);
+            })?;
+
+        let mut mapped_res: HashMap<RSSFeedServer, Vec<showtimes_db::m::RSSFeed>> = HashMap::new();
+
+        for rss in all_results {
+            let entry = mapped_res
+                .entry(RSSFeedServer(rss.creator))
+                .or_insert_with(Vec::new);
+
+            entry.push(rss);
+        }
+
+        Ok(mapped_res)
+    }
+}
+
 /// Find the current authenticated user
 ///
 /// Returns an error when fails to load or find the user
