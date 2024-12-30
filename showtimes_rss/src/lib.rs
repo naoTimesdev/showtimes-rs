@@ -38,13 +38,13 @@ pub async fn test_feed_validity(feed_url: impl AsRef<str>) -> Result<bool, RSSEr
     let url = feed_url.as_ref();
     let parsed_url = reqwest::Url::parse(url)?;
     let client = create_client()?;
-    let parser = create_parser(parsed_url.as_str());
 
-    let data = client.get(parsed_url).send().await?;
+    let data = client.get(parsed_url.clone()).send().await?;
 
     if data.status().is_success() {
         let text = data.text().await?;
 
+        let parser = create_parser(parsed_url.as_str());
         match parser.parse(text.as_bytes()) {
             Ok(_) => Ok(true),
             Err(_) => Ok(false),
@@ -194,7 +194,6 @@ pub async fn parse_feed<'a>(
     let url = feed_url.as_ref();
     let parsed_url = reqwest::Url::parse(url)?;
     let client = create_client()?;
-    let parser = create_parser(parsed_url.as_str());
 
     let data = client
         .get(parsed_url.clone())
@@ -216,6 +215,7 @@ pub async fn parse_feed<'a>(
 
     let text = data.text().await?;
 
+    let parser = create_parser(parsed_url.as_str());
     let parsed = parser.parse(text.as_bytes())?;
 
     let real_url = parsed

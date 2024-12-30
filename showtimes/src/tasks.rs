@@ -175,7 +175,7 @@ async fn tasks_rss_common(
             let cloned_state = Arc::clone(&state);
             let cloned_handler = Arc::clone(&handler_rss);
             let feed = feed.clone();
-            tokio::task::spawn_local(async move {
+            tokio::spawn(async move {
                 let feed_url = feed.url.clone();
                 let creator = feed.creator.to_string();
                 let res = rss_single_task(feed, cloned_state, cloned_handler).await;
