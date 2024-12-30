@@ -28,6 +28,7 @@ pub enum UserPrivilege {
     /// In addition to manager, this user can:
     /// - Add and remove users
     /// - Manage the server settings
+    /// - Manage RSS feeds
     Admin,
     /// A user with complete control over the server
     ///

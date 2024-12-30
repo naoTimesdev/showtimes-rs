@@ -3191,6 +3191,7 @@ dependencies = [
  "showtimes-metadata",
  "showtimes-shared",
  "tokio",
+ "url",
 ]
 
 [[package]]
@@ -3208,11 +3209,13 @@ dependencies = [
  "showtimes-gql-common",
  "showtimes-gql-models",
  "showtimes-metadata",
+ "showtimes-rss",
  "showtimes-search",
  "showtimes-session",
  "showtimes-shared",
  "tokio",
  "tracing",
+ "url",
 ]
 
 [[package]]

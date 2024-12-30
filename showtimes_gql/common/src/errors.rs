@@ -308,6 +308,10 @@ pub enum GQLErrorCode {
     RSSFeedDeleteSearchError = 7015,
     /// Failed to render RSS feed message
     RSSFeedRenderError = 7020,
+    /// Failed to fetch RSS feed
+    RSSFeedFetchError = 7021,
+    /// RSS feed is not a valid RSS feed
+    RSSFeedInvalidFeed = 7022,
 }
 
 impl GQLErrorCode {

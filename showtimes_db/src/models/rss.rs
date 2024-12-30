@@ -141,3 +141,26 @@ pub struct RSSFeed {
     )]
     pub updated: chrono::DateTime<chrono::Utc>,
 }
+
+impl RSSFeed {
+    /// Create a new simple RSS feed
+    pub fn new(url: url::Url, creator: showtimes_shared::ulid::Ulid) -> Self {
+        Self {
+            id: showtimes_shared::ulid::Ulid::new(),
+            url,
+            integrations: Vec::new(),
+            enabled: true,
+            display: RSSFeedDisplay::default(),
+            last_mod: None,
+            etag: None,
+            creator,
+            _id: None,
+            created: chrono::Utc::now(),
+            updated: chrono::Utc::now(),
+        }
+    }
+
+    pub fn set_integrations(&mut self, integrations: Vec<IntegrationId>) {
+        self.integrations = integrations;
+    }
+}

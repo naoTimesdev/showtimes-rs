@@ -4,6 +4,7 @@
 pub mod collaborations;
 pub mod common;
 pub mod projects;
+pub mod rss;
 pub mod search;
 pub mod servers;
 pub mod stats;

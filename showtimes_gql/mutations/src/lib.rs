@@ -8,6 +8,7 @@ use async_graphql::{dataloader::DataLoader, Context, Object};
 mod collaborations;
 mod common;
 mod projects;
+mod rss;
 mod servers;
 mod users;
 
@@ -21,6 +22,7 @@ use showtimes_gql_common::{
 use showtimes_gql_models::{
     collaborations::{CollaborationInviteGQL, CollaborationSyncGQL},
     projects::ProjectGQL,
+    rss::RSSFeedGQL,
     servers::ServerGQL,
     users::{UserGQL, UserSessionGQL},
 };
@@ -474,6 +476,21 @@ impl MutationRoot {
         let user = find_authenticated_user(ctx).await?;
 
         servers::mutate_servers_delete(ctx, user, id).await
+    }
+
+    /// Create a new RSS feed on Showtimes
+    #[graphql(
+        name = "createRssFeed",
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+    )]
+    async fn create_rss_feed(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The input to create the RSS feed")] input: rss::RSSFeedCreateInputGQL,
+    ) -> async_graphql::Result<RSSFeedGQL> {
+        let user = find_authenticated_user(ctx).await?;
+
+        rss::mutate_rss_feed_create(ctx, user, input).await
     }
 
     /// Create a session for another user.

@@ -11,6 +11,7 @@ description = "Mutations library for GraphQL definitions of Showtimes API"
 
 [dependencies]
 chrono.workspace = true
+url.workspace = true
 
 tokio.workspace = true
 
@@ -28,6 +29,7 @@ showtimes-fs = { path = "../../showtimes_fs" }
 showtimes-metadata = { path = "../../showtimes_metadata" }
 showtimes-search = { path = "../../showtimes_search" }
 showtimes-session = { path = "../../showtimes_session" }
+showtimes-rss = { path = "../../showtimes_rss" }
 showtimes-derive = { path = "../../showtimes_derive" }
 
 # GQL related
