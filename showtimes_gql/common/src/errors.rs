@@ -185,6 +185,19 @@ pub enum GQLErrorCode {
     /// Server fetch disabled
     ServerFetchDisabled = 2020,
 
+    /// Failed when requesting server premium info
+    ServerPremiumRequestFails = 2100,
+    /// Server premium not found in database
+    ServerPremiumNotFound = 2101,
+    /// Server premium already exists
+    ServerPremiumAlreadyExists = 2102,
+    /// Failed to create server premium data
+    ServerPremiumCreateError = 2110,
+    /// Failed to update server premium data
+    ServerPremiumUpdateError = 2111,
+    /// Failed to delete server premium data
+    ServerPremiumDeleteError = 2112,
+
     // --> Project related
     /// Failed when requesting project
     ProjectRequestFails = 3000,

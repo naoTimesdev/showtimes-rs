@@ -163,4 +163,8 @@ impl RSSFeed {
     pub fn set_integrations(&mut self, integrations: Vec<IntegrationId>) {
         self.integrations = integrations;
     }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
 }
