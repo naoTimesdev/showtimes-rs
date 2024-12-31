@@ -308,3 +308,19 @@ pub(crate) async fn execute_search_events(
         }
     }
 }
+
+pub(crate) fn is_string_set(value: &Option<String>) -> bool {
+    if let Some(value) = value {
+        !value.trim().is_empty()
+    } else {
+        false
+    }
+}
+
+pub(crate) fn is_vec_set<T>(value: &Option<Vec<T>>) -> bool {
+    if let Some(value) = value {
+        !value.is_empty()
+    } else {
+        false
+    }
+}

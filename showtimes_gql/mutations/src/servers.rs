@@ -13,7 +13,8 @@ use showtimes_gql_common::{
 use showtimes_gql_models::servers::ServerGQL;
 
 use crate::{
-    execute_search_events, IntegrationActionGQL, IntegrationInputGQL, IntegrationValidator,
+    execute_search_events, is_string_set, is_vec_set, IntegrationActionGQL, IntegrationInputGQL,
+    IntegrationValidator,
 };
 
 /// The server input object for creating a new server
@@ -85,7 +86,7 @@ pub struct ServerUpdateInputGQL {
 impl ServerUpdateInputGQL {
     /// Check if any field is set
     fn is_any_set(&self) -> bool {
-        self.name.is_some() || self.integrations.is_some() || self.avatar.is_some()
+        is_string_set(&self.name) || is_vec_set(&self.integrations) || self.avatar.is_some()
     }
 
     fn dump_query(&self, f_mut: &mut async_graphql::ErrorExtensionValues) {

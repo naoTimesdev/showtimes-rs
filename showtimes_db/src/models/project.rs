@@ -859,6 +859,16 @@ impl Project {
         }
     }
 
+    /// Add an integration
+    pub fn add_integration(&mut self, integration: IntegrationId) {
+        self.integrations.push(integration);
+    }
+
+    /// Remove an integration
+    pub fn remove_integration(&mut self, integration: &IntegrationId) {
+        self.integrations.retain(|i| i != integration);
+    }
+
     /// Propagate the roles for assignees.
     pub fn propagate_roles_assignees(&mut self) {
         // Check for roles to be removed

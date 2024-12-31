@@ -23,7 +23,10 @@ use showtimes_gql_models::{
     search::ExternalSearchSource,
 };
 
-use crate::execute_search_events;
+use crate::{
+    execute_search_events, is_string_set, is_vec_set, IntegrationActionGQL, IntegrationInputGQL,
+    IntegrationValidator,
+};
 
 /// The input information of an external metadata source
 #[derive(InputObject)]
@@ -179,18 +182,14 @@ pub struct ProjectProgressUpdateInputGQL {
 impl ProjectProgressUpdateInputGQL {
     /// Check if any field is set
     fn is_any_set(&self) -> bool {
-        self.finished.is_some()
-            || self.aired.is_some()
-            || self.delay_reason.is_some()
-            || self.unset_delay.is_some()
-            || self.statuses.is_some()
+        self.is_any_set_except_status() || is_vec_set(&self.statuses)
     }
 
     /// Check if any field is set that is not status
     fn is_any_set_except_status(&self) -> bool {
         self.finished.is_some()
             || self.aired.is_some()
-            || self.delay_reason.is_some()
+            || is_string_set(&self.delay_reason)
             || self.unset_delay.is_some()
     }
 }
@@ -244,6 +243,9 @@ pub struct ProjectUpdateInputGQL {
     roles: Option<Vec<ProjectRoleUpdateInputGQL>>,
     /// The modfied assignees for the project
     assignees: Option<Vec<ProjectAssigneeUpdateInputGQL>>,
+    /// The list of integration to add, update, or remove
+    #[graphql(validator(custom = "IntegrationValidator::new()"))]
+    integrations: Option<Vec<IntegrationInputGQL>>,
     /// The poster image
     poster: Option<Upload>,
     /// The poster color (rgb color in integer format)
@@ -275,15 +277,15 @@ pub struct ProjectUpdateInputGQL {
 impl ProjectUpdateInputGQL {
     /// Check if any field is set
     fn is_any_set(&self) -> bool {
-        self.title.is_some()
-            || self.aliases.is_some()
-            || self.roles.is_some()
-            || self.assignees.is_some()
+        is_string_set(&self.title)
+            || is_vec_set(&self.aliases)
+            || is_vec_set(&self.roles)
+            || is_vec_set(&self.assignees)
+            || self.sync_metadata
+            || is_vec_set(&self.progress)
             || self.poster.is_some()
             || self.poster_color.is_some()
-            || self.sync_metadata
-            || self.progress.is_some()
-            || self.status.is_some()
+            || is_vec_set(&self.integrations)
     }
 }
 
@@ -1591,6 +1593,54 @@ async fn update_single_project(
             before_project.set_aliases(&project.aliases.clone());
             project.aliases = aliases.clone();
             after_project.set_aliases(&project.aliases.clone());
+        }
+
+        // Update integrations
+        if let Some(integrations) = &input.integrations {
+            before_project.set_integrations(&project.integrations);
+
+            let mut has_any_changes = false;
+            for integration in integrations.iter() {
+                match (integration.action, &integration.original_id) {
+                    (IntegrationActionGQL::Update, Some(original_id)) => {
+                        let find_integration = project
+                            .integrations
+                            .iter_mut()
+                            .find(|i| i.id() == original_id);
+
+                        if let Some(integration_info) = find_integration {
+                            integration_info.set_id(&integration.id);
+                            integration_info.set_kind(integration.kind.into());
+                            has_any_changes = true;
+                        }
+                    }
+                    (IntegrationActionGQL::Add, _) => {
+                        let new_integration = showtimes_db::m::IntegrationId::new(
+                            &integration.id,
+                            integration.kind.into(),
+                        );
+
+                        project.add_integration(new_integration);
+                        has_any_changes = true;
+                    }
+                    (IntegrationActionGQL::Remove, _) => {
+                        // Check if the integration exists
+                        let integration: showtimes_db::m::IntegrationId = integration.into();
+                        let original_size = project.integrations.len();
+                        project.remove_integration(&integration);
+                        if project.integrations.len() != original_size {
+                            has_any_changes = true;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            if has_any_changes {
+                after_project.set_integrations(&project.integrations);
+            } else {
+                before_project.clear_integrations();
+            }
         }
     }
 

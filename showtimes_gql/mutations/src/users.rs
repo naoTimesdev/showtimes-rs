@@ -14,7 +14,7 @@ use showtimes_gql_common::{
 };
 use showtimes_gql_models::users::{UserGQL, UserSessionGQL};
 
-use crate::execute_search_events;
+use crate::{execute_search_events, is_string_set};
 
 /// The user input object on what to update
 ///
@@ -44,7 +44,7 @@ pub struct UserInputGQL {
 impl UserInputGQL {
     /// Check if any field is set
     fn is_any_set(&self) -> bool {
-        self.username.is_some()
+        is_string_set(&self.username)
             || self.kind.is_some()
             || self.reset_api_key.is_some()
             || self.avatar.is_some()
