@@ -192,7 +192,7 @@ impl MutationRoot {
     ///
     /// This will use the last episode as the base for the new episode
     #[graphql(
-        name = "projectProgressAddAuto",
+        name = "updateProjectProgressAddAuto",
         guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
     )]
     async fn update_project_progress_auto_add(
@@ -231,7 +231,7 @@ impl MutationRoot {
     ///
     /// You will need to provide each episode information
     #[graphql(
-        name = "projectProgressAdd",
+        name = "updateProjectProgressAdd",
         guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
     )]
     async fn update_project_progress_add(
@@ -270,7 +270,7 @@ impl MutationRoot {
     ///
     /// This will use the last episode as the base for the new episode
     #[graphql(
-        name = "projectProgressRemove",
+        name = "updateProjectProgressRemove",
         guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
     )]
     async fn update_project_progress_remove(
