@@ -2,28 +2,25 @@
 #![doc = include_str!("../../README.md")]
 
 use async_graphql::Object;
-use collaborations::{
+use showtimes_gql_events_models::collaborations::{
     CollabAcceptedEventDataGQL, CollabCreatedEventDataGQL, CollabDeletedEventDataGQL,
     CollabRejectedEventDataGQL, CollabRetractedEventDataGQL,
 };
-use executor::{query_events, query_events_with_user, query_rss_events};
-use prelude::EventGQL;
-use projects::{
+use showtimes_gql_events_models::prelude::EventGQL;
+use showtimes_gql_events_models::projects::{
     ProjectCreatedEventDataGQL, ProjectDeletedEventDataGQL, ProjectEpisodeUpdatedEventDataGQL,
     ProjectUpdatedEventDataGQL,
 };
-use rss::RSSEventGQL;
-use servers::{ServerCreatedEventDataGQL, ServerDeletedEventDataGQL, ServerUpdatedEventDataGQL};
-use users::{UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDataGQL};
+use showtimes_gql_events_models::rss::RSSEventGQL;
+use showtimes_gql_events_models::servers::{
+    ServerCreatedEventDataGQL, ServerDeletedEventDataGQL, ServerUpdatedEventDataGQL,
+};
+use showtimes_gql_events_models::users::{
+    UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDataGQL,
+};
 
 mod executor;
-
-pub mod collaborations;
-pub mod prelude;
-pub mod projects;
-pub mod rss;
-pub mod servers;
-pub mod users;
+use executor::{query_events, query_events_with_user, query_rss_events};
 
 /// The root query for events queries.
 ///

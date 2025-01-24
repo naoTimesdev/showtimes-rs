@@ -1,5 +1,5 @@
 [package]
-name = "showtimes-gql-mutations"
+name = "showtimes-gql-events-models"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -7,32 +7,21 @@ license = "AGPL-3.0-only"
 repository.workspace = true
 homepage.workspace = true
 rust-version.workspace = true
-description = "Mutations library for GraphQL definitions of Showtimes API"
+description = "Events models library for GraphQL definitions of Showtimes API"
 
 [dependencies]
 chrono.workspace = true
-url.workspace = true
-
-tokio.workspace = true
-
-tracing.workspace = true
+time.workspace = true
+serde.workspace = true
 
 async-graphql.workspace = true
-reqwest.workspace = true
-image.workspace = true
 
 # Showtimes related
 showtimes-shared = { path = "../../showtimes_shared" }
 showtimes-db = { path = "../../showtimes_db" }
 showtimes-events = { path = "../../showtimes_events" }
-showtimes-fs = { path = "../../showtimes_fs" }
-showtimes-metadata = { path = "../../showtimes_metadata" }
-showtimes-search = { path = "../../showtimes_search" }
-showtimes-session = { path = "../../showtimes_session" }
 showtimes-rss = { path = "../../showtimes_rss" }
-showtimes-derive = { path = "../../showtimes_derive" }
 
 # GQL related
 showtimes-gql-common = { path = "../common" }
 showtimes-gql-models = { path = "../models" }
-showtimes-gql-events-models = { path = "../events_models" }

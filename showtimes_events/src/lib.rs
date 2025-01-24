@@ -269,6 +269,33 @@ impl SHClickHouse {
     pub fn query_rss(&self, feed_id: showtimes_shared::ulid::Ulid) -> streams::SHRSSClickStream {
         streams::SHRSSClickStream::init(self.client.clone(), feed_id)
     }
+
+    /// Get single or latest RSS event for a feed from the database
+    pub async fn get_latest_rss(
+        &self,
+        feed_id: showtimes_shared::ulid::Ulid,
+    ) -> Result<Option<models::RSSEvent>, clickhouse::error::Error> {
+        let results = self
+            .client
+            .query(&format!(
+                r#"SELECT ?fields FROM {}
+                   WHERE (
+                       feed_id = toUUID(?)
+                   )
+                   ORDER BY toUInt128(id) DESC
+                   LIMIT 1"#,
+                RSS_TABLE_NAME,
+            ))
+            .bind(feed_id.to_string())
+            .fetch_all::<models::RSSEvent>()
+            .await?;
+
+        if let Some(result) = results.first() {
+            Ok(Some(result.clone()))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 /// Wrap the event data into [`m::SHEvent`] and return it

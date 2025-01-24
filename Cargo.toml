@@ -6,6 +6,7 @@ members = [
     "showtimes_fs",
     "showtimes_gql/common",
     "showtimes_gql/events",
+    "showtimes_gql/events_models",
     "showtimes_gql/models",
     "showtimes_gql/mutations",
     "showtimes_gql/paginator",
@@ -169,6 +170,10 @@ opt-level = "s"
 codegen-units = 1
 
 [profile.release.package.showtimes-gql-events]
+opt-level = "s"
+codegen-units = 1
+
+[profile.release.package.showtimes-gql-events-models]
 opt-level = "s"
 codegen-units = 1
 

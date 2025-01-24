@@ -4,7 +4,7 @@ use async_graphql::OutputType;
 use futures_util::{Stream, StreamExt};
 use serde::{de::DeserializeOwned, Serialize};
 use showtimes_gql_common::{queries::ServerQueryUser, UlidGQL};
-use showtimes_gql_events::{
+use showtimes_gql_events_models::{
     prelude::{EventGQL, QueryNew},
     rss::RSSEventGQL,
 };

@@ -9,20 +9,20 @@ use futures_util::Stream;
 use async_graphql::{Context, Subscription};
 
 use showtimes_gql_common::{guard, queries::ServerQueryUser, UserKindGQL};
-use showtimes_gql_events::collaborations::{
+use showtimes_gql_events_models::collaborations::{
     CollabAcceptedEventDataGQL, CollabCreatedEventDataGQL, CollabDeletedEventDataGQL,
     CollabRejectedEventDataGQL, CollabRetractedEventDataGQL,
 };
-use showtimes_gql_events::prelude::EventGQL;
-use showtimes_gql_events::projects::{
+use showtimes_gql_events_models::prelude::EventGQL;
+use showtimes_gql_events_models::projects::{
     ProjectCreatedEventDataGQL, ProjectDeletedEventDataGQL, ProjectEpisodeUpdatedEventDataGQL,
     ProjectUpdatedEventDataGQL,
 };
-use showtimes_gql_events::rss::RSSEventGQL;
-use showtimes_gql_events::servers::{
+use showtimes_gql_events_models::rss::RSSEventGQL;
+use showtimes_gql_events_models::servers::{
     ServerCreatedEventDataGQL, ServerDeletedEventDataGQL, ServerUpdatedEventDataGQL,
 };
-use showtimes_gql_events::users::{
+use showtimes_gql_events_models::users::{
     UserCreatedEventDataGQL, UserDeletedEventDataGQL, UserUpdatedEventDataGQL,
 };
 

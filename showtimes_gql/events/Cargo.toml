@@ -25,3 +25,4 @@ showtimes-rss = { path = "../../showtimes_rss" }
 # GQL related
 showtimes-gql-common = { path = "../common" }
 showtimes-gql-models = { path = "../models" }
+showtimes-gql-events-models = { path = "../events_models" }

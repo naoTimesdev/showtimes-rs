@@ -4,7 +4,7 @@ use async_graphql::OutputType;
 use serde::{de::DeserializeOwned, Serialize};
 use showtimes_gql_common::{errors::GQLError, queries::ServerQueryUser, GQLErrorCode, UlidGQL};
 
-use crate::{
+use showtimes_gql_events_models::{
     prelude::{EventGQL, QueryNew},
     rss::RSSEventGQL,
 };
