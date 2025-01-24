@@ -43,10 +43,10 @@ impl RSSManager {
     }
 
     /// Push a new entry
-    pub async fn push_entry<'a>(
+    pub async fn push_entry(
         &mut self,
         feed: impl Into<String>,
-        entry: &FeedEntry<'a>,
+        entry: &FeedEntry<'_>,
     ) -> RedisResult<()> {
         let entry_key = make_entry_key(entry);
         let rss_key = format!("{}:{}", RSS_MANAGER_BASE, feed.into());
@@ -55,10 +55,10 @@ impl RSSManager {
     }
 
     /// Push multiple new entries
-    pub async fn push_entries<'a>(
+    pub async fn push_entries(
         &mut self,
         feed: impl Into<String>,
-        entries: &[FeedEntry<'a>],
+        entries: &[FeedEntry<'_>],
     ) -> RedisResult<()> {
         let entry_key: Vec<String> = entries.iter().map(make_entry_key).collect();
         let rss_key = format!("{}:{}", RSS_MANAGER_BASE, feed.into());
@@ -74,10 +74,10 @@ impl RSSManager {
     }
 
     /// Check if the following keys exist or not.
-    pub async fn keys_exist<'a>(
+    pub async fn keys_exist(
         &mut self,
         feed: impl Into<String>,
-        entries: &[FeedEntry<'a>],
+        entries: &[FeedEntry<'_>],
     ) -> RedisResult<HashMap<String, bool>> {
         let rss_key = format!("{}:{}", RSS_MANAGER_BASE, feed.into());
 

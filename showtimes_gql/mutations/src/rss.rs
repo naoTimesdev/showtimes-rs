@@ -171,7 +171,7 @@ pub struct RSSFeedDisplayPreviewInputGQL {
 impl RSSFeedDisplayUpdateInputGQL {
     /// Check if any field is set
     fn is_any_set(&self) -> bool {
-        let is_embed_set = self.embed.as_ref().map_or(false, |e| e.is_any_set());
+        let is_embed_set = self.embed.as_ref().is_some_and(|d| d.is_any_set());
         is_string_set(&self.message) || self.unset_embed.is_some() || is_embed_set
     }
 }
@@ -216,7 +216,7 @@ impl RSSFeedUpdateInputGQL {
     fn is_any_set(&self) -> bool {
         is_string_set(&self.url)
             || is_vec_set(&self.integrations)
-            || self.display.as_ref().map_or(false, |d| d.is_any_set())
+            || self.display.as_ref().is_some_and(|d| d.is_any_set())
             || self.enable.is_some()
     }
 }
