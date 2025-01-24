@@ -22,7 +22,6 @@ chrono.workspace = true
 tokio.workspace = true
 tokio-cron-scheduler.workspace = true
 futures-util.workspace = true
-console-subscriber.workspace = true
 
 # Web server
 axum.workspace = true

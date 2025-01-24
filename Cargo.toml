@@ -37,33 +37,32 @@ rust-version = "1.81" # MSRV to 1.81 due to async-graphql
 [workspace.dependencies]
 # Essential stuff
 anyhow = "1"
-tosho-macros = "0.3"
+tosho-macros = "0.4"
 
 # Serde
 serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.134"
+serde_json = "1.0.137"
 serde_repr = "0.1.19"
 
 # Parsing data
-uuid = { version = "1.11.0", features = ["v7", "fast-rng"] }
-ulid = "1.1.3"
+uuid = { version = "1.12.1", features = ["v7", "fast-rng"] }
+ulid = "1.1.4"
 chrono = "0.4.39"
 time = "0.3.37"
 nom = "7.1.3"
 toml = { version = "0.8.19", default-features = false, features = ["parse", "preserve_order"] }
 
 # Async/Futures
-tokio = { version = "1.42.0", features = ["full", "tracing"] }
+tokio = { version = "1.43.0", features = ["full", "tracing"] }
 tokio-stream = "0.1.17"
 tokio-cron-scheduler = "0.13.0"
 futures-util = { version = "0.3.31", default-features = false, features = ["std"] }
 futures-channel = { version = "0.3.31", default-features = false, features = ["std"] }
-async-trait = "0.1.83"
-console-subscriber = "0.4.1"
+async-trait = "0.1.85"
 
 # File server
 mime_guess = "2.0.5"
-rusty-s3 = { version = "0.6.0", features = ["full"] }
+rusty-s3 = { version = "0.7.0", features = ["full"] }
 slab = "0.4.9"
 
 # Image related
@@ -73,7 +72,7 @@ palette = { version = "0.7.6", default-features = false, features = ["std"] }
 fxhash = "0.2.1"
 
 # Web server
-axum = { version = "0.7.9", default-features = false, features = [
+axum = { version = "0.8.1", default-features = false, features = [
     "http1",
     "json",
     "matched-path",
@@ -83,9 +82,9 @@ axum = { version = "0.7.9", default-features = false, features = [
     "tracing",
     "ws",
 ] }
-axum-extra = { version = "0.9.6", default-features = false, features = ["tracing", "async-read-body"] }
-async-graphql = { version = "7.0.13", default-features = false, features = ["tracing", "bson", "unblock", "dataloader", "graphiql", "tempfile"] }
-async-graphql-axum = "7.0.13"
+axum-extra = { version = "0.10.0", default-features = false, features = ["tracing", "async-read-body"] }
+async-graphql = { version = "7.0.14", default-features = false, features = ["tracing", "bson", "unblock", "dataloader", "graphiql", "tempfile"] }
+async-graphql-axum = "7.0.14"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tracing-appender = "0.2.3"
@@ -95,16 +94,16 @@ tower-layer = "0.3.3"
 urlencoding = "2.1.3"
 
 # Database
-mongodb = { version = "3.1.1", default-features = false, features = ["compat-3-0-0", "rustls-tls"] }
+mongodb = { version = "3.2.0", default-features = false, features = ["compat-3-0-0", "rustls-tls"] }
 bson = { version = "2.13.0", features = ["chrono-0_4"] }
-redis = { version = "0.27.6", default-features = false, features = ["acl", "keep-alive", "tokio-comp"] }
+redis = { version = "0.28.2", default-features = false, features = ["acl", "keep-alive", "tokio-comp"] }
 clickhouse = { version = "0.13.1", features = ["uuid", "time"] }
 meilisearch-sdk = "0.27.1"
 jsonwebtoken = { version = "9.3.0", default-features = false }
 
 # FansubRSS/Network
 url = { version = "2.5.4", features = ["serde"] }
-reqwest = { version = "0.12.11", default-features = false, features = [
+reqwest = { version = "0.12.12", default-features = false, features = [
     "charset",
     "macos-system-configuration",
     "rustls-tls",
@@ -117,7 +116,7 @@ pulldown-cmark-escape = "0.11.0"
 htmd = "0.1.6"
 
 # CLI
-clap = { version = "4.5.23", features = ["derive"] }
+clap = { version = "4.5.27", features = ["derive"] }
 dotenvy = "0.15.7"
 
 [profile.dev]
@@ -212,7 +211,3 @@ codegen-units = 1
 [profile.release.package.showtimes-db]
 opt-level = "s"
 codegen-units = 1
-
-[patch.crates-io]
-# Use git version for rusty-s3
-rusty-s3 = { git = "https://github.com/paolobarbolini/rusty-s3.git", rev = "905915d470916451b2b481988b4e497d19537319" }

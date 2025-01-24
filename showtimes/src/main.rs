@@ -64,16 +64,10 @@ async fn entrypoint() -> anyhow::Result<()> {
     let log_file = tracing_appender::rolling::daily(log_dir, "showtimes.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(log_file);
 
-    let console_layer = console_subscriber::ConsoleLayer::builder()
-        .retention(std::time::Duration::from_secs(120))
-        .server_addr(([127, 0, 0, 1], config.tokio_port.unwrap_or(5562)))
-        .spawn();
-
     let merged_env_trace = "showtimes=debug,showtimes_events=debug,tower_http=debug,axum::rejection=trace,async_graphql::graphql=debug,mongodb::connection=debug";
 
     // Initialize tracing logger
     tracing_subscriber::registry()
-        .with(console_layer)
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .map(|filter| {
