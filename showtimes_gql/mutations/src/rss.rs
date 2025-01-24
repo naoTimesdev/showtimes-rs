@@ -4,7 +4,9 @@ use async_graphql::{dataloader::DataLoader, InputObject};
 use showtimes_db::{mongodb::bson::doc, DatabaseShared};
 
 use showtimes_gql_common::{
-    data_loader::ServerDataLoader, errors::GQLError, GQLErrorCode, GQLErrorExt, UlidGQL,
+    data_loader::{RSSFeedLoader, ServerDataLoader},
+    errors::GQLError,
+    GQLErrorCode, GQLErrorExt, OkResponse, UlidGQL,
 };
 use showtimes_gql_models::rss::RSSFeedGQL;
 
@@ -91,6 +93,31 @@ impl RSSFeedEmbedDisplayUpdateInputGQL {
             || self.color.is_some()
             || self.timestamped.is_some()
     }
+
+    fn as_display(
+        &self,
+        original: &Option<showtimes_db::m::RSSFeedEmbedDisplay>,
+    ) -> showtimes_db::m::RSSFeedEmbedDisplay {
+        let timestamped = if let Some(embed) = original {
+            self.timestamped.unwrap_or(embed.timestamped)
+        } else {
+            self.timestamped.unwrap_or(true)
+        };
+
+        showtimes_db::m::RSSFeedEmbedDisplay {
+            title: self.title.clone(),
+            description: self.description.clone(),
+            url: self.url.clone(),
+            thumbnail: self.thumbnail.clone(),
+            image: self.image.clone(),
+            footer: self.footer.clone(),
+            footer_image: self.footer_image.clone(),
+            author: self.author.clone(),
+            author_image: self.author_image.clone(),
+            color: self.color,
+            timestamped,
+        }
+    }
 }
 
 /// The RSS display feed input object for updating an existing RSS feed
@@ -99,7 +126,7 @@ pub struct RSSFeedDisplayUpdateInputGQL {
     /// The message that will be send, maximum of 1500 characters
     ///
     /// This part cannot be removed entirely, if you don't want message leave it empty!
-    #[graphql(validator(max_length = 1500))]
+    #[graphql(validator(min_length = 1, max_length = 1500))]
     message: Option<String>,
     /// The embed display information of the RSS feed
     ///
@@ -131,6 +158,8 @@ pub struct RSSFeedUpdateInputGQL {
     integrations: Option<Vec<IntegrationInputGQL>>,
     /// The display information of the RSS feed
     display: Option<RSSFeedDisplayUpdateInputGQL>,
+    /// Enable or disable the RSS feed
+    enable: Option<bool>,
 }
 
 impl RSSFeedUpdateInputGQL {
@@ -159,6 +188,7 @@ impl RSSFeedUpdateInputGQL {
         is_string_set(&self.url)
             || is_vec_set(&self.integrations)
             || self.display.as_ref().map_or(false, |d| d.is_any_set())
+            || self.enable.is_some()
     }
 }
 
@@ -181,7 +211,7 @@ async fn check_permissions(
             // Check if we are allowed to adjust RSS info
             if user.privilege < showtimes_db::m::UserPrivilege::Admin {
                 GQLError::new(
-                    "User not allowed to create/delete projects",
+                    "User not allowed to create/modify/delete RSS feeds",
                     GQLErrorCode::UserInsufficientPrivilege,
                 )
                 .extend(|e| {
@@ -199,7 +229,7 @@ async fn check_permissions(
             }
         }
         (None, showtimes_db::m::UserKind::User) => GQLError::new(
-            "User not allowed to create projects",
+            "User not allowed to create/modify/delete RSS feeds",
             GQLErrorCode::UserInsufficientPrivilege,
         )
         .extend(|e| {
@@ -241,6 +271,41 @@ fn can_enable_rss(
     rss_count < limit
 }
 
+pub async fn validate_rss_feed(
+    url: &str,
+    server_id: showtimes_shared::ulid::Ulid,
+) -> Result<(), GQLError> {
+    // Check if feed is Valid
+    let feed_valid = showtimes_rss::test_feed_validity(url).await.map_err(|e| {
+        GQLError::new(e.to_string(), GQLErrorCode::RSSFeedFetchError).extend(|f| {
+            f.set("url", url);
+            f.set("server", server_id.to_string());
+            match e {
+                showtimes_rss::RSSError::Feed(_) => {
+                    f.set("kind", "feed_parse");
+                }
+                showtimes_rss::RSSError::InvalidUrl(_) => {
+                    f.set("kind", "invalid_url");
+                }
+                showtimes_rss::RSSError::Reqwest(_) => {
+                    f.set("kind", "http_request");
+                }
+            }
+        })
+    })?;
+
+    if !feed_valid {
+        Err(
+            GQLError::new("RSS feed is invalid", GQLErrorCode::RSSFeedInvalidFeed).extend(|f| {
+                f.set("url", url);
+                f.set("server", server_id.to_string());
+            }),
+        )
+    } else {
+        Ok(())
+    }
+}
+
 pub async fn mutate_rss_feed_create(
     ctx: &async_graphql::Context<'_>,
     user: showtimes_db::m::User,
@@ -252,6 +317,14 @@ pub async fn mutate_rss_feed_create(
     let srv = check_permissions(ctx, *input.server, &user).await?;
     let premi_handler = showtimes_db::ServerPremiumHandler::new(&db);
     let current_time_bson = showtimes_db::mongodb::bson::DateTime::from_chrono(current_time);
+
+    // Guarantee that the URL is valid
+    let url_parsed = url::Url::parse(&input.url).map_err(|e| {
+        GQLError::new(e.to_string(), GQLErrorCode::RSSFeedInvalidURL).extend(|f| {
+            f.set("url", &input.url);
+            f.set("server", srv.id.to_string());
+        })
+    })?;
 
     let premium_status = premi_handler
         .find_all_by(doc! {
@@ -269,19 +342,19 @@ pub async fn mutate_rss_feed_create(
 
     let rss_count = rss_loader
         .get_collection()
-        .count_documents(doc! { "creator": srv.id.to_string() })
+        .count_documents(doc! { "creator": srv.id.to_string(), "enabled": true })
         .await
         .extend_error(GQLErrorCode::RSSFeedRequestFails, |e| {
             e.set("url", &input.url);
             e.set("server", srv.id.to_string());
-            e.set("at", "count_query");
+            e.set("at", "count_enabled_query");
             input.dump_query(e);
         })?;
 
     let already_exist = rss_loader
         .find_by(doc! {
             "creator": srv.id.to_string(),
-            "url": &input.url
+            "url": url_parsed.as_str(),
         })
         .await
         .extend_error(GQLErrorCode::RSSFeedRequestFails, |e| {
@@ -305,43 +378,14 @@ pub async fn mutate_rss_feed_create(
     }
 
     // Check if feed is Valid
-    let feed_valid = showtimes_rss::test_feed_validity(&input.url)
-        .await
-        .map_err(|e| {
-            GQLError::new(e.to_string(), GQLErrorCode::RSSFeedFetchError)
-                .extend(|f| {
-                    f.set("url", &input.url);
-                    f.set("server", srv.id.to_string());
-                    match e {
-                        showtimes_rss::RSSError::Feed(_) => {
-                            f.set("kind", "feed_parse");
-                        }
-                        showtimes_rss::RSSError::InvalidUrl(_) => {
-                            f.set("kind", "invalid_url");
-                        }
-                        showtimes_rss::RSSError::Reqwest(_) => {
-                            f.set("kind", "http_request");
-                        }
-                    }
-                    input.dump_query(f);
-                })
-                .build()
-        })?;
+    validate_rss_feed(&input.url, srv.id).await.map_err(|e| {
+        e.extend(|f| {
+            input.dump_query(f);
+        })
+        .build()
+    })?;
 
-    if !feed_valid {
-        return GQLError::new("RSS feed is invalid", GQLErrorCode::RSSFeedInvalidFeed)
-            .extend(|f| {
-                f.set("url", &input.url);
-                f.set("server", srv.id.to_string());
-                input.dump_query(f);
-            })
-            .into();
-    }
-
-    // Guarantee that the URL is valid
-    let url_parse = url::Url::parse(&input.url).expect("Failed to parse URL");
-
-    let mut new_feed = showtimes_db::m::RSSFeed::new(url_parse, srv.id);
+    let mut new_feed = showtimes_db::m::RSSFeed::new(url_parsed, srv.id);
 
     if let Some(integrations) = &input.integrations {
         let added_integration: Vec<showtimes_db::m::IntegrationId> = integrations
@@ -376,4 +420,229 @@ pub async fn mutate_rss_feed_create(
     let gql_feed = RSSFeedGQL::from(&new_feed);
 
     Ok(gql_feed)
+}
+
+pub async fn mutate_rss_feed_update(
+    ctx: &async_graphql::Context<'_>,
+    id: UlidGQL,
+    user: showtimes_db::m::User,
+    input: RSSFeedUpdateInputGQL,
+) -> async_graphql::Result<RSSFeedGQL> {
+    if !input.is_any_set() {
+        return GQLError::new("No fields to update", GQLErrorCode::MissingModification).into();
+    }
+
+    let rss_loader = ctx.data_unchecked::<DataLoader<RSSFeedLoader>>();
+
+    // Fetch feed
+    let mut rss_feed = rss_loader.load_one(*id).await?.ok_or_else(|| {
+        GQLError::new("RSS Feed not found", GQLErrorCode::RSSFeedNotFound)
+            .extend(|e| e.set("id", id.to_string()))
+    })?;
+
+    let server = check_permissions(ctx, rss_feed.creator, &user).await?;
+
+    if let Some(enabled) = input.enable {
+        if enabled {
+            let db = ctx.data_unchecked::<DatabaseShared>().clone();
+
+            let current_time = chrono::Utc::now();
+            let premi_handler = showtimes_db::ServerPremiumHandler::new(&db);
+            let current_time_bson =
+                showtimes_db::mongodb::bson::DateTime::from_chrono(current_time);
+
+            let premium_status = premi_handler
+                .find_all_by(doc! {
+                    "target": server.id.to_string(),
+                    "ends_at": { "$gte": current_time_bson }
+                })
+                .await
+                .extend_error(GQLErrorCode::ServerPremiumRequestFails, |e| {
+                    e.set("id", id.to_string());
+                    e.set("server", server.id.to_string());
+                    e.set("at", "premium_status_query");
+                    input.dump_query(e);
+                })?;
+
+            // Check how much enabled feeds the server has
+            let rss_count = rss_loader
+                .loader()
+                .get_inner()
+                .get_collection()
+                .count_documents(doc! { "creator": server.id.to_string(), "enabled": true })
+                .await
+                .extend_error(GQLErrorCode::RSSFeedRequestFails, |e| {
+                    e.set("id", id.to_string());
+                    e.set("server", server.id.to_string());
+                    e.set("at", "count_enabled_query");
+                    input.dump_query(e);
+                })?;
+
+            let config = ctx.data_unchecked::<Arc<showtimes_shared::Config>>();
+            if !can_enable_rss(config, rss_count, &premium_status) {
+                let has_premium = has_valid_premium(&premium_status);
+                // Cannot enable more feeds
+                return GQLError::new(
+                    "Unable to enable more RSS feeds",
+                    GQLErrorCode::RSSFeedLimitReached,
+                )
+                .extend(|f| {
+                    f.set("id", id.to_string());
+                    f.set("server", server.id.to_string());
+                    f.set("rss_count", rss_count);
+                    f.set("has_premium", has_premium);
+                    f.set(
+                        "limit",
+                        if has_premium {
+                            config.rss.premium_limit.unwrap_or(5)
+                        } else {
+                            config.rss.standard_limit.unwrap_or(2)
+                        },
+                    );
+                    input.dump_query(f);
+                })
+                .into();
+            }
+
+            rss_feed.set_enabled(true);
+        } else {
+            rss_feed.set_enabled(false);
+        }
+    }
+
+    if let Some(url) = &input.url {
+        // Guarantee that the URL is valid
+        let url_parsed = url::Url::parse(url).map_err(|e| {
+            GQLError::new(e.to_string(), GQLErrorCode::RSSFeedInvalidURL).extend(|f| {
+                f.set("url", url);
+                f.set("server", server.id.to_string());
+                input.dump_query(f);
+            })
+        })?;
+
+        // Check if feed is Valid
+        validate_rss_feed(url, server.id).await.map_err(|e| {
+            e.extend(|f| {
+                f.set("id", id.to_string());
+                input.dump_query(f);
+            })
+            .build()
+        })?;
+
+        rss_feed.url = url_parsed;
+    }
+
+    if let Some(display) = &input.display {
+        if let Some(true) = display.unset_embed {
+            rss_feed.display.embed = None;
+        } else if let Some(embed) = &display.embed {
+            rss_feed.display.embed = Some(embed.as_display(&rss_feed.display.embed));
+        }
+
+        if let Some(message) = &display.message {
+            rss_feed.display.message = Some(message.clone());
+        }
+    }
+
+    for (idx, integration) in input
+        .integrations
+        .clone()
+        .unwrap_or_default()
+        .iter()
+        .enumerate()
+    {
+        match (integration.action, integration.original_id.clone()) {
+            (IntegrationActionGQL::Add, _) => {
+                // Check if the integration already exists
+                let same_integration = rss_feed
+                    .integrations
+                    .iter()
+                    .find(|i| i.id() == integration.id);
+
+                if same_integration.is_none() {
+                    rss_feed.add_integration(integration.into());
+                }
+            }
+            (IntegrationActionGQL::Update, Some(original_id)) => {
+                // Get olf integration
+                let old_integration = server
+                    .integrations
+                    .iter()
+                    .find(|i| i.id() == original_id)
+                    .ok_or_else(|| {
+                        GQLError::new("Integration not found", GQLErrorCode::IntegrationNotFound)
+                            .extend(|e| {
+                                e.set("id", &original_id);
+                                e.set("feed", rss_feed.id.to_string());
+                                e.set("action", "update");
+                            })
+                    })?;
+
+                // Update the integration
+                let new_integration = integration.into();
+                rss_feed.remove_integration(old_integration);
+                rss_feed.add_integration(new_integration);
+            }
+            (IntegrationActionGQL::Update, None) => {
+                return GQLError::new(
+                    "Integration original ID is required for update",
+                    GQLErrorCode::IntegrationMissingOriginal,
+                )
+                .extend(|e| {
+                    e.set("id", integration.id.to_string());
+                    e.set("kind", integration.kind.to_string());
+                    e.set("feed", rss_feed.id.to_string());
+                    e.set("action", "update");
+                    e.set("index", idx);
+                })
+                .into();
+            }
+            (IntegrationActionGQL::Remove, _) => {
+                // Check if the integration exists
+                let integration: showtimes_db::m::IntegrationId = integration.into();
+                rss_feed.remove_integration(&integration);
+            }
+        }
+    }
+
+    rss_loader
+        .loader()
+        .get_inner()
+        .save(&mut rss_feed, None)
+        .await
+        .extend_error(GQLErrorCode::RSSFeedUpdateError, |f_mut| {
+            f_mut.set("id", rss_feed.id.to_string());
+            f_mut.set("actor", user.id.to_string());
+            input.dump_query(f_mut);
+        })?;
+
+    Ok(RSSFeedGQL::from(&rss_feed))
+}
+
+pub async fn mutate_rss_feed_delete(
+    ctx: &async_graphql::Context<'_>,
+    id: UlidGQL,
+    user: showtimes_db::m::User,
+) -> async_graphql::Result<OkResponse> {
+    let rss_loader = ctx.data_unchecked::<DataLoader<RSSFeedLoader>>();
+
+    // Fetch feed
+    let rss_feed = rss_loader.load_one(*id).await?.ok_or_else(|| {
+        GQLError::new("RSS Feed not found", GQLErrorCode::RSSFeedNotFound)
+            .extend(|e| e.set("id", id.to_string()))
+    })?;
+
+    check_permissions(ctx, rss_feed.creator, &user).await?;
+
+    rss_loader
+        .loader()
+        .get_inner()
+        .delete(&rss_feed)
+        .await
+        .extend_error(GQLErrorCode::RSSFeedDeleteError, |f| {
+            f.set("id", rss_feed.id.to_string());
+            f.set("actor", user.id.to_string());
+        })?;
+
+    Ok(OkResponse::ok("RSS feed deleted"))
 }

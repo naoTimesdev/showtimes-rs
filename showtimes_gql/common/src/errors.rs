@@ -325,6 +325,10 @@ pub enum GQLErrorCode {
     RSSFeedFetchError = 7021,
     /// RSS feed is not a valid RSS feed
     RSSFeedInvalidFeed = 7022,
+    /// RSS feed URL is invalid
+    RSSFeedInvalidURL = 7023,
+    /// RSS feed limit reached
+    RSSFeedLimitReached = 7024,
 }
 
 impl GQLErrorCode {

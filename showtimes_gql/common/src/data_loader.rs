@@ -671,6 +671,11 @@ impl RSSFeedLoader {
         let col = showtimes_db::RSSFeedHandler::new(col);
         RSSFeedLoader { col }
     }
+
+    /// Get the collection handler
+    pub fn get_inner(&self) -> &showtimes_db::RSSFeedHandler {
+        &self.col
+    }
 }
 
 impl Loader<Ulid> for RSSFeedLoader {

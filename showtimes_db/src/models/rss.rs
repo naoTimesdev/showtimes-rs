@@ -160,6 +160,14 @@ impl RSSFeed {
         }
     }
 
+    pub fn add_integration(&mut self, integration: IntegrationId) {
+        self.integrations.push(integration);
+    }
+
+    pub fn remove_integration(&mut self, integration: &IntegrationId) {
+        self.integrations.retain(|i| i != integration);
+    }
+
     pub fn set_integrations(&mut self, integrations: Vec<IntegrationId>) {
         self.integrations = integrations;
     }

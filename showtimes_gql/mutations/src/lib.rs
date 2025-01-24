@@ -122,6 +122,21 @@ impl MutationRoot {
         projects::mutate_projects_create(ctx, user, id, input).await
     }
 
+    /// Create a new RSS feed on Showtimes
+    #[graphql(
+        name = "createRssFeed",
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+    )]
+    async fn create_rss_feed(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The input to create the RSS feed")] input: rss::RSSFeedCreateInputGQL,
+    ) -> async_graphql::Result<RSSFeedGQL> {
+        let user = find_authenticated_user(ctx).await?;
+
+        rss::mutate_rss_feed_create(ctx, user, input).await
+    }
+
     /// Update user information
     #[graphql(
         name = "updateUser",
@@ -298,6 +313,22 @@ impl MutationRoot {
 
         projects::mutate_projects_episode_remove(ctx, user_behalf.unwrap_or(user), id, &episodes)
             .await
+    }
+
+    /// Update a RSS feed on Showtimes
+    #[graphql(
+        name = "updateRssFeed",
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+    )]
+    async fn update_rss_feed(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The RSS feed ID to update")] id: showtimes_gql_common::UlidGQL,
+        #[graphql(desc = "The input to update the RSS feed")] input: rss::RSSFeedUpdateInputGQL,
+    ) -> async_graphql::Result<RSSFeedGQL> {
+        let user = find_authenticated_user(ctx).await?;
+
+        rss::mutate_rss_feed_update(ctx, id, user, input).await
     }
 
     /// Initiate a collaboration between projects
@@ -478,19 +509,19 @@ impl MutationRoot {
         servers::mutate_servers_delete(ctx, user, id).await
     }
 
-    /// Create a new RSS feed on Showtimes
+    /// Delete a RSS feed on Showtimes
     #[graphql(
-        name = "createRssFeed",
+        name = "deleteRssFeed",
         guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
     )]
-    async fn create_rss_feed(
+    async fn delete_rss_feed(
         &self,
         ctx: &Context<'_>,
-        #[graphql(desc = "The input to create the RSS feed")] input: rss::RSSFeedCreateInputGQL,
-    ) -> async_graphql::Result<RSSFeedGQL> {
+        #[graphql(desc = "The RSS feed ID to delete")] id: showtimes_gql_common::UlidGQL,
+    ) -> async_graphql::Result<OkResponse> {
         let user = find_authenticated_user(ctx).await?;
 
-        rss::mutate_rss_feed_create(ctx, user, input).await
+        rss::mutate_rss_feed_delete(ctx, id, user).await
     }
 
     /// Create a session for another user.
