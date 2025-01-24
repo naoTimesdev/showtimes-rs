@@ -66,6 +66,7 @@ impl Loader<Ulid> for UserDataLoader {
                 e.set("where", GQLDataLoaderWhere::UserLoaderCollect);
                 e.set("where_req", GQLDataLoaderWhere::UserLoaderId);
             })?;
+
         let mapped_res: HashMap<Ulid, showtimes_db::m::User> =
             all_results.iter().map(|u| (u.id, u.clone())).collect();
 
@@ -103,6 +104,7 @@ impl Loader<DiscordIdLoad> for UserDataLoader {
                 e.set("where", GQLDataLoaderWhere::UserLoaderCollect);
                 e.set("where_req", GQLDataLoaderWhere::UserLoaderDiscordId);
             })?;
+
         let mapped_res: HashMap<DiscordIdLoad, showtimes_db::m::User> = all_results
             .iter()
             .map(|u| (DiscordIdLoad(u.discord_meta.id.clone()), u.clone()))
@@ -142,6 +144,7 @@ impl Loader<showtimes_shared::APIKey> for UserDataLoader {
                 e.set("where", GQLDataLoaderWhere::UserLoaderCollect);
                 e.set("where_req", GQLDataLoaderWhere::UserLoaderAPIKey);
             })?;
+
         let mapped_res: HashMap<showtimes_shared::APIKey, showtimes_db::m::User> =
             all_results.iter().map(|u| (u.api_key, u.clone())).collect();
 
@@ -191,18 +194,14 @@ impl Loader<ServerOwnerId> for ProjectDataLoader {
                 e.set("where", GQLDataLoaderWhere::ProjectLoaderCollect);
                 e.set("where_req", GQLDataLoaderWhere::ProjectLoaderOwnerId);
             })?;
-        let mapped_res: HashMap<ServerOwnerId, Vec<showtimes_db::m::Project>> = keys
-            .iter()
-            .map(|k| {
-                let res = all_results
-                    .iter()
-                    .filter(|u| u.creator == **k)
-                    .cloned()
-                    .collect();
 
-                (k.clone(), res)
-            })
-            .collect();
+        let mapped_res: HashMap<ServerOwnerId, Vec<showtimes_db::m::Project>> =
+            all_results.iter().fold(HashMap::new(), |mut acc, item| {
+                acc.entry(ServerOwnerId::new(item.creator))
+                    .or_default()
+                    .push(item.clone());
+                acc
+            });
 
         Ok(mapped_res)
     }
@@ -234,6 +233,7 @@ impl Loader<Ulid> for ProjectDataLoader {
                 e.set("where", GQLDataLoaderWhere::ProjectLoaderCollect);
                 e.set("where_req", GQLDataLoaderWhere::ProjectLoaderId);
             })?;
+
         let mapped_res: HashMap<Ulid, showtimes_db::m::Project> = all_results
             .iter()
             .map(|proj| (proj.id, proj.clone()))
@@ -354,18 +354,16 @@ impl Loader<ServerOwnerId> for ServerDataLoader {
                 e.set("where", GQLDataLoaderWhere::ServerLoaderCollect);
                 e.set("where_req", GQLDataLoaderWhere::ServerLoaderOwnerId);
             })?;
-        let mapped_res: HashMap<ServerOwnerId, Vec<showtimes_db::m::Server>> = keys
-            .iter()
-            .map(|k| {
-                let res = all_results
-                    .iter()
-                    .filter(|u| u.owners.iter().any(|o| o.id == **k))
-                    .cloned()
-                    .collect();
 
-                (k.clone(), res)
-            })
-            .collect();
+        let mapped_res: HashMap<ServerOwnerId, Vec<showtimes_db::m::Server>> =
+            all_results.iter().fold(HashMap::new(), |mut acc, item| {
+                item.owners.iter().for_each(|o| {
+                    acc.entry(ServerOwnerId::new(o.id))
+                        .or_default()
+                        .push(item.clone());
+                });
+                acc
+            });
 
         Ok(mapped_res)
     }
@@ -408,16 +406,15 @@ impl Loader<ServerAndOwnerId> for ServerDataLoader {
                 e.set("where", GQLDataLoaderWhere::ServerLoaderCollect);
                 e.set("where_req", GQLDataLoaderWhere::ServerLoaderIdOrOwnerId);
             })?;
-        let mapped_res: HashMap<ServerAndOwnerId, showtimes_db::m::Server> = keys
-            .iter()
-            .filter_map(|k| {
-                let res = all_results
-                    .iter()
-                    .find(|u| u.id == k.server && u.owners.iter().any(|o| o.id == k.owner));
 
-                res.map(|r| (k.clone(), r.clone()))
-            })
-            .collect();
+        let mapped_res: HashMap<ServerAndOwnerId, showtimes_db::m::Server> =
+            all_results.iter().fold(HashMap::new(), |mut acc, item| {
+                item.owners.iter().for_each(|o| {
+                    acc.entry(ServerAndOwnerId::new(item.id, o.id))
+                        .or_insert(item.clone());
+                });
+                acc
+            });
 
         Ok(mapped_res)
     }
@@ -538,18 +535,16 @@ impl Loader<ServerSyncServerId> for ServerSyncLoader {
                 e.set("where", GQLDataLoaderWhere::ServerSyncLoaderCollect);
                 e.set("where_req", GQLDataLoaderWhere::ServerSyncLoaderServerId);
             })?;
-        let mapped_res: HashMap<ServerSyncServerId, Vec<showtimes_db::m::ServerCollaborationSync>> =
-            keys.iter()
-                .map(|k| {
-                    let res: Vec<showtimes_db::m::ServerCollaborationSync> = all_results
-                        .iter()
-                        .filter(|u| u.projects.iter().any(|p| p.server == **k))
-                        .cloned()
-                        .collect();
 
-                    (k.clone(), res)
-                })
-                .collect();
+        let mapped_res: HashMap<ServerSyncServerId, Vec<showtimes_db::m::ServerCollaborationSync>> =
+            all_results.iter().fold(HashMap::new(), |mut acc, item| {
+                item.projects.iter().for_each(|o| {
+                    acc.entry(ServerSyncServerId::new(o.server))
+                        .or_default()
+                        .push(item.clone())
+                });
+                acc
+            });
 
         Ok(mapped_res)
     }
@@ -602,18 +597,15 @@ impl Loader<ServerSyncIds> for ServerSyncLoader {
                     GQLDataLoaderWhere::ServerSyncLoaderServerAndProjectId,
                 );
             })?;
-        let mapped_res: HashMap<ServerSyncIds, showtimes_db::m::ServerCollaborationSync> = keys
-            .iter()
-            .filter_map(|k| {
-                let res = all_results.iter().find(|u| {
-                    u.projects
-                        .iter()
-                        .any(|p| p.server == k.id && p.project == k.project)
-                });
 
-                res.map(|r| (k.clone(), r.clone()))
-            })
-            .collect();
+        let mapped_res: HashMap<ServerSyncIds, showtimes_db::m::ServerCollaborationSync> =
+            all_results.iter().fold(HashMap::new(), |mut acc, item| {
+                item.projects.iter().for_each(|o| {
+                    acc.entry(ServerSyncIds::new(o.server, o.project))
+                        .or_insert(item.clone());
+                });
+                acc
+            });
 
         Ok(mapped_res)
     }
@@ -658,6 +650,7 @@ impl Loader<Ulid> for ServerInviteLoader {
                 e.set("where", GQLDataLoaderWhere::ServerSyncInviteLoaderCollect);
                 e.set("where_req", GQLDataLoaderWhere::ServerSyncLoaderId);
             })?;
+
         let mapped_res: HashMap<Ulid, showtimes_db::m::ServerCollaborationInvite> = all_results
             .iter()
             .map(|proj| (proj.id, proj.clone()))
@@ -706,6 +699,7 @@ impl Loader<Ulid> for RSSFeedLoader {
                 e.set("where", GQLDataLoaderWhere::RSSFeedLoaderCollect);
                 e.set("where_req", GQLDataLoaderWhere::RSSFeedLoaderId);
             })?;
+
         let mapped_res: HashMap<Ulid, showtimes_db::m::RSSFeed> = all_results
             .iter()
             .map(|rss| (rss.id, rss.clone()))
@@ -778,13 +772,13 @@ impl Loader<RSSFeedServer> for RSSFeedLoader {
                 e.set("where_req", GQLDataLoaderWhere::RSSFeedLoaderId);
             })?;
 
-        let mut mapped_res: HashMap<RSSFeedServer, Vec<showtimes_db::m::RSSFeed>> = HashMap::new();
-
-        for rss in all_results {
-            let entry = mapped_res.entry(RSSFeedServer(rss.creator)).or_default();
-
-            entry.push(rss);
-        }
+        let mapped_res: HashMap<RSSFeedServer, Vec<showtimes_db::m::RSSFeed>> =
+            all_results.iter().fold(HashMap::new(), |mut acc, item| {
+                acc.entry(RSSFeedServer::from(item.creator))
+                    .or_default()
+                    .push(item.clone());
+                acc
+            });
 
         Ok(mapped_res)
     }
