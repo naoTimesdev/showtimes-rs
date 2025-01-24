@@ -307,6 +307,8 @@ pub enum GQLErrorCode {
     RSSFeedNotFound = 7001,
     /// RSS feed already exists
     RSSFeedAlreadyExists = 7002,
+    /// Failed when requesting RSS latest entries from ClickHouse
+    RSSFeedLatestRequestFails = 7003,
     /// Failed to create RSS feed
     RSSFeedCreateError = 7010,
     /// Failed to create RSS feed in search database

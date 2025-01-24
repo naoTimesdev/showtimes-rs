@@ -8,6 +8,7 @@ use showtimes_gql_common::{
     errors::GQLError,
     GQLErrorCode, GQLErrorExt, OkResponse, UlidGQL,
 };
+use showtimes_gql_events_models::rss::{render_feed_display_with_entry, RSSFeedRenderedGQL};
 use showtimes_gql_models::rss::RSSFeedGQL;
 
 use crate::{
@@ -104,6 +105,22 @@ impl RSSFeedEmbedDisplayUpdateInputGQL {
             self.timestamped.unwrap_or(true)
         };
 
+        let author = if let Some(author) = &self.author {
+            Some(author.clone())
+        } else if let Some(embed) = original {
+            embed.author.clone()
+        } else {
+            None
+        };
+
+        let author_image = if let Some(author_image) = &self.author_image {
+            Some(author_image.clone())
+        } else if let Some(embed) = original {
+            embed.author_image.clone()
+        } else {
+            None
+        };
+
         showtimes_db::m::RSSFeedEmbedDisplay {
             title: self.title.clone(),
             description: self.description.clone(),
@@ -112,8 +129,8 @@ impl RSSFeedEmbedDisplayUpdateInputGQL {
             image: self.image.clone(),
             footer: self.footer.clone(),
             footer_image: self.footer_image.clone(),
-            author: self.author.clone(),
-            author_image: self.author_image.clone(),
+            author,
+            author_image,
             color: self.color,
             timestamped,
         }
@@ -126,7 +143,7 @@ pub struct RSSFeedDisplayUpdateInputGQL {
     /// The message that will be send, maximum of 1500 characters
     ///
     /// This part cannot be removed entirely, if you don't want message leave it empty!
-    #[graphql(validator(min_length = 1, max_length = 1500))]
+    #[graphql(validator(max_length = 1500))]
     message: Option<String>,
     /// The embed display information of the RSS feed
     ///
@@ -137,6 +154,18 @@ pub struct RSSFeedDisplayUpdateInputGQL {
     /// This takes precedence over the `embed` field
     #[graphql(name = "unsetEmbed")]
     unset_embed: Option<bool>,
+}
+
+/// The RSS display feed input object for previewing an existing RSS feed
+#[derive(InputObject)]
+pub struct RSSFeedDisplayPreviewInputGQL {
+    /// The message that will be send, maximum of 1500 characters
+    ///
+    /// This part cannot be removed entirely, if you don't want message leave it empty!
+    #[graphql(validator(max_length = 1500))]
+    message: Option<String>,
+    /// The embed display information of the RSS feed
+    embed: Option<RSSFeedEmbedDisplayUpdateInputGQL>,
 }
 
 impl RSSFeedDisplayUpdateInputGQL {
@@ -645,4 +674,53 @@ pub async fn mutate_rss_feed_delete(
         })?;
 
     Ok(OkResponse::ok("RSS feed deleted"))
+}
+
+pub async fn mutate_rss_feed_preview(
+    ctx: &async_graphql::Context<'_>,
+    id: UlidGQL,
+    input: RSSFeedDisplayPreviewInputGQL,
+) -> async_graphql::Result<Option<RSSFeedRenderedGQL>> {
+    let rss_loader = ctx.data_unchecked::<DataLoader<RSSFeedLoader>>();
+
+    // Fetch feed
+    let rss_feed = rss_loader.load_one(*id).await?.ok_or_else(|| {
+        GQLError::new("RSS Feed not found", GQLErrorCode::RSSFeedNotFound)
+            .extend(|e| e.set("id", id.to_string()))
+    })?;
+
+    let clickhouse = ctx.data_unchecked::<showtimes_events::SharedSHClickHouse>();
+    let latest_entry = clickhouse.get_latest_rss(rss_feed.id).await.extend_error(
+        GQLErrorCode::RSSFeedLatestRequestFails,
+        |e| {
+            e.set("id", id.to_string());
+        },
+    )?;
+
+    if let Some(latest_entry) = latest_entry {
+        let merged_embed = if let Some(embed) = &input.embed {
+            Some(embed.as_display(&rss_feed.display.embed))
+        } else {
+            None
+        };
+
+        let message = if let Some(message) = &input.message {
+            message.clone()
+        } else {
+            "".to_string()
+        };
+
+        let merged_display = if let Some(display) = merged_embed {
+            showtimes_db::m::RSSFeedDisplay::new_with_embed(&message, display)
+        } else {
+            showtimes_db::m::RSSFeedDisplay::new(&message)
+        };
+
+        let rendered =
+            render_feed_display_with_entry(&merged_display, latest_entry.entry().clone())?;
+
+        Ok(Some(rendered))
+    } else {
+        Ok(None)
+    }
 }

@@ -19,6 +19,7 @@ use showtimes_gql_common::{
     errors::GQLError,
     guard, GQLErrorCode, GQLErrorExt, OkResponse, Orchestrator, UserKindGQL,
 };
+use showtimes_gql_events_models::rss::RSSFeedRenderedGQL;
 use showtimes_gql_models::{
     collaborations::{CollaborationInviteGQL, CollaborationSyncGQL},
     projects::ProjectGQL,
@@ -564,5 +565,22 @@ impl MutationRoot {
         drop(sess_mutex);
 
         Ok(UserSessionGQL::new(user, claims.get_token()))
+    }
+
+    /// Preview RSS feed template or display.
+    ///
+    /// This will use the latest data from the RSS feed to generate the preview.
+    /// If there is no latest data
+    #[graphql(
+        name = "previewRssFeed",
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+    )]
+    async fn preview_rss_feed(
+        &self,
+        ctx: &Context<'_>,
+        id: showtimes_gql_common::UlidGQL,
+        input: rss::RSSFeedDisplayPreviewInputGQL,
+    ) -> async_graphql::Result<Option<RSSFeedRenderedGQL>> {
+        rss::mutate_rss_feed_preview(ctx, id, input).await
     }
 }

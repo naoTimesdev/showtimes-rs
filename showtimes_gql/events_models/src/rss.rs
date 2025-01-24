@@ -50,6 +50,15 @@ pub struct RSSEventEmbedFormatValueGQL {
     timestamped: bool,
 }
 
+/// A rendered entries of the RSS event without the integrations
+#[derive(SimpleObject)]
+pub struct RSSFeedRenderedGQL {
+    /// The base message of the render text
+    message: RSSEventFormatValueGQL,
+    /// The embed message of the render text
+    embed: Option<RSSEventEmbedFormatValueGQL>,
+}
+
 /// A rendered entries of the RSS event
 #[derive(SimpleObject)]
 pub struct RSSEventRenderedGQL {
@@ -98,7 +107,7 @@ impl RSSEventGQL {
         self.timestamp
     }
 
-    /// The rendered message of the event
+    /// The rendered message of the event with integrations information
     async fn rendered(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -115,7 +124,8 @@ impl RSSEventGQL {
 }
 
 impl RSSEventRenderedGQL {
-    fn render(
+    /// Render the RSS feed with the given entry
+    pub fn render(
         feed: showtimes_db::m::RSSFeed,
         entries: FeedEntryCloned,
     ) -> async_graphql::Result<Self> {
@@ -125,64 +135,11 @@ impl RSSEventRenderedGQL {
             .map(IntegrationIdGQL::from)
             .collect();
 
-        let raw_msg = feed
-            .display
-            .message
-            .unwrap_or_else(|| RSSFeedDisplay::default_message().to_string());
-
-        let entries: BTreeMap<_, _> = entries
-            .into_iter()
-            .map(|(k, v)| (k.to_string(), v))
-            .collect();
-
-        let embed_display = if let Some(embed) = &feed.display.embed {
-            let title = render_single_opt("embed.title", embed.title.as_deref(), &entries)?;
-            let description =
-                render_single_opt("embed.description", embed.description.as_deref(), &entries)?;
-            let url = render_single_opt("embed.url", embed.url.as_deref(), &entries)?;
-            let thumbnail =
-                render_single_opt("embed.thumbnail", embed.thumbnail.as_deref(), &entries)?;
-            let image = render_single_opt("embed.image", embed.image.as_deref(), &entries)?;
-            let footer = render_single_opt("embed.footer", embed.footer.as_deref(), &entries)?;
-            let footer_image = render_single_opt(
-                "embed.footer_image",
-                embed.footer_image.as_deref(),
-                &entries,
-            )?;
-            let author = render_single(
-                "embed.author",
-                embed.author.as_deref().unwrap_or("naoTimes Feed"),
-                &entries,
-            )?;
-            let author_image = render_single(
-                "embed.author_image",
-                embed
-                    .author_image
-                    .as_deref()
-                    .unwrap_or("https://naoti.me/assets/img/nt256.png"),
-                &entries,
-            )?;
-
-            Some(RSSEventEmbedFormatValueGQL {
-                title,
-                description,
-                url,
-                thumbnail,
-                image,
-                footer,
-                footer_image,
-                author,
-                author_image,
-                color: embed.color,
-                timestamped: embed.timestamped,
-            })
-        } else {
-            None
-        };
+        let rendered_data = render_feed_display_with_entry(&feed.display, entries)?;
 
         Ok(Self {
-            message: render_single("message", &raw_msg, &entries)?,
-            embed: embed_display,
+            message: rendered_data.message,
+            embed: rendered_data.embed,
             integrations,
         })
     }
@@ -262,4 +219,69 @@ fn render_single_opt(
     } else {
         Ok(None)
     }
+}
+
+/// Render a rendered RSS feed display, given the display configuration and the feed entry.
+pub fn render_feed_display_with_entry(
+    display: &RSSFeedDisplay,
+    entries: FeedEntryCloned,
+) -> async_graphql::Result<RSSFeedRenderedGQL> {
+    let raw_msg = display
+        .message
+        .clone()
+        .unwrap_or_else(|| RSSFeedDisplay::default_message().to_string());
+
+    let entries: BTreeMap<_, _> = entries
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v))
+        .collect();
+
+    let embed_display = if let Some(embed) = &display.embed {
+        let title = render_single_opt("embed.title", embed.title.as_deref(), &entries)?;
+        let description =
+            render_single_opt("embed.description", embed.description.as_deref(), &entries)?;
+        let url = render_single_opt("embed.url", embed.url.as_deref(), &entries)?;
+        let thumbnail = render_single_opt("embed.thumbnail", embed.thumbnail.as_deref(), &entries)?;
+        let image = render_single_opt("embed.image", embed.image.as_deref(), &entries)?;
+        let footer = render_single_opt("embed.footer", embed.footer.as_deref(), &entries)?;
+        let footer_image = render_single_opt(
+            "embed.footer_image",
+            embed.footer_image.as_deref(),
+            &entries,
+        )?;
+        let author = render_single(
+            "embed.author",
+            embed.author.as_deref().unwrap_or("naoTimes Feed"),
+            &entries,
+        )?;
+        let author_image = render_single(
+            "embed.author_image",
+            embed
+                .author_image
+                .as_deref()
+                .unwrap_or("https://naoti.me/assets/img/nt256.png"),
+            &entries,
+        )?;
+
+        Some(RSSEventEmbedFormatValueGQL {
+            title,
+            description,
+            url,
+            thumbnail,
+            image,
+            footer,
+            footer_image,
+            author,
+            author_image,
+            color: embed.color,
+            timestamped: embed.timestamped,
+        })
+    } else {
+        None
+    };
+
+    Ok(RSSFeedRenderedGQL {
+        message: render_single("message", &raw_msg, &entries)?,
+        embed: embed_display,
+    })
 }
