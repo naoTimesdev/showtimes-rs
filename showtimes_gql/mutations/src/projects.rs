@@ -853,7 +853,7 @@ async fn check_permissions(
             }
         }
         (None, showtimes_db::m::UserKind::User) => GQLError::new(
-            "User not allowed to create projects",
+            "User not allowed to manage projects",
             GQLErrorCode::UserInsufficientPrivilege,
         )
         .extend(|e| {

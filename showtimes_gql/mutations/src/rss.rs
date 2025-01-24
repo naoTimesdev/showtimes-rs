@@ -211,7 +211,7 @@ async fn check_permissions(
             // Check if we are allowed to adjust RSS info
             if user.privilege < showtimes_db::m::UserPrivilege::Admin {
                 GQLError::new(
-                    "User not allowed to create/modify/delete RSS feeds",
+                    "User not allowed to manage RSS feeds",
                     GQLErrorCode::UserInsufficientPrivilege,
                 )
                 .extend(|e| {
@@ -229,7 +229,7 @@ async fn check_permissions(
             }
         }
         (None, showtimes_db::m::UserKind::User) => GQLError::new(
-            "User not allowed to create/modify/delete RSS feeds",
+            "User not allowed to manage RSS feeds",
             GQLErrorCode::UserInsufficientPrivilege,
         )
         .extend(|e| {
