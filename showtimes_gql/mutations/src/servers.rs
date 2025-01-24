@@ -876,6 +876,18 @@ pub async fn mutate_servers_delete(
         execute_search_events(task_search, task_events).await?;
     }
 
+    // Delete RSS feeds
+    let rss_handler = showtimes_db::RSSFeedHandler::new(db);
+    rss_handler
+        .get_collection()
+        .delete_many(doc! {
+            "creator": server.id.to_string()
+        })
+        .await
+        .extend_error(GQLErrorCode::RSSFeedDeleteError, |f| {
+            f.set("creator", server.id.to_string());
+        })?;
+
     // Delete assets
     storages
         .directory_delete(server.id, None, Some(showtimes_fs::FsFileKind::Images))
