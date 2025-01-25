@@ -3,7 +3,6 @@
 pub mod errors;
 pub mod models;
 
-use bson::doc;
 use std::sync::Arc;
 
 use crate::models::ShowModelHandler;
@@ -50,7 +49,7 @@ pub async fn create_connection(url: &str) -> Result<Connection, mongodb::error::
     let db = client.database("showtimes_db");
 
     // Test the connection
-    db.run_command(doc! { "ping": 1 }).await?;
+    db.run_command(mongodb::bson::doc! { "ping": 1 }).await?;
 
     // It works! Return the client and db with Arc<T>
     Ok(Connection {

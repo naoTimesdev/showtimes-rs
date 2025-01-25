@@ -1,5 +1,5 @@
-use bson::doc;
 use chrono::TimeZone;
+use mongodb::bson::doc;
 use showtimes_db::{ClientShared, DatabaseShared};
 
 use crate::common::env_or_exit;

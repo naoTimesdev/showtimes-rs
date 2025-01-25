@@ -122,11 +122,10 @@ async fn tasks_rss_common(
         state.config.rss.standard_limit.unwrap_or(2)
     };
 
-    let current_time = chrono::Utc::now();
     let handler_rss = Arc::new(showtimes_db::RSSFeedHandler::new(&state.db));
     let handler_premium = showtimes_db::ServerPremiumHandler::new(&state.db);
 
-    let current_time_bson = showtimes_db::mongodb::bson::DateTime::from_chrono(current_time);
+    let current_time_bson = showtimes_db::mongodb::bson::DateTime::now();
 
     let premium_server = handler_premium
         .find_all_by(doc! {

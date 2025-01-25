@@ -3,9 +3,9 @@ use std::{
     sync::Arc,
 };
 
-use bson::doc;
 use chrono::TimeZone;
 use futures_util::TryStreamExt;
+use mongodb::bson::doc;
 use showtimes_db::{
     m::{
         DiscordUser, EpisodeProgress, ImageMetadata, IntegrationId, RoleAssignee, RoleStatus, User,

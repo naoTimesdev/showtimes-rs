@@ -342,10 +342,9 @@ pub async fn mutate_rss_feed_create(
 ) -> async_graphql::Result<RSSFeedGQL> {
     let db = ctx.data_unchecked::<DatabaseShared>().clone();
 
-    let current_time = chrono::Utc::now();
     let srv = check_permissions(ctx, *input.server, &user).await?;
     let premi_handler = showtimes_db::ServerPremiumHandler::new(&db);
-    let current_time_bson = showtimes_db::mongodb::bson::DateTime::from_chrono(current_time);
+    let current_time_bson = showtimes_db::mongodb::bson::DateTime::now();
 
     // Guarantee that the URL is valid
     let url_parsed = url::Url::parse(&input.url).map_err(|e| {
@@ -475,10 +474,8 @@ pub async fn mutate_rss_feed_update(
         if enabled {
             let db = ctx.data_unchecked::<DatabaseShared>().clone();
 
-            let current_time = chrono::Utc::now();
             let premi_handler = showtimes_db::ServerPremiumHandler::new(&db);
-            let current_time_bson =
-                showtimes_db::mongodb::bson::DateTime::from_chrono(current_time);
+            let current_time_bson = showtimes_db::mongodb::bson::DateTime::now();
 
             let premium_status = premi_handler
                 .find_all_by(doc! {

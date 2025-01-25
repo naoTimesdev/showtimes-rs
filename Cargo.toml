@@ -83,7 +83,7 @@ axum = { version = "0.8.1", default-features = false, features = [
     "ws",
 ] }
 axum-extra = { version = "0.10.0", default-features = false, features = ["tracing", "async-read-body"] }
-async-graphql = { version = "7.0.14", default-features = false, features = ["tracing", "bson", "unblock", "dataloader", "graphiql", "tempfile"] }
+async-graphql = { version = "7.0.14", default-features = false, features = ["tracing", "unblock", "dataloader", "graphiql", "tempfile"] }
 async-graphql-axum = "7.0.14"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
@@ -211,3 +211,8 @@ codegen-units = 1
 [profile.release.package.showtimes-db]
 opt-level = "s"
 codegen-units = 1
+
+[patch.crates-io]
+# XXX: Fix for mongodb 3.2.0, this is temporary until the patch is published.
+mongodb = { git = "https://github.com/isabelatkinson/mongo-rust-driver.git", rev = "c39b4b9691935453ff72d53ea06b25b53e742598" }
+bson = { git = "https://github.com/mongodb/bson-rust.git", rev = "098e1a17e34cbe7f28aac87609eeea2a191b93a3" }

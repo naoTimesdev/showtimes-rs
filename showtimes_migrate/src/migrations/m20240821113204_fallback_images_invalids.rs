@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use bson::doc;
 use chrono::TimeZone;
+use mongodb::bson::doc;
 use showtimes_db::{ClientShared, DatabaseShared};
 use showtimes_fs::{
     local::LocalFs,
