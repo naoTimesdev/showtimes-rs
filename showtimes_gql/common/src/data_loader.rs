@@ -851,3 +851,158 @@ pub async fn find_authenticated_user(
         Err(e) => Err(e),
     }
 }
+
+/// The verification method for the API key
+pub enum APIKeyVerify {
+    /// Any capability
+    Any(&'static [showtimes_db::m::APIKeyCapability]),
+    /// All capabilities
+    All(&'static [showtimes_db::m::APIKeyCapability]),
+    /// Specific capability
+    Specific(showtimes_db::m::APIKeyCapability),
+    /// Do not allow API key
+    NotAllowed,
+    /// Allow any API key
+    AllowAny,
+}
+
+/// Another extra guard to check if the user API key is valid
+pub fn verify_api_key_permissions(
+    ctx: &Context<'_>,
+    user: &showtimes_db::m::User,
+    permissions: APIKeyVerify,
+) -> async_graphql::Result<()> {
+    let session = ctx.data_unchecked::<ShowtimesUserSession>();
+
+    match session.get_claims().get_audience() {
+        showtimes_session::ShowtimesAudience::APIKey => {
+            // load as API key
+            let api_key = session.get_claims().get_metadata();
+            let parse_api = showtimes_shared::APIKey::try_from(api_key).extend_error(
+                GQLErrorCode::ParseAPIKeyError,
+                |e| {
+                    e.set("user", user.id.to_string());
+                    e.set("value", api_key);
+                    e.set(
+                        "audience",
+                        showtimes_session::ShowtimesAudience::APIKey.to_string(),
+                    );
+                },
+            )?;
+
+            // Find API key
+            let match_key = user
+                .api_key
+                .iter()
+                .find(|&k| k.key == parse_api)
+                .ok_or_else(|| {
+                    GQLError::new(
+                        "API key not found in the user list",
+                        GQLErrorCode::APIKeyNotFound,
+                    )
+                    .extend(|e| {
+                        e.set("user", user.id.to_string());
+                        e.set("key", parse_api.to_string());
+                    })
+                })?;
+
+            match permissions {
+                APIKeyVerify::Any(capabilities) => {
+                    if match_key.can_any(capabilities) {
+                        Ok(())
+                    } else {
+                        Err(GQLError::new(
+                            "API key does not have any of the required capabilities",
+                            GQLErrorCode::APIKeyMissingCapability,
+                        )
+                        .extend(|e| {
+                            e.set("user", user.id.to_string());
+                            e.set("key", parse_api.to_string());
+                            e.set(
+                                "required",
+                                capabilities.iter().map(|c| c.to_name()).collect::<Vec<_>>(),
+                            );
+                            e.set(
+                                "current",
+                                match_key
+                                    .capabilities
+                                    .iter()
+                                    .map(|c| c.to_name())
+                                    .collect::<Vec<_>>(),
+                            );
+                            e.set("mode", "any");
+                        })
+                        .build())
+                    }
+                }
+                APIKeyVerify::All(capabilities) => {
+                    if match_key.can_all(capabilities) {
+                        Ok(())
+                    } else {
+                        Err(GQLError::new(
+                            "API key does not have all required capabilities",
+                            GQLErrorCode::APIKeyMissingCapability,
+                        )
+                        .extend(|e| {
+                            e.set("user", user.id.to_string());
+                            e.set("key", parse_api.to_string());
+                            e.set(
+                                "required",
+                                capabilities.iter().map(|c| c.to_name()).collect::<Vec<_>>(),
+                            );
+                            e.set(
+                                "current",
+                                match_key
+                                    .capabilities
+                                    .iter()
+                                    .map(|c| c.to_name())
+                                    .collect::<Vec<_>>(),
+                            );
+                            e.set("mode", "all");
+                        })
+                        .build())
+                    }
+                }
+                APIKeyVerify::Specific(capability) => {
+                    if match_key.can(capability) {
+                        Ok(())
+                    } else {
+                        Err(GQLError::new(
+                            "API key does not have the required capability",
+                            GQLErrorCode::APIKeyMissingCapability,
+                        )
+                        .extend(|e| {
+                            e.set("user", user.id.to_string());
+                            e.set("key", parse_api.to_string());
+                            e.set("capability", capability.to_name());
+                            e.set(
+                                "current",
+                                match_key
+                                    .capabilities
+                                    .iter()
+                                    .map(|c| c.to_name())
+                                    .collect::<Vec<_>>(),
+                            );
+                            e.set("mode", "specific");
+                        })
+                        .build())
+                    }
+                }
+                APIKeyVerify::AllowAny => Ok(()),
+                APIKeyVerify::NotAllowed => Err(GQLError::new(
+                    "API key is not allowed for this operation",
+                    GQLErrorCode::APIKeyNotAllowed,
+                )
+                .extend(|e| {
+                    e.set("user", user.id.to_string());
+                    e.set("key", parse_api.to_string());
+                })
+                .build()),
+            }
+        }
+        _ => {
+            // We ignore the check
+            Ok(())
+        }
+    }
+}

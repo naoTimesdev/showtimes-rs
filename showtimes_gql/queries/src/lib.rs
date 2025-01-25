@@ -3,8 +3,12 @@
 
 use async_graphql::{dataloader::DataLoader, Context, Object};
 
+use showtimes_db::m::APIKeyCapability;
 use showtimes_gql_common::{
-    data_loader::{find_authenticated_user, ServerAndOwnerId, ServerDataLoader, ServerOwnerId},
+    data_loader::{
+        find_authenticated_user, verify_api_key_permissions, APIKeyVerify, ServerAndOwnerId,
+        ServerDataLoader, ServerOwnerId,
+    },
     errors::GQLError,
     guard, GQLErrorCode, UserKindGQL,
 };
@@ -58,6 +62,12 @@ impl QueryRoot {
         >,
     ) -> async_graphql::Result<PaginatedGQL<ServerGQL>> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::QueryServers),
+        )?;
+
         let mut queries = showtimes_gql_paginator::servers::ServerQuery::new()
             .with_current_user(showtimes_gql_common::queries::ServerQueryUser::from(&user));
         if let Some(ids) = ids {
@@ -114,6 +124,12 @@ impl QueryRoot {
         unpaged: bool,
     ) -> async_graphql::Result<PaginatedGQL<ProjectGQL>> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::QueryProjects),
+        )?;
+
         let allowed_servers = match user.kind {
             showtimes_db::m::UserKind::User => {
                 let projector = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
@@ -207,6 +223,11 @@ impl QueryRoot {
         #[graphql(desc = "Specify server ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<StatsGQL> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::QueryStats),
+        )?;
 
         let projector = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
         let server = match user.kind {

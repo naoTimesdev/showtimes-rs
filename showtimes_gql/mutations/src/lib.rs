@@ -14,8 +14,11 @@ mod users;
 
 pub(crate) use common::*;
 
+use showtimes_db::m::APIKeyCapability;
 use showtimes_gql_common::{
-    data_loader::{find_authenticated_user, UserDataLoader},
+    data_loader::{
+        find_authenticated_user, verify_api_key_permissions, APIKeyVerify, UserDataLoader,
+    },
     errors::GQLError,
     guard, GQLErrorCode, GQLErrorExt, OkResponse, Orchestrator, UserKindGQL,
 };
@@ -102,6 +105,11 @@ impl MutationRoot {
         input: servers::ServerCreateInputGQL,
     ) -> async_graphql::Result<ServerGQL> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageServers),
+        )?;
 
         servers::mutate_servers_create(ctx, user, input).await
     }
@@ -119,6 +127,11 @@ impl MutationRoot {
         input: projects::ProjectCreateInputGQL,
     ) -> async_graphql::Result<ProjectGQL> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageProjects),
+        )?;
 
         projects::mutate_projects_create(ctx, user, id, input).await
     }
@@ -134,6 +147,11 @@ impl MutationRoot {
         #[graphql(desc = "The input to create the RSS feed")] input: rss::RSSFeedCreateInputGQL,
     ) -> async_graphql::Result<RSSFeedGQL> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageRSS),
+        )?;
 
         rss::mutate_rss_feed_create(ctx, user, input).await
     }
@@ -150,6 +168,12 @@ impl MutationRoot {
         #[graphql(desc = "The user information to update")] input: users::UserInputGQL,
     ) -> async_graphql::Result<UserGQL> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageUsers),
+        )?;
+
         let requested = users::UserRequester::new(user);
         let requested = if let Some(id) = id {
             requested.with_id(*id)
@@ -172,6 +196,11 @@ impl MutationRoot {
         #[graphql(desc = "The server information to update")] input: servers::ServerUpdateInputGQL,
     ) -> async_graphql::Result<ServerGQL> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageServers),
+        )?;
 
         servers::mutate_servers_update(ctx, id, user, input).await
     }
@@ -189,6 +218,12 @@ impl MutationRoot {
         input: projects::ProjectUpdateInputGQL,
     ) -> async_graphql::Result<ProjectGQL> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageProjects),
+        )?;
+
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
             other => {
@@ -222,6 +257,12 @@ impl MutationRoot {
         total: u32,
     ) -> async_graphql::Result<ProjectGQL> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageProjects),
+        )?;
+
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
             other => {
@@ -261,6 +302,12 @@ impl MutationRoot {
         episodes: Vec<projects::ProgressCreateInputGQL>,
     ) -> async_graphql::Result<ProjectGQL> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageProjects),
+        )?;
+
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
             other => {
@@ -300,6 +347,12 @@ impl MutationRoot {
         episodes: Vec<u64>,
     ) -> async_graphql::Result<ProjectGQL> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageProjects),
+        )?;
+
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
             other => {
@@ -328,6 +381,11 @@ impl MutationRoot {
         #[graphql(desc = "The input to update the RSS feed")] input: rss::RSSFeedUpdateInputGQL,
     ) -> async_graphql::Result<RSSFeedGQL> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageRSS),
+        )?;
 
         rss::mutate_rss_feed_update(ctx, id, user, input).await
     }
@@ -344,6 +402,12 @@ impl MutationRoot {
         input: collaborations::CollaborationRequestInputGQL,
     ) -> async_graphql::Result<CollaborationInviteGQL> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration),
+        )?;
+
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
             other => {
@@ -371,6 +435,12 @@ impl MutationRoot {
         #[graphql(desc = "The collaboration ID to accept")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<CollaborationSyncGQL> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration),
+        )?;
+
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
             other => {
@@ -397,6 +467,12 @@ impl MutationRoot {
         #[graphql(desc = "The collaboration ID to deny")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration),
+        )?;
+
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
             other => {
@@ -424,6 +500,12 @@ impl MutationRoot {
         #[graphql(desc = "The collaboration ID to retract")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration),
+        )?;
+
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
             other => {
@@ -453,6 +535,12 @@ impl MutationRoot {
         target: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration),
+        )?;
+
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
             other => {
@@ -480,6 +568,12 @@ impl MutationRoot {
         #[graphql(desc = "The project ID to delete")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::DeleteProjects),
+        )?;
+
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
             other => {
@@ -506,6 +600,11 @@ impl MutationRoot {
         #[graphql(desc = "The server ID to delete")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::DeleteServers),
+        )?;
 
         servers::mutate_servers_delete(ctx, user, id).await
     }
@@ -521,6 +620,11 @@ impl MutationRoot {
         #[graphql(desc = "The RSS feed ID to delete")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
         let user = find_authenticated_user(ctx).await?;
+        verify_api_key_permissions(
+            ctx,
+            &user,
+            APIKeyVerify::Specific(APIKeyCapability::ManageRSS),
+        )?;
 
         rss::mutate_rss_feed_delete(ctx, id, user).await
     }

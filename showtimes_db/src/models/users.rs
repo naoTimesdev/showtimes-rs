@@ -38,7 +38,7 @@ pub enum APIKeyCapability {
     ManageServers,
     /// A combination of create and update for projects
     ManageProjects,
-    /// A combination of create and update for RSS feeds
+    /// A combination of create, update, and delete for RSS feeds
     #[serde(rename = "MANAGE_RSS")]
     #[enum_name(rename = "MANAGE_RSS")]
     ManageRSS,

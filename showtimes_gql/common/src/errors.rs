@@ -84,6 +84,12 @@ pub enum GQLErrorCode {
     InvalidToken = 130,
     /// Expired token provided
     ExpiredToken = 131,
+    /// API key cannot be found or matched in the user list
+    APIKeyNotFound = 132,
+    /// API key cannot be used because of missing capability
+    APIKeyMissingCapability = 133,
+    /// API key is not allowed to be used
+    APIKeyNotAllowed = 134,
     /// Internal server error
     InternalServerError = 140,
 
