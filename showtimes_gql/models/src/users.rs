@@ -55,12 +55,7 @@ impl UserGQL {
         if let Some(requester) = self.requester {
             // Only return the API key if the requester is the same user or the requester is not a user
             if requester.id() == self.id || requester.kind() != showtimes_db::m::UserKind::User {
-                Some(
-                    self.api_key
-                        .iter()
-                        .map(|key| APIKeyDataGQL::from(key))
-                        .collect(),
-                )
+                Some(self.api_key.iter().map(APIKeyDataGQL::from).collect())
             } else {
                 None
             }

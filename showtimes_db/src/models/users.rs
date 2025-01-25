@@ -147,6 +147,14 @@ pub struct APIKey {
 }
 
 impl APIKey {
+    /// Create a new API key with the given key and capabilities
+    ///
+    /// The provided capabilities should be a subset of the capabilities
+    /// returned by `APIKeyCapability::all()`.
+    pub fn new(key: showtimes_shared::APIKey, capabilities: Vec<APIKeyCapability>) -> Self {
+        APIKey { key, capabilities }
+    }
+
     /// Check if API key has specific capability
     pub fn can(&self, capability: APIKeyCapability) -> bool {
         self.capabilities.contains(&capability)

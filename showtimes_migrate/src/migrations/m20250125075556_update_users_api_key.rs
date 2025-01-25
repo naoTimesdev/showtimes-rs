@@ -149,9 +149,10 @@ impl From<UserV1> for showtimes_db::m::User {
         }
 
         // Default should give all capabilities
-        let mut new_api_keys = showtimes_db::m::APIKey::default();
-        new_api_keys.key = user.api_key;
-
+        let new_api_keys = showtimes_db::m::APIKey::new(
+            user.api_key,
+            showtimes_db::m::APIKeyCapability::all().to_vec(),
+        );
         stub.api_key = vec![new_api_keys];
 
         stub
