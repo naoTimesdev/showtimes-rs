@@ -168,7 +168,7 @@ impl From<showtimes_db::m::Server> for Server {
 #[derive(Debug, Clone, Serialize, Deserialize, Default, SearchModel)]
 #[search(
     name = "nt-users",
-    filterable = ["id", "created", "username", "discord_id", "discord_username", "api_key", "kind", "registered"],
+    filterable = ["id", "created", "username", "discord_id", "discord_username", "api_key.key", "api_key.capabilities", "kind", "registered"],
     searchable = ["id", "username", "discord_id", "discord_username", "api_key"],
     sortable = ["id", "created", "updated"],
     distinct = "id",
@@ -187,7 +187,7 @@ pub struct User {
     /// Their username on Discord
     pub discord_username: String,
     /// Their API key
-    pub api_key: showtimes_shared::APIKey,
+    pub api_key: Vec<showtimes_db::m::APIKey>,
     /// Their user kind
     pub kind: showtimes_db::m::UserKind,
     /// Is the user registered or not

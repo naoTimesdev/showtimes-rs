@@ -4,7 +4,7 @@ use async_graphql::{dataloader::DataLoader, Object, SimpleObject};
 
 use errors::GQLError;
 use showtimes_gql_common::{data_loader::UserDataLoader, queries::ServerQueryUser, *};
-use showtimes_gql_models::users::UserGQL;
+use showtimes_gql_models::users::{APIKeyDataGQL, UserGQL};
 
 use crate::prelude::QueryNew;
 
@@ -48,7 +48,7 @@ pub struct UserUpdatedEventDataContentGQL {
     name: Option<String>,
     /// The change in the user's API key
     #[graphql(name = "apiKey")]
-    api_key: Option<APIKeyGQL>,
+    api_key: Option<Vec<APIKeyDataGQL>>,
     /// The change in the user's kind
     kind: Option<UserKindGQL>,
     /// The change in the user's avatar
@@ -64,7 +64,9 @@ impl From<showtimes_events::m::UserUpdatedDataEvent> for UserUpdatedEventDataCon
     fn from(value: showtimes_events::m::UserUpdatedDataEvent) -> Self {
         Self {
             name: value.name().map(|n| n.to_string()),
-            api_key: value.api_key().map(|a| a.into()),
+            api_key: value
+                .api_key()
+                .map(|a| a.iter().map(|k| k.into()).collect()),
             kind: value.kind().map(|k| k.into()),
             avatar: value.avatar().map(|a| a.into()),
             discord_updated: value.discord_meta().is_some(),
@@ -76,7 +78,9 @@ impl From<&showtimes_events::m::UserUpdatedDataEvent> for UserUpdatedEventDataCo
     fn from(value: &showtimes_events::m::UserUpdatedDataEvent) -> Self {
         Self {
             name: value.name().map(|n| n.to_string()),
-            api_key: value.api_key().map(|a| a.into()),
+            api_key: value
+                .api_key()
+                .map(|a| a.iter().map(|k| k.into()).collect()),
             kind: value.kind().map(|k| k.into()),
             avatar: value.avatar().map(|a| a.into()),
             discord_updated: value.discord_meta().is_some(),

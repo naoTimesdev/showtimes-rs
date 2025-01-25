@@ -300,6 +300,44 @@ impl std::fmt::Display for IntegrationTypeGQL {
     }
 }
 
+/// The capability of the API key.
+///
+/// This capabilities is also limited to what a user can do without API key.
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, EnumName)]
+#[graphql(
+    remote = "showtimes_db::m::APIKeyCapability",
+    rename_items = "SCREAMING_SNAKE_CASE"
+)]
+#[enum_name(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum APIKeyCapabilityGQL {
+    /// A combination of create and update for servers
+    ManageServers,
+    /// A combination of create and update for projects
+    ManageProjects,
+    /// A combination of create and update for RSS feeds
+    #[graphql(name = "MANAGE_RSS")]
+    #[enum_name(rename = "MANAGE_RSS")]
+    ManageRSS,
+    /// A combination of update for users
+    ManageUsers,
+    /// A delete capability for servers
+    DeleteServers,
+    /// A delete capability for projects
+    DeleteProjects,
+    /// Manage collaboration of a project
+    ///
+    /// This can do everything of collaboration thing does
+    ManageCollaboration,
+    /// Query for servers
+    QueryServers,
+    /// Query for projects
+    QueryProjects,
+    /// Query for stats
+    QueryStats,
+    /// Query for search data
+    QuerySearch,
+}
+
 /// A metadata collection to hold integration information with other platform
 #[derive(SimpleObject)]
 pub struct IntegrationIdGQL {

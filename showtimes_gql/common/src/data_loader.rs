@@ -127,7 +127,7 @@ impl Loader<showtimes_shared::APIKey> for UserDataLoader {
             .col
             .get_collection()
             .find(doc! {
-                "api_key": { "$in": keys_to_string.clone() }
+                "api_key.key": { "$in": keys_to_string.clone() }
             })
             .limit(keys.len() as i64)
             .await
@@ -146,7 +146,12 @@ impl Loader<showtimes_shared::APIKey> for UserDataLoader {
             })?;
 
         let mapped_res: HashMap<showtimes_shared::APIKey, showtimes_db::m::User> =
-            all_results.iter().map(|u| (u.api_key, u.clone())).collect();
+            all_results.iter().fold(HashMap::new(), |mut acc, item| {
+                item.api_key.iter().for_each(|k| {
+                    acc.entry(k.key).or_insert(item.clone());
+                });
+                acc
+            });
 
         Ok(mapped_res)
     }

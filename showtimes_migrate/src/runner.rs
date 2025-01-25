@@ -1,4 +1,4 @@
-use bson::doc;
+use mongodb::bson::doc;
 use mongodb::{options::IndexOptions, IndexModel};
 use showtimes_db::{m::ShowModelHandler, MigrationHandler};
 
@@ -351,10 +351,26 @@ pub async fn run_database_create_indexes(conn: &showtimes_db::Connection) -> any
             ))
             .build(),
         IndexModel::builder()
+            .keys(doc! { "api_key.key": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("API Key".to_string()))
+                    .build(),
+            ))
+            .build(),
+        IndexModel::builder()
             .keys(doc! { "discord_meta.id": 1, "id": 1 })
             .options(Some(
                 IndexOptions::builder()
                     .name(Some("ID + Discord ID".to_string()))
+                    .build(),
+            ))
+            .build(),
+        IndexModel::builder()
+            .keys(doc! { "api_key.key": 1, "id": 1 })
+            .options(Some(
+                IndexOptions::builder()
+                    .name(Some("ID + API Key".to_string()))
                     .build(),
             ))
             .build(),

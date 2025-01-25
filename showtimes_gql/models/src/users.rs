@@ -15,13 +15,22 @@ pub struct UserGQL {
     id: showtimes_shared::ulid::Ulid,
     username: String,
     kind: showtimes_db::m::UserKind,
-    api_key: showtimes_shared::APIKey,
+    api_key: Vec<showtimes_db::m::APIKey>,
     registered: bool,
     avatar: Option<showtimes_db::m::ImageMetadata>,
     created: chrono::DateTime<chrono::Utc>,
     updated: chrono::DateTime<chrono::Utc>,
     disallow_server_fetch: bool,
     requester: Option<ServerQueryUser>,
+}
+
+/// The API key and the capabilities associated with it
+#[derive(SimpleObject)]
+pub struct APIKeyDataGQL {
+    /// The API key
+    key: APIKeyGQL,
+    /// The capabilities associated with the API key
+    capabilities: Vec<APIKeyCapabilityGQL>,
 }
 
 #[Object]
@@ -42,11 +51,16 @@ impl UserGQL {
     }
 
     /// The user's API key, this will be `null` if you're not *this* user.
-    async fn api_key(&self) -> Option<APIKeyGQL> {
+    async fn api_key(&self) -> Option<Vec<APIKeyDataGQL>> {
         if let Some(requester) = self.requester {
             // Only return the API key if the requester is the same user or the requester is not a user
             if requester.id() == self.id || requester.kind() != showtimes_db::m::UserKind::User {
-                Some(self.api_key.into())
+                Some(
+                    self.api_key
+                        .iter()
+                        .map(|key| APIKeyDataGQL::from(key))
+                        .collect(),
+                )
             } else {
                 None
             }
@@ -156,13 +170,31 @@ impl From<&showtimes_db::m::User> for UserGQL {
             id: user.id,
             username: user.username.clone(),
             kind: user.kind,
-            api_key: user.api_key,
+            api_key: user.api_key.clone(),
             registered: user.registered,
             avatar: user.avatar.clone(),
             created: user.created,
             updated: user.updated,
             disallow_server_fetch: false,
             requester: None,
+        }
+    }
+}
+
+impl From<showtimes_db::m::APIKey> for APIKeyDataGQL {
+    fn from(key: showtimes_db::m::APIKey) -> Self {
+        APIKeyDataGQL {
+            key: APIKeyGQL::from(key.key),
+            capabilities: key.capabilities.iter().map(|&c| c.into()).collect(),
+        }
+    }
+}
+
+impl From<&showtimes_db::m::APIKey> for APIKeyDataGQL {
+    fn from(key: &showtimes_db::m::APIKey) -> Self {
+        APIKeyDataGQL {
+            key: APIKeyGQL::from(key.key),
+            capabilities: key.capabilities.iter().map(|&c| c.into()).collect(),
         }
     }
 }

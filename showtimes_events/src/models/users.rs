@@ -38,8 +38,7 @@ pub struct UserUpdatedDataEvent {
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[event_copy]
-    api_key: Option<showtimes_shared::APIKey>,
+    api_key: Option<Vec<showtimes_db::m::APIKey>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[event_copy]
     kind: Option<showtimes_db::m::UserKind>,

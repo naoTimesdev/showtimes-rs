@@ -34,20 +34,15 @@ pub struct UserInputGQL {
     /// - Any -> Owner, with any auth: No
     /// - Owner -> Any, with any auth: Yes
     kind: Option<UserKindGQL>,
-    /// Reset the API key
-    #[graphql(name = "resetApiKey")]
-    reset_api_key: Option<bool>,
     /// The user's avatar
     avatar: Option<Upload>,
+    // TODO: Implement back API key modification
 }
 
 impl UserInputGQL {
     /// Check if any field is set
     fn is_any_set(&self) -> bool {
-        is_string_set(&self.username)
-            || self.kind.is_some()
-            || self.reset_api_key.is_some()
-            || self.avatar.is_some()
+        is_string_set(&self.username) || self.kind.is_some() || self.avatar.is_some()
     }
 
     fn dump_query(&self, ctx: &mut async_graphql::ErrorExtensionValues) {
@@ -56,9 +51,6 @@ impl UserInputGQL {
         }
         if let Some(kind) = &self.kind {
             ctx.set("kind", kind.to_name());
-        }
-        if let Some(reset_api_key) = &self.reset_api_key {
-            ctx.set("reset_api_key", reset_api_key.to_string());
         }
         ctx.set("avatar_change", self.avatar.is_some());
     }
@@ -183,11 +175,6 @@ pub async fn mutate_users_update(
         user_before.set_kind(user_info.kind);
         user_info.kind = kind.into();
         user_after.set_kind(user_info.kind);
-    }
-    if let Some(true) = input.reset_api_key {
-        user_before.set_api_key(user_info.api_key);
-        user_info.api_key = showtimes_shared::APIKey::new();
-        user_after.set_api_key(user_info.api_key);
     }
     if let Some(avatar_upload) = input.avatar {
         let info_up = avatar_upload.value(ctx).map_err(|err| {

@@ -1,22 +1,13 @@
 use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
+use showtimes_derive::EnumName;
 use showtimes_shared::ulid_serializer;
 
 use super::{ImageMetadata, ShowModelHandler};
 
 /// Enum to hold user kinds
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    Serialize,
-    Deserialize,
-    Default,
-    PartialEq,
-    PartialOrd,
-    Eq,
-    Ord,
-    tosho_macros::EnumName,
+    Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, PartialOrd, Eq, Ord, EnumName,
 )]
 pub enum UserKind {
     /// A normal user
@@ -30,6 +21,163 @@ pub enum UserKind {
     /// to mark that this is request made by master key
     /// which can do anything.
     Owner,
+}
+
+/// Enum that say how the API key should be used (or the limitation)
+///
+/// This API key is still locked to the user kind and the user itself
+/// so if you create API key with specific or greater user case, it will
+/// not be able to do anything.
+#[derive(
+    Debug, Clone, Copy, Serialize, Deserialize, PartialEq, PartialOrd, Eq, Ord, Hash, EnumName,
+)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[enum_name(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum APIKeyCapability {
+    /// A combination of create and update for servers
+    ManageServers,
+    /// A combination of create and update for projects
+    ManageProjects,
+    /// A combination of create and update for RSS feeds
+    #[serde(rename = "MANAGE_RSS")]
+    #[enum_name(rename = "MANAGE_RSS")]
+    ManageRSS,
+    /// A combination of update for users
+    ManageUsers,
+    /// A delete capability for servers
+    DeleteServers,
+    /// A delete capability for projects
+    DeleteProjects,
+    /// Manage collaboration of a project
+    ///
+    /// This can do everything of collaboration thing does
+    ManageCollaboration,
+    /// Query for servers
+    QueryServers,
+    /// Query for projects
+    QueryProjects,
+    /// Query for stats
+    QueryStats,
+    /// Query for search data
+    QuerySearch,
+}
+
+impl APIKeyCapability {
+    /// Get all capabilities
+    pub fn all() -> &'static [APIKeyCapability] {
+        &[
+            APIKeyCapability::ManageServers,
+            APIKeyCapability::ManageProjects,
+            APIKeyCapability::ManageRSS,
+            APIKeyCapability::ManageUsers,
+            APIKeyCapability::DeleteServers,
+            APIKeyCapability::DeleteProjects,
+            APIKeyCapability::ManageCollaboration,
+            APIKeyCapability::QueryServers,
+            APIKeyCapability::QueryProjects,
+            APIKeyCapability::QueryStats,
+            APIKeyCapability::QuerySearch,
+        ]
+    }
+
+    /// Get all capabilities for query only operation
+    pub fn queries() -> &'static [APIKeyCapability] {
+        &[
+            APIKeyCapability::QueryServers,
+            APIKeyCapability::QueryProjects,
+            APIKeyCapability::QueryStats,
+            APIKeyCapability::QuerySearch,
+        ]
+    }
+
+    /// Get all capabilities for management operation
+    pub fn manages() -> &'static [APIKeyCapability] {
+        &[
+            APIKeyCapability::ManageServers,
+            APIKeyCapability::ManageProjects,
+            APIKeyCapability::ManageRSS,
+            APIKeyCapability::ManageUsers,
+        ]
+    }
+
+    /// Get all capabilities for deletion operation
+    pub fn deletes() -> &'static [APIKeyCapability] {
+        &[
+            APIKeyCapability::DeleteServers,
+            APIKeyCapability::DeleteProjects,
+        ]
+    }
+
+    /// Get all operation related to projects
+    pub fn projects() -> &'static [APIKeyCapability] {
+        &[
+            APIKeyCapability::ManageProjects,
+            APIKeyCapability::DeleteProjects,
+            APIKeyCapability::QueryProjects,
+        ]
+    }
+
+    /// Get all operation related to servers
+    pub fn servers() -> &'static [APIKeyCapability] {
+        &[
+            APIKeyCapability::ManageServers,
+            APIKeyCapability::DeleteServers,
+            APIKeyCapability::QueryServers,
+        ]
+    }
+
+    /// Get all operation related to RSS feeds
+    pub fn rss() -> &'static [APIKeyCapability] {
+        &[APIKeyCapability::ManageRSS]
+    }
+
+    /// Get all operation related to users
+    pub fn users() -> &'static [APIKeyCapability] {
+        &[APIKeyCapability::ManageUsers]
+    }
+}
+
+/// A model to hold API key information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct APIKey {
+    /// The API key itself
+    pub key: showtimes_shared::APIKey,
+    /// The API key capabilities
+    pub capabilities: Vec<APIKeyCapability>,
+}
+
+impl APIKey {
+    /// Check if API key has specific capability
+    pub fn can(&self, capability: APIKeyCapability) -> bool {
+        self.capabilities.contains(&capability)
+    }
+
+    /// Check if API key has the following capabilities
+    pub fn can_all(&self, capabilities: &[APIKeyCapability]) -> bool {
+        capabilities.iter().all(|c| self.can(*c))
+    }
+
+    /// Check if API key has any of the following capabilities
+    pub fn can_any(&self, capabilities: &[APIKeyCapability]) -> bool {
+        capabilities.iter().any(|c| self.can(*c))
+    }
+
+    /// Stub an API key
+    pub fn stub() -> Self {
+        APIKey {
+            key: showtimes_shared::APIKey::new(),
+            capabilities: Vec::new(),
+        }
+    }
+}
+
+impl Default for APIKey {
+    fn default() -> Self {
+        APIKey {
+            key: showtimes_shared::APIKey::new(),
+            capabilities: APIKeyCapability::all().to_vec(),
+        }
+    }
 }
 
 /// A model to hold discord user information
@@ -99,7 +247,7 @@ pub struct User {
     /// This can be changed by the user.
     pub avatar: Option<ImageMetadata>,
     /// The user API key
-    pub api_key: showtimes_shared::APIKey,
+    pub api_key: Vec<APIKey>,
     /// The user kind
     pub kind: UserKind,
     /// The user discord information
@@ -130,7 +278,7 @@ impl User {
             id: ulid_serializer::default(),
             username,
             avatar: None,
-            api_key: showtimes_shared::APIKey::new(),
+            api_key: vec![APIKey::default()],
             kind: UserKind::User,
             registered: true,
             discord_meta,
@@ -148,7 +296,7 @@ impl User {
             id: ulid_serializer::default(),
             username,
             avatar: None,
-            api_key: showtimes_shared::APIKey::new(),
+            api_key: vec![APIKey::default()],
             kind: UserKind::Admin,
             registered: true,
             discord_meta,
@@ -172,7 +320,7 @@ impl User {
             id: ulid_serializer::default(),
             username: "Showtimes Administrator".to_string(),
             avatar: None,
-            api_key: showtimes_shared::APIKey::new(),
+            api_key: vec![APIKey::default()],
             kind: UserKind::Owner,
             registered: true,
             // Stub discord user since this is a master key
@@ -191,7 +339,7 @@ impl User {
             id: ulid_serializer::default(),
             username: "Showtimes User".to_string(),
             avatar: None,
-            api_key: showtimes_shared::APIKey::new(),
+            api_key: vec![APIKey::stub()],
             kind: UserKind::User,
             registered: true,
             discord_meta: DiscordUser::stub(),
