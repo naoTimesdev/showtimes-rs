@@ -28,6 +28,8 @@ pub const GRAPHQL_ROUTE: &str = "/graphql";
 pub const GRAPHQL_WS_ROUTE: &str = "/graphql/ws";
 static DISCORD_CLIENT: OnceLock<Arc<DiscordClient>> = OnceLock::new();
 
+static GRAPHQL_SDL: OnceLock<String> = OnceLock::new();
+
 /// Create the GraphQL schema
 pub fn create_schema(db_pool: &DatabaseShared) -> ShowtimesGQLSchema {
     showtimes_gql_common::Schema::build(QueryRoot, MutationRoot, SubscriptionRoot)
@@ -60,12 +62,13 @@ pub fn create_schema(db_pool: &DatabaseShared) -> ShowtimesGQLSchema {
 }
 
 pub async fn graphql_sdl(State(state): State<SharedShowtimesState>) -> impl IntoResponse {
-    let sdl_data = state.schema.sdl();
+    // Cache the SDL since it only change between compilation
+    let sdl_data = GRAPHQL_SDL.get_or_init(|| state.schema.sdl());
 
     // Return the SDL as plain text
     let mut headers = HeaderMap::new();
     headers.insert("Content-Type", "text/plain".parse().unwrap());
-    (headers, sdl_data)
+    (headers, sdl_data.clone())
 }
 
 pub async fn graphql_playground() -> impl IntoResponse {

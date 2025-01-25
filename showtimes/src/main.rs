@@ -214,9 +214,9 @@ async fn entrypoint() -> anyhow::Result<()> {
         .route(GRAPHQL_WS_ROUTE, get(routes::graphql::graphql_ws_handler))
         .route("/_/schema.graphql", get(routes::graphql::graphql_sdl))
         .route("/_/health", get(|| async { "OK" }))
-        .route("/images/:id/:filename", get(routes::image::image_by_id))
+        .route("/images/{id}/{filename}", get(routes::image::image_by_id))
         .route(
-            "/images/:parent_id/:id/:filename",
+            "/images/{parent_id}/{id}/{filename}",
             get(routes::image::image_by_id),
         )
         .route(
