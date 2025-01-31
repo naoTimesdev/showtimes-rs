@@ -41,7 +41,7 @@ tosho-macros = "0.4"
 
 # Serde
 serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.137"
+serde_json = "1.0.138"
 serde_repr = "0.1.19"
 
 # Parsing data
@@ -49,7 +49,7 @@ uuid = { version = "1.12.1", features = ["v7", "fast-rng"] }
 ulid = "1.1.4"
 chrono = "0.4.39"
 time = "0.3.37"
-nom = "7.1.3"
+nom = "8.0.0"
 toml = { version = "0.8.19", default-features = false, features = ["parse", "preserve_order"] }
 
 # Async/Futures
@@ -214,5 +214,5 @@ codegen-units = 1
 
 [patch.crates-io]
 # XXX: Fix for mongodb 3.2.0, this is temporary until the patch is published.
-mongodb = { git = "https://github.com/isabelatkinson/mongo-rust-driver.git", rev = "c39b4b9691935453ff72d53ea06b25b53e742598" }
+mongodb = { git = "https://github.com/mongodb/mongo-rust-driver.git", rev = "2eb8d34fcc5daae0205c2846172ef660b9c534d7" }
 bson = { git = "https://github.com/mongodb/bson-rust.git", rev = "098e1a17e34cbe7f28aac87609eeea2a191b93a3" }

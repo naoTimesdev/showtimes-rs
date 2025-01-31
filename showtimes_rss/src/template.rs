@@ -11,7 +11,7 @@ use nom::{
     combinator::{map, map_res, value},
     multi::many0,
     sequence::delimited,
-    IResult,
+    IResult, Parser,
 };
 use serde::{ser::SerializeSeq, Deserialize, Serialize};
 
@@ -131,11 +131,13 @@ pub fn parse_template(text_template: &str) -> Result<Vec<TemplateToken<'_>>, Tem
         alt((
             map_res(digit1, |s: &str| s.parse().map(Template::Indexed)),
             map(alphanumeric1, Template::Named),
-        ))(input)
+        ))
+        .parse(input)
     }
 
     fn parse_template_token(input: &str) -> IResult<&str, Template> {
-        let (rest, token) = alt((tag("{}"), delimited(tag("{"), alphanumeric1, tag("}"))))(input)?;
+        let (rest, token) =
+            alt((tag("{}"), delimited(tag("{"), alphanumeric1, tag("}")))).parse(input)?;
 
         if token == "{}" {
             Ok((rest, Template::Empty))
@@ -147,22 +149,23 @@ pub fn parse_template(text_template: &str) -> Result<Vec<TemplateToken<'_>>, Tem
     }
 
     fn map_template(input: &str) -> IResult<&str, TemplateToken> {
-        map(parse_template_token, TemplateToken::Template)(input)
+        map(parse_template_token, TemplateToken::Template).parse(input)
     }
 
     fn map_escaped_open(input: &str) -> IResult<&str, TemplateToken> {
-        value(TemplateToken::Escaped('{'), tag("{{"))(input)
+        value(TemplateToken::Escaped('{'), tag("{{")).parse(input)
     }
 
     fn map_escaped_close(input: &str) -> IResult<&str, TemplateToken> {
-        value(TemplateToken::Escaped('}'), tag("}}"))(input)
+        value(TemplateToken::Escaped('}'), tag("}}")).parse(input)
     }
 
     fn map_standard(input: &str) -> IResult<&str, TemplateToken> {
         map(
             take_until0_multiple(&["{", "}", "{{", "}}"]),
             TemplateToken::Standard,
-        )(input)
+        )
+        .parse(input)
     }
 
     fn map_template_token(input: &str) -> IResult<&str, TemplateToken> {
@@ -179,13 +182,14 @@ pub fn parse_template(text_template: &str) -> Result<Vec<TemplateToken<'_>>, Tem
             map_escaped_close,
             map_template,
             map_standard,
-        ))(input)?;
+        ))
+        .parse(input)?;
 
         Ok((rest, token))
     }
 
     fn internal_parser(input: &str) -> IResult<&str, Vec<TemplateToken>> {
-        many0(map_template_token)(input)
+        many0(map_template_token).parse(input)
     }
 
     let (rest, mut tokens) = internal_parser(text_template).map_err(throw_nom_error)?;

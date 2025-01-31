@@ -5,8 +5,7 @@ use kmeans_colors::{get_kmeans_hamerly, Kmeans, Sort};
 use nom::{
     bytes::complete::{tag, take_while_m_n},
     combinator::map_res,
-    sequence::tuple,
-    IResult,
+    IResult, Parser,
 };
 use palette::{
     cast::ComponentsAs, rgb::channels::Rgba, white_point::D65, IntoColor, Lab, Srgb, Srgba,
@@ -101,7 +100,7 @@ fn is_hex_digit(c: char) -> bool {
 }
 
 fn hex_primary(input: &str) -> IResult<&str, u8> {
-    map_res(take_while_m_n(2, 2, is_hex_digit), from_hex)(input)
+    map_res(take_while_m_n(2, 2, is_hex_digit), from_hex).parse(input)
 }
 
 /// Parse a hex color string into a [`u32`].
@@ -111,7 +110,8 @@ pub fn hex_to_u32(hex: &str) -> Result<u32, MetadataError> {
     let (input, _) = tag("#")(hex).map_err(|_: nom::Err<nom::error::Error<&str>>| {
         MetadataImageError::InvalidHexColor(hex.to_string())
     })?;
-    let (_, (red, green, blue)) = tuple((hex_primary, hex_primary, hex_primary))(input)
+    let (_, (red, green, blue)) = (hex_primary, hex_primary, hex_primary)
+        .parse(input)
         .map_err(|_| MetadataImageError::InvalidHexColor(hex.to_string()))?;
 
     Ok((red as u32) << 16 | (green as u32) << 8 | blue as u32)
