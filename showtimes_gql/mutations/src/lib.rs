@@ -16,11 +16,10 @@ pub(crate) use common::*;
 
 use showtimes_db::m::APIKeyCapability;
 use showtimes_gql_common::{
-    data_loader::{
-        find_authenticated_user, verify_api_key_permissions, APIKeyVerify, UserDataLoader,
-    },
+    data_loader::UserDataLoader,
     errors::GQLError,
-    guard, GQLErrorCode, GQLErrorExt, OkResponse, Orchestrator, UserKindGQL,
+    guard::{APIKeyVerify, AuthUserAndAPIKeyGuard, AuthUserMinimumGuard},
+    GQLErrorCode, GQLErrorExt, OkResponse, Orchestrator, UserKindGQL,
 };
 use showtimes_gql_events_models::rss::RSSFeedRenderedGQL;
 use showtimes_gql_models::{
@@ -49,7 +48,7 @@ impl MutationRoot {
     }
 
     /// Disconnect/logout from Showtimes, this can also be used to revoke OAuth2 token
-    #[graphql(guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)")]
+    #[graphql(guard = "AuthUserMinimumGuard::new(UserKindGQL::User)")]
     async fn disconnect(
         &self,
         ctx: &Context<'_>,
@@ -96,7 +95,7 @@ impl MutationRoot {
     /// Create a new server in Showtimes
     #[graphql(
         name = "createServer",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageServers))"
     )]
     async fn create_server(
         &self,
@@ -104,20 +103,13 @@ impl MutationRoot {
         #[graphql(desc = "The server information to be created")]
         input: servers::ServerCreateInputGQL,
     ) -> async_graphql::Result<ServerGQL> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageServers),
-        )?;
-
-        servers::mutate_servers_create(ctx, user, input).await
+        servers::mutate_servers_create(ctx, input).await
     }
 
     /// Create a new project in Showtimes
     #[graphql(
         name = "createProject",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageProjects))"
     )]
     async fn create_project(
         &self,
@@ -126,103 +118,7 @@ impl MutationRoot {
         #[graphql(desc = "The project information to be created")]
         input: projects::ProjectCreateInputGQL,
     ) -> async_graphql::Result<ProjectGQL> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageProjects),
-        )?;
-
-        projects::mutate_projects_create(ctx, user, id, input).await
-    }
-
-    /// Create a new RSS feed on Showtimes
-    #[graphql(
-        name = "createRssFeed",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
-    )]
-    async fn create_rss_feed(
-        &self,
-        ctx: &Context<'_>,
-        #[graphql(desc = "The input to create the RSS feed")] input: rss::RSSFeedCreateInputGQL,
-    ) -> async_graphql::Result<RSSFeedGQL> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageRSS),
-        )?;
-
-        rss::mutate_rss_feed_create(ctx, user, input).await
-    }
-
-    /// Update user information
-    #[graphql(
-        name = "updateUser",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
-    )]
-    async fn update_user(
-        &self,
-        ctx: &Context<'_>,
-        #[graphql(desc = "The user ID to update, when NOT provided will use the current user")] id: Option<showtimes_gql_common::UlidGQL>,
-        #[graphql(desc = "The user information to update")] input: users::UserInputGQL,
-    ) -> async_graphql::Result<UserGQL> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageUsers),
-        )?;
-
-        let requested = users::UserRequester::new(user);
-        let requested = if let Some(id) = id {
-            requested.with_id(*id)
-        } else {
-            requested
-        };
-
-        users::mutate_users_update(ctx, requested, input).await
-    }
-
-    /// Update server information
-    #[graphql(
-        name = "updateServer",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
-    )]
-    async fn update_server(
-        &self,
-        ctx: &Context<'_>,
-        #[graphql(desc = "The server ID to update")] id: showtimes_gql_common::UlidGQL,
-        #[graphql(desc = "The server information to update")] input: servers::ServerUpdateInputGQL,
-    ) -> async_graphql::Result<ServerGQL> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageServers),
-        )?;
-
-        servers::mutate_servers_update(ctx, id, user, input).await
-    }
-
-    /// Update project information
-    #[graphql(
-        name = "updateProject",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
-    )]
-    async fn update_project(
-        &self,
-        ctx: &Context<'_>,
-        #[graphql(desc = "The project ID to update")] id: showtimes_gql_common::UlidGQL,
-        #[graphql(desc = "The project information to update")]
-        input: projects::ProjectUpdateInputGQL,
-    ) -> async_graphql::Result<ProjectGQL> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageProjects),
-        )?;
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
@@ -236,7 +132,86 @@ impl MutationRoot {
             }
         };
 
-        projects::mutate_projects_update(ctx, user_behalf.unwrap_or(user), id, input).await
+        projects::mutate_projects_create(ctx, user_behalf.unwrap_or(user.clone()), id, input).await
+    }
+
+    /// Create a new RSS feed on Showtimes
+    #[graphql(
+        name = "createRssFeed",
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageRSS))"
+    )]
+    async fn create_rss_feed(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The input to create the RSS feed")] input: rss::RSSFeedCreateInputGQL,
+    ) -> async_graphql::Result<RSSFeedGQL> {
+        rss::mutate_rss_feed_create(ctx, input).await
+    }
+
+    /// Update user information
+    #[graphql(
+        name = "updateUser",
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageUsers))"
+    )]
+    async fn update_user(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The user ID to update, when NOT provided will use the current user")] id: Option<showtimes_gql_common::UlidGQL>,
+        #[graphql(desc = "The user information to update")] input: users::UserInputGQL,
+    ) -> async_graphql::Result<UserGQL> {
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
+
+        let requested = users::UserRequester::new(user.clone());
+        let requested = if let Some(id) = id {
+            requested.with_id(*id)
+        } else {
+            requested
+        };
+
+        users::mutate_users_update(ctx, requested, input).await
+    }
+
+    /// Update server information
+    #[graphql(
+        name = "updateServer",
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageServers))"
+    )]
+    async fn update_server(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The server ID to update")] id: showtimes_gql_common::UlidGQL,
+        #[graphql(desc = "The server information to update")] input: servers::ServerUpdateInputGQL,
+    ) -> async_graphql::Result<ServerGQL> {
+        servers::mutate_servers_update(ctx, id, input).await
+    }
+
+    /// Update project information
+    #[graphql(
+        name = "updateProject",
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageProjects))"
+    )]
+    async fn update_project(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The project ID to update")] id: showtimes_gql_common::UlidGQL,
+        #[graphql(desc = "The project information to update")]
+        input: projects::ProjectUpdateInputGQL,
+    ) -> async_graphql::Result<ProjectGQL> {
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
+
+        let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
+            Orchestrator::Standalone => None,
+            other => {
+                // Only allow if the user is type is Admin or greater
+                if user.kind >= showtimes_db::m::UserKind::Admin {
+                    other.to_user(ctx).await?
+                } else {
+                    None
+                }
+            }
+        };
+
+        projects::mutate_projects_update(ctx, user_behalf.unwrap_or(user.clone()), id, input).await
     }
 
     /// Add new episode automatically to a project
@@ -244,7 +219,7 @@ impl MutationRoot {
     /// This will use the last episode as the base for the new episode
     #[graphql(
         name = "updateProjectProgressAddAuto",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageProjects))"
     )]
     async fn update_project_progress_auto_add(
         &self,
@@ -256,12 +231,7 @@ impl MutationRoot {
         )]
         total: u32,
     ) -> async_graphql::Result<ProjectGQL> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageProjects),
-        )?;
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
@@ -277,7 +247,7 @@ impl MutationRoot {
 
         projects::mutate_projects_episode_add_auto(
             ctx,
-            user_behalf.unwrap_or(user),
+            user_behalf.unwrap_or(user.clone()),
             id,
             total.into(),
         )
@@ -289,7 +259,7 @@ impl MutationRoot {
     /// You will need to provide each episode information
     #[graphql(
         name = "updateProjectProgressAdd",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageProjects))"
     )]
     async fn update_project_progress_add(
         &self,
@@ -301,12 +271,7 @@ impl MutationRoot {
         )]
         episodes: Vec<projects::ProgressCreateInputGQL>,
     ) -> async_graphql::Result<ProjectGQL> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageProjects),
-        )?;
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
@@ -322,7 +287,7 @@ impl MutationRoot {
 
         projects::mutate_projects_episode_add_manual(
             ctx,
-            user_behalf.unwrap_or(user),
+            user_behalf.unwrap_or(user.clone()),
             id,
             &episodes,
         )
@@ -334,7 +299,7 @@ impl MutationRoot {
     /// This will use the last episode as the base for the new episode
     #[graphql(
         name = "updateProjectProgressRemove",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageProjects))"
     )]
     async fn update_project_progress_remove(
         &self,
@@ -346,12 +311,7 @@ impl MutationRoot {
         )]
         episodes: Vec<u64>,
     ) -> async_graphql::Result<ProjectGQL> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageProjects),
-        )?;
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
@@ -365,14 +325,19 @@ impl MutationRoot {
             }
         };
 
-        projects::mutate_projects_episode_remove(ctx, user_behalf.unwrap_or(user), id, &episodes)
-            .await
+        projects::mutate_projects_episode_remove(
+            ctx,
+            user_behalf.unwrap_or(user.clone()),
+            id,
+            &episodes,
+        )
+        .await
     }
 
     /// Update a RSS feed on Showtimes
     #[graphql(
         name = "updateRssFeed",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageRSS))"
     )]
     async fn update_rss_feed(
         &self,
@@ -380,20 +345,13 @@ impl MutationRoot {
         #[graphql(desc = "The RSS feed ID to update")] id: showtimes_gql_common::UlidGQL,
         #[graphql(desc = "The input to update the RSS feed")] input: rss::RSSFeedUpdateInputGQL,
     ) -> async_graphql::Result<RSSFeedGQL> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageRSS),
-        )?;
-
-        rss::mutate_rss_feed_update(ctx, id, user, input).await
+        rss::mutate_rss_feed_update(ctx, id, input).await
     }
 
     /// Initiate a collaboration between projects
     #[graphql(
         name = "collaborateProjects",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration))"
     )]
     async fn collaborate_projects(
         &self,
@@ -401,12 +359,7 @@ impl MutationRoot {
         #[graphql(desc = "The collaboration information to be created")]
         input: collaborations::CollaborationRequestInputGQL,
     ) -> async_graphql::Result<CollaborationInviteGQL> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration),
-        )?;
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
@@ -420,26 +373,25 @@ impl MutationRoot {
             }
         };
 
-        collaborations::mutate_collaborations_initiate(ctx, user_behalf.unwrap_or(user), input)
-            .await
+        collaborations::mutate_collaborations_initiate(
+            ctx,
+            user_behalf.unwrap_or(user.clone()),
+            input,
+        )
+        .await
     }
 
     /// Accept a collaboration request between projects
     #[graphql(
         name = "collaborateAccept",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration))"
     )]
     async fn collaborate_accept(
         &self,
         ctx: &Context<'_>,
         #[graphql(desc = "The collaboration ID to accept")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<CollaborationSyncGQL> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration),
-        )?;
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
@@ -453,25 +405,21 @@ impl MutationRoot {
             }
         };
 
-        collaborations::mutate_collaborations_accept(ctx, user_behalf.unwrap_or(user), id).await
+        collaborations::mutate_collaborations_accept(ctx, user_behalf.unwrap_or(user.clone()), id)
+            .await
     }
 
     /// Deny a collaboration request between projects
     #[graphql(
         name = "collaborateDeny",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration))"
     )]
     async fn collaborate_deny(
         &self,
         ctx: &Context<'_>,
         #[graphql(desc = "The collaboration ID to deny")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration),
-        )?;
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
@@ -485,26 +433,26 @@ impl MutationRoot {
             }
         };
 
-        collaborations::mutate_collaborations_cancel(ctx, user_behalf.unwrap_or(user), id, true)
-            .await
+        collaborations::mutate_collaborations_cancel(
+            ctx,
+            user_behalf.unwrap_or(user.clone()),
+            id,
+            true,
+        )
+        .await
     }
 
     /// Retract a collaboration request between projects
     #[graphql(
         name = "collaborateRetract",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration))"
     )]
     async fn collaborate_retract(
         &self,
         ctx: &Context<'_>,
         #[graphql(desc = "The collaboration ID to retract")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration),
-        )?;
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
@@ -518,14 +466,19 @@ impl MutationRoot {
             }
         };
 
-        collaborations::mutate_collaborations_cancel(ctx, user_behalf.unwrap_or(user), id, false)
-            .await
+        collaborations::mutate_collaborations_cancel(
+            ctx,
+            user_behalf.unwrap_or(user.clone()),
+            id,
+            false,
+        )
+        .await
     }
 
     /// Delete or unlink a collaboration between projects
     #[graphql(
         name = "collaborateDelete",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration))"
     )]
     async fn collaborate_delete(
         &self,
@@ -534,12 +487,7 @@ impl MutationRoot {
         #[graphql(desc = "The target project to delete or remove")]
         target: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration),
-        )?;
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
@@ -553,26 +501,26 @@ impl MutationRoot {
             }
         };
 
-        collaborations::mutate_collaborations_unlink(ctx, user_behalf.unwrap_or(user), id, target)
-            .await
+        collaborations::mutate_collaborations_unlink(
+            ctx,
+            user_behalf.unwrap_or(user.clone()),
+            id,
+            target,
+        )
+        .await
     }
 
     /// Delete a project from Showtimes
     #[graphql(
         name = "deleteProject",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::DeleteProjects))"
     )]
     async fn delete_project(
         &self,
         ctx: &Context<'_>,
         #[graphql(desc = "The project ID to delete")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::DeleteProjects),
-        )?;
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
         let user_behalf = match ctx.data_unchecked::<Orchestrator>() {
             Orchestrator::Standalone => None,
@@ -586,47 +534,33 @@ impl MutationRoot {
             }
         };
 
-        projects::mutate_projects_delete(ctx, user_behalf.unwrap_or(user), id).await
+        projects::mutate_projects_delete(ctx, user_behalf.unwrap_or(user.clone()), id).await
     }
 
     /// Delete a server from Showtimes
     #[graphql(
         name = "deleteServer",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::DeleteServers))"
     )]
     async fn delete_server(
         &self,
         ctx: &Context<'_>,
         #[graphql(desc = "The server ID to delete")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::DeleteServers),
-        )?;
-
-        servers::mutate_servers_delete(ctx, user, id).await
+        servers::mutate_servers_delete(ctx, id).await
     }
 
     /// Delete a RSS feed on Showtimes
     #[graphql(
         name = "deleteRssFeed",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::ManageRSS))"
     )]
     async fn delete_rss_feed(
         &self,
         ctx: &Context<'_>,
         #[graphql(desc = "The RSS feed ID to delete")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<OkResponse> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::ManageRSS),
-        )?;
-
-        rss::mutate_rss_feed_delete(ctx, id, user).await
+        rss::mutate_rss_feed_delete(ctx, id).await
     }
 
     /// Create a session for another user.
@@ -636,7 +570,7 @@ impl MutationRoot {
     /// Only available for Admin users.
     #[graphql(
         name = "createSession",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::NotAllowed)"
     )]
     async fn create_session(
         &self,
@@ -668,7 +602,7 @@ impl MutationRoot {
             })?;
         drop(sess_mutex);
 
-        Ok(UserSessionGQL::new(user, claims.get_token()))
+        Ok(UserSessionGQL::new(&user, claims.get_token()))
     }
 
     /// Preview RSS feed template or display.
@@ -677,7 +611,7 @@ impl MutationRoot {
     /// If there is no latest data
     #[graphql(
         name = "previewRssFeed",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)"
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::AllowAny)"
     )]
     async fn preview_rss_feed(
         &self,

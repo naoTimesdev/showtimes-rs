@@ -2,6 +2,7 @@
 
 use async_graphql::{Object, SimpleObject};
 use errors::GQLError;
+use showtimes_db::m::APIKeyCapability;
 use showtimes_db::mongodb::bson::doc;
 use showtimes_gql_common::{queries::ServerQueryUser, *};
 use showtimes_gql_paginator::servers::ServerQuery;
@@ -85,6 +86,9 @@ impl UserGQL {
     }
 
     /// Get the server associated with the user
+    #[graphql(
+        guard = "guard::AuthAPIKeyMinimumGuard::new(guard::APIKeyVerify::Specific(APIKeyCapability::QueryServers))"
+    )]
     async fn servers(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -225,8 +229,8 @@ pub struct UserSessionGQL {
 
 impl UserSessionGQL {
     /// Create a new user session
-    pub fn new(user: showtimes_db::m::User, token: impl Into<String>) -> Self {
-        let gql_user = UserGQL::from(&user).with_requester(user.into());
+    pub fn new(user: &showtimes_db::m::User, token: impl Into<String>) -> Self {
+        let gql_user = UserGQL::from(user).with_requester(user.into());
 
         UserSessionGQL {
             user: gql_user,

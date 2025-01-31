@@ -2,6 +2,8 @@
 #![doc = include_str!("../../README.md")]
 
 use async_graphql::Object;
+use showtimes_db::m::APIKeyCapability;
+use showtimes_gql_common::guard::{APIKeyVerify, AuthAPIKeyMinimumGuard};
 use showtimes_gql_events_models::collaborations::{
     CollabAcceptedEventDataGQL, CollabCreatedEventDataGQL, CollabDeletedEventDataGQL,
     CollabRejectedEventDataGQL, CollabRetractedEventDataGQL,
@@ -36,7 +38,10 @@ pub struct QueryEventsRoot;
 #[Object]
 impl QueryEventsRoot {
     /// The user created event, use `watchUserCreated` to get a real-time stream instead.
-    #[graphql(name = "userCreated")]
+    #[graphql(
+        name = "userCreated",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::ManageUsers))"
+    )]
     async fn user_created(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -51,7 +56,10 @@ impl QueryEventsRoot {
     }
 
     /// The user updated event, use `watchUserUpdated` to get a real-time stream instead.
-    #[graphql(name = "userUpdated")]
+    #[graphql(
+        name = "userUpdated",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::ManageUsers))"
+    )]
     async fn user_updated(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -66,7 +74,10 @@ impl QueryEventsRoot {
     }
 
     /// The user deleted event, use `watchUserDeleted` to get a real-time stream instead.
-    #[graphql(name = "userDeleted")]
+    #[graphql(
+        name = "userDeleted",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::ManageUsers))"
+    )]
     async fn user_deleted(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -81,7 +92,10 @@ impl QueryEventsRoot {
     }
 
     /// The server created event, use `watchServerCreated` to get a real-time stream instead.
-    #[graphql(name = "serverCreated")]
+    #[graphql(
+        name = "serverCreated",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::QueryServers))"
+    )]
     async fn server_created(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -96,7 +110,10 @@ impl QueryEventsRoot {
     }
 
     /// The server updated event, use `watchServerUpdated` to get a real-time stream instead.
-    #[graphql(name = "serverUpdated")]
+    #[graphql(
+        name = "serverUpdated",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::QueryServers))"
+    )]
     async fn server_updated(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -111,7 +128,10 @@ impl QueryEventsRoot {
     }
 
     /// The server deleted event, use `watchServerDeleted` to get a real-time stream instead.
-    #[graphql(name = "serverDeleted")]
+    #[graphql(
+        name = "serverDeleted",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::QueryServers))"
+    )]
     async fn server_deleted(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -126,7 +146,10 @@ impl QueryEventsRoot {
     }
 
     /// The project created event, use `watchProjectCreated` to get a real-time stream instead.
-    #[graphql(name = "projectCreated")]
+    #[graphql(
+        name = "projectCreated",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::QueryProjects))"
+    )]
     async fn project_created(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -141,7 +164,10 @@ impl QueryEventsRoot {
     }
 
     /// The project updated event, use `watchProjectUpdated` to get a real-time stream instead.
-    #[graphql(name = "projectUpdated")]
+    #[graphql(
+        name = "projectUpdated",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::QueryProjects))"
+    )]
     async fn project_updated(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -156,7 +182,10 @@ impl QueryEventsRoot {
     }
 
     /// The project episode updated event, use `watchProjectEpisodeUpdated` to get a real-time stream instead.
-    #[graphql(name = "projectEpisodeUpdated")]
+    #[graphql(
+        name = "projectEpisodeUpdated",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::QueryProjects))"
+    )]
     async fn project_episode_updated(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -170,7 +199,10 @@ impl QueryEventsRoot {
     }
 
     /// The project deleted event, use `watchProjectDeleted` to get a real-time stream instead.
-    #[graphql(name = "projectDeleted")]
+    #[graphql(
+        name = "projectDeleted",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::QueryProjects))"
+    )]
     async fn project_deleted(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -185,7 +217,10 @@ impl QueryEventsRoot {
     }
 
     /// The collaboration created event, use `watchCollabCreated` to get a real-time stream instead.
-    #[graphql(name = "collabCreated")]
+    #[graphql(
+        name = "collabCreated",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration))"
+    )]
     async fn collab_created(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -200,7 +235,10 @@ impl QueryEventsRoot {
     }
 
     /// The collaboration acceptance event, use `watchCollabAccepted` to get a real-time stream instead.
-    #[graphql(name = "collabAccepted")]
+    #[graphql(
+        name = "collabAccepted",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration))"
+    )]
     async fn collab_accepted(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -215,7 +253,10 @@ impl QueryEventsRoot {
     }
 
     /// The collaboration rejection event, use `watchCollabRejected` to get a real-time stream instead.
-    #[graphql(name = "collabRejected")]
+    #[graphql(
+        name = "collabRejected",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration))"
+    )]
     async fn collab_rejected(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -230,7 +271,10 @@ impl QueryEventsRoot {
     }
 
     /// The collaboration retraction event, use `watchCollabRetracted` to get a real-time stream instead.
-    #[graphql(name = "collabRetracted")]
+    #[graphql(
+        name = "collabRetracted",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration))"
+    )]
     async fn collab_retracted(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -245,7 +289,10 @@ impl QueryEventsRoot {
     }
 
     /// The collaboration deletion or unlinking event, use `watchCollabDeleted` to get a real-time stream instead.
-    #[graphql(name = "collabDeleted")]
+    #[graphql(
+        name = "collabDeleted",
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::ManageCollaboration))"
+    )]
     async fn collab_deleted(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -260,6 +307,9 @@ impl QueryEventsRoot {
     }
 
     /// A list of new RSS events, use `watchRSS` to get a real-time stream instead.
+    #[graphql(
+        guard = "AuthAPIKeyMinimumGuard::new(APIKeyVerify::Specific(APIKeyCapability::ManageRSS))"
+    )]
     async fn rss(
         &self,
         ctx: &async_graphql::Context<'_>,

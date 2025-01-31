@@ -8,8 +8,8 @@ use axum::{
 };
 use showtimes_db::DatabaseShared;
 use showtimes_gql_common::{
-    data_loader, graphiql_plugin_explorer, Data as GQLData, Error as GQLError, GraphiQLSource,
-    ALL_WEBSOCKET_PROTOCOLS,
+    data_loader, graphiql_plugin_explorer, Data as GQLData, Error as GQLError, GQLDataLoaderWhere,
+    GQLErrorCode, GQLResponse, GQLServerError, GraphiQLSource, ALL_WEBSOCKET_PROTOCOLS,
 };
 use showtimes_gql_mutations::MutationRoot;
 use showtimes_gql_queries::QueryRoot;
@@ -26,8 +26,9 @@ pub type ShowtimesGQLSchema =
     showtimes_gql_common::Schema<QueryRoot, MutationRoot, SubscriptionRoot>;
 pub const GRAPHQL_ROUTE: &str = "/graphql";
 pub const GRAPHQL_WS_ROUTE: &str = "/graphql/ws";
-static DISCORD_CLIENT: OnceLock<Arc<DiscordClient>> = OnceLock::new();
 
+static DISCORD_CLIENT: OnceLock<Arc<DiscordClient>> = OnceLock::new();
+static STUBBED_OWNER: OnceLock<showtimes_db::m::User> = OnceLock::new();
 static GRAPHQL_SDL: OnceLock<String> = OnceLock::new();
 
 /// Create the GraphQL schema
@@ -151,8 +152,18 @@ pub async fn graphql_handler(
         match state.session.lock().await.get_session(token, kind).await {
             Ok(session) => {
                 tracing::debug!("Got session: {:?}", session);
-                req = req.data(session.get_claims().clone());
-                req = req.data(session);
+                // Always provide user info
+                match load_authenticated_user(&session, &state.db).await {
+                    Ok(user) => {
+                        req = req.data(session.get_claims().clone());
+                        req = req.data(session);
+                        req = req.data(user);
+                    }
+                    Err(err) => {
+                        tracing::error!("Error loading authenticated user: {:?}", &err);
+                        return GraphQLResponse::from(err);
+                    }
+                }
             }
             Err(err) => {
                 tracing::error!("Error getting session: {:?}", err);
@@ -340,4 +351,143 @@ async fn on_ws_init(
     }
 
     Ok(data)
+}
+
+async fn load_authenticated_user(
+    session: &showtimes_session::ShowtimesUserSession,
+    database: &DatabaseShared,
+) -> Result<showtimes_db::m::User, GQLResponse> {
+    let user_db = showtimes_db::UserHandler::new(database);
+
+    let audience = session.get_claims().get_audience();
+
+    let load_method = match audience {
+        showtimes_session::ShowtimesAudience::User => {
+            // load as ULID
+            let user_id =
+                showtimes_shared::ulid::Ulid::from_string(session.get_claims().get_metadata())
+                    .map_err(|e| {
+                        // make error
+                        let gql_error = showtimes_gql_common::errors::GQLError::new(
+                            e.to_string(),
+                            GQLErrorCode::ParseUlidError,
+                        )
+                        .extend(|e| {
+                            e.set("value", session.get_claims().get_metadata());
+                            e.set("audience", audience.to_string());
+                        })
+                        .build();
+
+                        error_to_gql_response(gql_error)
+                    })?;
+
+            user_db
+                .find_by(showtimes_db::mongodb::bson::doc! {
+                    "id": user_id.to_string(),
+                })
+                .await
+                .map_err(|e| {
+                    // make error
+                    let gql_error = showtimes_gql_common::errors::GQLError::new(
+                        e.to_string(),
+                        GQLErrorCode::UserRequestFails,
+                    )
+                    .extend(|e| {
+                        e.set("id", user_id.to_string());
+                        e.set("audience", audience.to_string());
+                        e.set("where", GQLDataLoaderWhere::UserLoaderId);
+                    })
+                    .build();
+
+                    error_to_gql_response(gql_error)
+                })?
+        }
+        showtimes_session::ShowtimesAudience::APIKey => {
+            let api_key_raw = session.get_claims().get_metadata();
+            let api_key = showtimes_shared::APIKey::try_from(api_key_raw).map_err(|e| {
+                // make error
+                let gql_error = showtimes_gql_common::errors::GQLError::new(
+                    e.to_string(),
+                    GQLErrorCode::ParseAPIKeyError,
+                )
+                .extend(|e| {
+                    e.set("value", api_key_raw);
+                    e.set("audience", audience.to_string());
+                })
+                .build();
+
+                error_to_gql_response(gql_error)
+            })?;
+
+            user_db
+                .find_by(showtimes_db::mongodb::bson::doc! {
+                    "api_key.key": api_key.to_string(),
+                })
+                .await
+                .map_err(|e| {
+                    // make error
+                    let gql_error = showtimes_gql_common::errors::GQLError::new(
+                        e.to_string(),
+                        GQLErrorCode::UserRequestFails,
+                    )
+                    .extend(|e| {
+                        e.set("id", api_key.to_string());
+                        e.set("audience", audience.to_string());
+                        e.set("where", GQLDataLoaderWhere::UserLoaderAPIKey);
+                    })
+                    .build();
+
+                    error_to_gql_response(gql_error)
+                })?
+        }
+        showtimes_session::ShowtimesAudience::MasterKey => {
+            let result = STUBBED_OWNER.get_or_init(|| {
+                showtimes_db::m::User::stub_owner(session.get_claims().get_metadata())
+            });
+
+            Some(result.clone())
+        }
+        _ => {
+            let gql_error = showtimes_gql_common::errors::GQLError::new(
+                "Invalid audience type for this session",
+                GQLErrorCode::UserInvalidAudience,
+            )
+            .extend(|e| {
+                e.set("value", session.get_claims().get_metadata());
+                e.set("audience", audience.to_string());
+            })
+            .build();
+
+            return Err(error_to_gql_response(gql_error));
+        }
+    };
+
+    match load_method {
+        Some(user) => Ok(user),
+        None => {
+            let gql_error = showtimes_gql_common::errors::GQLError::new(
+                "User not found",
+                GQLErrorCode::UserNotFound,
+            )
+            .extend(|e| {
+                e.set("id", session.get_claims().get_metadata());
+                e.set("audience", audience.to_string());
+            })
+            .build();
+
+            Err(error_to_gql_response(gql_error))
+        }
+    }
+}
+
+fn error_to_gql_response(error: GQLError) -> GQLResponse {
+    let srv_error = GQLServerError {
+        message: error.message,
+        source: error.source,
+        locations: vec![],
+        path: vec![],
+        extensions: error.extensions,
+    };
+
+    GQLResponse::from_errors(vec![srv_error])
 }

@@ -60,7 +60,7 @@ where
     O: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + std::fmt::Debug + 'static,
     T: QueryNew<O> + OutputType + 'static,
 {
-    let user = showtimes_gql_common::data_loader::find_authenticated_user(ctx).await?;
+    let user = ctx.data_unchecked::<showtimes_db::m::User>();
     let query_stream = ctx.data_unchecked::<showtimes_events::SharedSHClickHouse>();
 
     let mut stream = query_stream.query::<O>(kind).start_after(*id);

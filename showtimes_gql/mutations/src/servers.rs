@@ -137,11 +137,11 @@ impl ServerOwnerInputGQL {
 
 pub async fn mutate_servers_create(
     ctx: &async_graphql::Context<'_>,
-    user: showtimes_db::m::User,
     input: ServerCreateInputGQL,
 ) -> async_graphql::Result<ServerGQL> {
     let db = ctx.data_unchecked::<DatabaseShared>();
     let meili = ctx.data_unchecked::<SearchClientShared>();
+    let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
     if user.kind == UserKind::Owner {
         // Fails, Owner cannot create server
@@ -366,7 +366,6 @@ async fn get_and_check_server(
 pub async fn mutate_servers_update(
     ctx: &async_graphql::Context<'_>,
     id: UlidGQL,
-    user: showtimes_db::m::User,
     input: ServerUpdateInputGQL,
 ) -> async_graphql::Result<ServerGQL> {
     if !input.is_any_set() {
@@ -376,10 +375,11 @@ pub async fn mutate_servers_update(
     let db = ctx.data_unchecked::<DatabaseShared>();
     let storages = ctx.data_unchecked::<Arc<FsPool>>();
     let meili = ctx.data_unchecked::<SearchClientShared>();
+    let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
     // Do update
     let server =
-        get_and_check_server(ctx, *id, &user, showtimes_db::m::UserPrivilege::Admin).await?;
+        get_and_check_server(ctx, *id, user, showtimes_db::m::UserPrivilege::Admin).await?;
     let mut server_mut = server.clone();
 
     let mut server_before = showtimes_events::m::ServerUpdatedDataEvent::default();
@@ -593,16 +593,16 @@ pub async fn mutate_servers_update(
 
 pub async fn mutate_servers_delete(
     ctx: &async_graphql::Context<'_>,
-    user: showtimes_db::m::User,
     id: UlidGQL,
 ) -> async_graphql::Result<OkResponse> {
     let db = ctx.data_unchecked::<DatabaseShared>();
     let storages = ctx.data_unchecked::<Arc<FsPool>>();
     let meili = ctx.data_unchecked::<SearchClientShared>();
+    let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
     // Get server info
     let server =
-        get_and_check_server(ctx, *id, &user, showtimes_db::m::UserPrivilege::Owner).await?;
+        get_and_check_server(ctx, *id, user, showtimes_db::m::UserPrivilege::Owner).await?;
 
     // Unlink Collab sync and invite
     let collab_handler = showtimes_db::CollaborationSyncHandler::new(db);

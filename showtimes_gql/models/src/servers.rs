@@ -2,7 +2,10 @@
 
 use async_graphql::{dataloader::DataLoader, Enum, Object};
 use errors::GQLError;
-use showtimes_db::{m::ServerUser, mongodb::bson::doc};
+use showtimes_db::{
+    m::{APIKeyCapability, ServerUser},
+    mongodb::bson::doc,
+};
 use showtimes_gql_common::{data_loader::UserDataLoader, queries::MinimalServerUsers, *};
 use showtimes_gql_paginator::projects::ProjectQuery;
 
@@ -160,6 +163,9 @@ impl ServerGQL {
     }
 
     /// The list of server projects
+    #[graphql(
+        guard = "guard::AuthAPIKeyMinimumGuard::new(guard::APIKeyVerify::Specific(APIKeyCapability::QueryProjects))"
+    )]
     async fn projects(
         &self,
         ctx: &async_graphql::Context<'_>,

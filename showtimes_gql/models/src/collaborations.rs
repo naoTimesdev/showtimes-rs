@@ -2,6 +2,7 @@
 
 use async_graphql::{dataloader::DataLoader, Object};
 use errors::GQLError;
+use showtimes_db::m::APIKeyCapability;
 use showtimes_shared::ulid::Ulid;
 
 use showtimes_gql_common::data_loader::{ProjectDataLoader, ServerDataLoader};
@@ -70,6 +71,9 @@ impl CollaborationSyncGQL {
     }
 
     /// The server information
+    #[graphql(
+        guard = "guard::AuthAPIKeyMinimumGuard::new(guard::APIKeyVerify::Specific(APIKeyCapability::QueryServers))"
+    )]
     async fn servers(
         &self,
         ctx: &async_graphql::Context<'_>,
@@ -104,6 +108,9 @@ impl CollaborationSyncGQL {
     }
 
     /// All the attached projects
+    #[graphql(
+        guard = "guard::AuthAPIKeyMinimumGuard::new(guard::APIKeyVerify::Specific(APIKeyCapability::QueryProjects))"
+    )]
     async fn projects(
         &self,
         ctx: &async_graphql::Context<'_>,

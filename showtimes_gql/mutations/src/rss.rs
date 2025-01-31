@@ -337,12 +337,12 @@ pub async fn validate_rss_feed(
 
 pub async fn mutate_rss_feed_create(
     ctx: &async_graphql::Context<'_>,
-    user: showtimes_db::m::User,
     input: RSSFeedCreateInputGQL,
 ) -> async_graphql::Result<RSSFeedGQL> {
+    let user = ctx.data_unchecked::<showtimes_db::m::User>();
     let db = ctx.data_unchecked::<DatabaseShared>().clone();
 
-    let srv = check_permissions(ctx, *input.server, &user).await?;
+    let srv = check_permissions(ctx, *input.server, user).await?;
     let premi_handler = showtimes_db::ServerPremiumHandler::new(&db);
     let current_time_bson = showtimes_db::mongodb::bson::DateTime::now();
 
@@ -453,13 +453,13 @@ pub async fn mutate_rss_feed_create(
 pub async fn mutate_rss_feed_update(
     ctx: &async_graphql::Context<'_>,
     id: UlidGQL,
-    user: showtimes_db::m::User,
     input: RSSFeedUpdateInputGQL,
 ) -> async_graphql::Result<RSSFeedGQL> {
     if !input.is_any_set() {
         return GQLError::new("No fields to update", GQLErrorCode::MissingModification).into();
     }
 
+    let user = ctx.data_unchecked::<showtimes_db::m::User>();
     let rss_loader = ctx.data_unchecked::<DataLoader<RSSFeedLoader>>();
 
     // Fetch feed
@@ -468,7 +468,7 @@ pub async fn mutate_rss_feed_update(
             .extend(|e| e.set("id", id.to_string()))
     })?;
 
-    let server = check_permissions(ctx, rss_feed.creator, &user).await?;
+    let server = check_permissions(ctx, rss_feed.creator, user).await?;
 
     if let Some(enabled) = input.enable {
         if enabled {
@@ -648,8 +648,8 @@ pub async fn mutate_rss_feed_update(
 pub async fn mutate_rss_feed_delete(
     ctx: &async_graphql::Context<'_>,
     id: UlidGQL,
-    user: showtimes_db::m::User,
 ) -> async_graphql::Result<OkResponse> {
+    let user = ctx.data_unchecked::<showtimes_db::m::User>();
     let rss_loader = ctx.data_unchecked::<DataLoader<RSSFeedLoader>>();
 
     // Fetch feed
@@ -658,7 +658,7 @@ pub async fn mutate_rss_feed_delete(
             .extend(|e| e.set("id", id.to_string()))
     })?;
 
-    check_permissions(ctx, rss_feed.creator, &user).await?;
+    check_permissions(ctx, rss_feed.creator, user).await?;
 
     rss_loader
         .loader()

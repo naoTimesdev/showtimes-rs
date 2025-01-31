@@ -5,12 +5,10 @@ use async_graphql::{dataloader::DataLoader, Context, Object};
 
 use showtimes_db::m::APIKeyCapability;
 use showtimes_gql_common::{
-    data_loader::{
-        find_authenticated_user, verify_api_key_permissions, APIKeyVerify, ServerAndOwnerId,
-        ServerDataLoader, ServerOwnerId,
-    },
+    data_loader::{ServerAndOwnerId, ServerDataLoader, ServerOwnerId},
     errors::GQLError,
-    guard, GQLErrorCode, UserKindGQL,
+    guard::{visible_minimum_admin, APIKeyVerify, AuthUserAndAPIKeyGuard, AuthUserMinimumGuard},
+    GQLErrorCode, UserKindGQL,
 };
 use showtimes_gql_events::QueryEventsRoot;
 use showtimes_gql_models::{
@@ -30,10 +28,10 @@ pub struct QueryRoot;
 #[Object]
 impl QueryRoot {
     /// Get current authenticated user
-    #[graphql(guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)")]
+    #[graphql(guard = "AuthUserMinimumGuard::new(UserKindGQL::User)")]
     async fn current(&self, ctx: &Context<'_>) -> async_graphql::Result<UserSessionGQL> {
         let user_session = ctx.data_unchecked::<ShowtimesUserSession>();
-        let user = find_authenticated_user(ctx).await?;
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
         match ctx.data_opt::<ShowtimesRefreshSession>() {
             Some(refresh_session) => Ok(UserSessionGQL::new(user, user_session.get_token())
@@ -43,7 +41,9 @@ impl QueryRoot {
     }
 
     /// Get authenticated user associated servers
-    #[graphql(guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)")]
+    #[graphql(
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::QueryServers))"
+    )]
     async fn servers(
         &self,
         ctx: &Context<'_>,
@@ -61,15 +61,10 @@ impl QueryRoot {
             showtimes_gql_common::SortOrderGQL,
         >,
     ) -> async_graphql::Result<PaginatedGQL<ServerGQL>> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::QueryServers),
-        )?;
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
         let mut queries = showtimes_gql_paginator::servers::ServerQuery::new()
-            .with_current_user(showtimes_gql_common::queries::ServerQueryUser::from(&user));
+            .with_current_user(showtimes_gql_common::queries::ServerQueryUser::from(user));
         if let Some(ids) = ids {
             queries.set_ids(ids.into_iter().map(|id| *id).collect());
         };
@@ -100,7 +95,9 @@ impl QueryRoot {
     }
 
     /// Get authenticated user associated projects
-    #[graphql(guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)")]
+    #[graphql(
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::QueryProjects))"
+    )]
     #[allow(clippy::too_many_arguments)]
     async fn projects(
         &self,
@@ -123,12 +120,7 @@ impl QueryRoot {
         #[graphql(desc = "Remove pagination limit, this only works if you're an Admin")]
         unpaged: bool,
     ) -> async_graphql::Result<PaginatedGQL<ProjectGQL>> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::QueryProjects),
-        )?;
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
         let allowed_servers = match user.kind {
             showtimes_db::m::UserKind::User => {
@@ -174,7 +166,10 @@ impl QueryRoot {
     }
 
     /// Get all available users, you need a minimum of admin role to access this
-    #[graphql(guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)")]
+    #[graphql(
+        guard = "AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "visible_minimum_admin"
+    )]
     async fn users(
         &self,
         ctx: &Context<'_>,
@@ -192,9 +187,9 @@ impl QueryRoot {
             showtimes_gql_common::SortOrderGQL,
         >,
     ) -> async_graphql::Result<PaginatedGQL<UserGQL>> {
-        let user = find_authenticated_user(ctx).await?;
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
         let mut queries = showtimes_gql_paginator::users::UserQuery::new()
-            .with_current_user(showtimes_gql_common::queries::ServerQueryUser::from(&user));
+            .with_current_user(showtimes_gql_common::queries::ServerQueryUser::from(user));
         if let Some(ids) = ids {
             queries.set_ids(ids.into_iter().map(|id| *id).collect());
         };
@@ -216,19 +211,15 @@ impl QueryRoot {
     }
 
     /// Get server statistics
-    #[graphql(guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)")]
+    #[graphql(
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::QueryStats))"
+    )]
     async fn stats(
         &self,
         ctx: &Context<'_>,
         #[graphql(desc = "Specify server ID to query")] id: showtimes_gql_common::UlidGQL,
     ) -> async_graphql::Result<StatsGQL> {
-        let user = find_authenticated_user(ctx).await?;
-        verify_api_key_permissions(
-            ctx,
-            &user,
-            APIKeyVerify::Specific(APIKeyCapability::QueryStats),
-        )?;
-
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
         let projector = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
         let server = match user.kind {
             showtimes_db::m::UserKind::User => {
@@ -247,7 +238,9 @@ impl QueryRoot {
     }
 
     /// Do a external searvice metadata search
-    #[graphql(guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::User)")]
+    #[graphql(
+        guard = "AuthUserAndAPIKeyGuard::new(UserKindGQL::User, APIKeyVerify::Specific(APIKeyCapability::QuerySearch))"
+    )]
     async fn search(&self) -> QuerySearchRoot {
         // This is just an empty root which has dynamic fields
         QuerySearchRoot
@@ -258,7 +251,10 @@ impl QueryRoot {
     /// Warning: This branch of query will return all updates from your provided IDs. It's recommended
     /// to use the equivalent subscription instead for real-time updates. This is mainly used to get
     /// older updates that is not yet processed by the client connecting to the subscription.
-    #[graphql(guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)")]
+    #[graphql(
+        guard = "AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "visible_minimum_admin"
+    )]
     async fn events(&self) -> QueryEventsRoot {
         // This is just an empty root which has dynamic fields
         QueryEventsRoot

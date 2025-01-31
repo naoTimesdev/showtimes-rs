@@ -15,6 +15,8 @@ pub mod queries;
 
 /// Re-exports of the async_graphql crate
 pub use async_graphql::http::{graphiql_plugin_explorer, GraphiQLSource, ALL_WEBSOCKET_PROTOCOLS};
+pub use async_graphql::Response as GQLResponse;
+pub use async_graphql::ServerError as GQLServerError;
 pub use async_graphql::{dataloader::DataLoader, extensions::Tracing, Data, Error, Schema};
 /// Re-exports of the errors enums
 pub use errors::{GQLDataLoaderWhere, GQLErrorCode, GQLErrorExt};

@@ -461,10 +461,8 @@ pub async fn mutate_users_authenticate(
                 })?;
             drop(sess_mutex);
 
-            Ok(
-                UserSessionGQL::new(user, oauth_user.get_token())
-                    .with_refresh_token(&refresh_token),
-            )
+            Ok(UserSessionGQL::new(&user, oauth_user.get_token())
+                .with_refresh_token(&refresh_token))
         }
         None => {
             tracing::info!(
@@ -561,10 +559,8 @@ pub async fn mutate_users_authenticate(
                 })?;
             drop(sess_mutex);
 
-            Ok(
-                UserSessionGQL::new(user, oauth_user.get_token())
-                    .with_refresh_token(&refresh_token),
-            )
+            Ok(UserSessionGQL::new(&user, oauth_user.get_token())
+                .with_refresh_token(&refresh_token))
         }
     }
 }

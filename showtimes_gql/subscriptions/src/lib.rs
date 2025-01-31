@@ -44,7 +44,8 @@ impl SubscriptionRoot {
     /// Watch for user created events
     #[graphql(
         name = "watchUserCreated",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_user_created(
         &self,
@@ -61,7 +62,8 @@ impl SubscriptionRoot {
     /// Watch for user updates events
     #[graphql(
         name = "watchUserUpdated",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_user_updated(
         &self,
@@ -78,7 +80,8 @@ impl SubscriptionRoot {
     /// Watch for user deleted events
     #[graphql(
         name = "watchUserDeleted",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_user_deleted(
         &self,
@@ -94,7 +97,8 @@ impl SubscriptionRoot {
     /// Watch for server created events
     #[graphql(
         name = "watchServerCreated",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_server_created(
         &self,
@@ -110,7 +114,8 @@ impl SubscriptionRoot {
     /// Watch for server updates events
     #[graphql(
         name = "watchServerUpdated",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_server_updated(
         &self,
@@ -126,7 +131,8 @@ impl SubscriptionRoot {
     /// Watch for server deleted events
     #[graphql(
         name = "watchServerDeleted",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_server_deleted(
         &self,
@@ -142,7 +148,8 @@ impl SubscriptionRoot {
     /// Watch for project created events
     #[graphql(
         name = "watchProjectCreated",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_project_created(
         &self,
@@ -158,7 +165,8 @@ impl SubscriptionRoot {
     /// Watch for project updates events
     #[graphql(
         name = "watchProjectUpdated",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_project_updated(
         &self,
@@ -174,7 +182,8 @@ impl SubscriptionRoot {
     /// Watch for project episodes update events
     #[graphql(
         name = "watchProjectEpisodeUpdated",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_project_episode_updated(
         &self,
@@ -191,7 +200,8 @@ impl SubscriptionRoot {
     /// Watch for project deleted events
     #[graphql(
         name = "watchProjectDeleted",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_project_deleted(
         &self,
@@ -207,7 +217,8 @@ impl SubscriptionRoot {
     /// Watch for collaboration created events
     #[graphql(
         name = "watchCollabCreated",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_collab_created(
         &self,
@@ -223,7 +234,8 @@ impl SubscriptionRoot {
     /// Watch for collaboration acceptances events
     #[graphql(
         name = "watchCollabAccepted",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_collab_accepted(
         &self,
@@ -239,7 +251,8 @@ impl SubscriptionRoot {
     /// Watch for collaboration rejection events
     #[graphql(
         name = "watchCollabRejected",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_collab_rejected(
         &self,
@@ -255,7 +268,8 @@ impl SubscriptionRoot {
     /// Watch for collaboration retraction events
     #[graphql(
         name = "watchCollabRetracted",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_collab_retracted(
         &self,
@@ -271,7 +285,8 @@ impl SubscriptionRoot {
     /// Watch for collaboration deleted events
     #[graphql(
         name = "watchCollabDeleted",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_collab_deleted(
         &self,
@@ -287,7 +302,8 @@ impl SubscriptionRoot {
     /// Watch for RSS entry feed event for specific RSS feed
     #[graphql(
         name = "watchRSS",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
+        visible = "guard::visible_minimum_admin"
     )]
     async fn watch_rss_entry(
         &self,
