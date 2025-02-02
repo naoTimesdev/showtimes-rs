@@ -19,9 +19,9 @@ serde.workspace = true
 serde_json.workspace = true
 reqwest.workspace = true
 
-tosho-macros.workspace = true
-
 image.workspace = true
 kmeans_colors.workspace = true
 fxhash.workspace = true
 palette.workspace = true
+
+showtimes-derive = { path = "../showtimes_derive" }

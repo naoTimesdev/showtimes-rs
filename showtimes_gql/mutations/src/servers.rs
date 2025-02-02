@@ -257,7 +257,7 @@ pub async fn mutate_servers_create(
                 })?;
 
             let image_meta = showtimes_db::m::ImageMetadata::new(
-                showtimes_fs::FsFileKind::Images.as_path_name(),
+                showtimes_fs::FsFileKind::Images.to_name(),
                 server.id,
                 &filename,
                 format.as_extension(),
@@ -268,7 +268,7 @@ pub async fn mutate_servers_create(
         }
         None => {
             server.avatar = Some(showtimes_db::m::ImageMetadata::new(
-                FsFileKind::Invalids.as_path_name(),
+                FsFileKind::Invalids.to_name(),
                 "server",
                 "default.png",
                 "png",
@@ -535,7 +535,7 @@ pub async fn mutate_servers_update(
             })?;
 
         let image_meta = showtimes_db::m::ImageMetadata::new(
-            showtimes_fs::FsFileKind::Images.as_path_name(),
+            showtimes_fs::FsFileKind::Images.to_name(),
             server_mut.id,
             &filename,
             format.as_extension(),

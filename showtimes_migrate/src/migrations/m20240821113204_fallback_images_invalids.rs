@@ -170,7 +170,7 @@ impl Migration for M20240821113204FallbackImagesInvalids {
                 doc! {
                     "$set": {
                         "avatar": {
-                            "kind": FsFileKind::Invalids.as_path_name(),
+                            "kind": FsFileKind::Invalids.to_name(),
                             "key": "user",
                             "filename": "default.png",
                             "format": "png",
@@ -211,7 +211,7 @@ impl Migration for M20240821113204FallbackImagesInvalids {
                 doc! {
                     "$set": {
                         "avatar": {
-                            "kind": FsFileKind::Invalids.as_path_name(),
+                            "kind": FsFileKind::Invalids.to_name(),
                             "key": "server",
                             "filename": "default.png",
                             "format": "png",

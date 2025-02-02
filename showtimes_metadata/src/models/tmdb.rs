@@ -29,7 +29,7 @@ pub enum TMDbMediaType {
 /// The sizes of the poster images of the TMDb API
 ///
 /// Usually 2:3 aspect ratio
-#[derive(Debug, Clone, Copy, PartialEq, tosho_macros::EnumName)]
+#[derive(Debug, Clone, Copy, PartialEq, showtimes_derive::EnumName)]
 pub enum TMDbPosterSize {
     /// 92x138
     W92,
@@ -50,7 +50,7 @@ pub enum TMDbPosterSize {
 /// The sizes of the backdrop images of the TMDb API
 ///
 /// Usually 16:9 aspect ratio
-#[derive(Debug, Clone, Copy, PartialEq, tosho_macros::EnumName)]
+#[derive(Debug, Clone, Copy, PartialEq, showtimes_derive::EnumName)]
 pub enum TMDbBackdropSize {
     /// 300x169
     W300,

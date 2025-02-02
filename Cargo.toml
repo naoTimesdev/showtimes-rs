@@ -37,7 +37,6 @@ rust-version = "1.81" # MSRV to 1.81 due to async-graphql
 [workspace.dependencies]
 # Essential stuff
 anyhow = "1"
-tosho-macros = "0.4"
 
 # Serde
 serde = { version = "1.0.217", features = ["derive"] }
@@ -45,7 +44,7 @@ serde_json = "1.0.138"
 serde_repr = "0.1.19"
 
 # Parsing data
-uuid = { version = "1.12.1", features = ["v7", "fast-rng"] }
+uuid = { version = "1.12.1", default-features = false, features = ["v4", "v7", "fast-rng"] }
 ulid = "1.1.4"
 chrono = "0.4.39"
 time = "0.3.37"

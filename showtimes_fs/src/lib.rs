@@ -19,28 +19,14 @@ pub enum FsPool {
 }
 
 /// The kind of the file system object.
-#[derive(Default, Debug, Clone, tosho_macros::EnumName)]
+#[derive(Default, Debug, Clone, showtimes_derive::EnumName)]
+#[enum_name(rename_all = "snake_case")]
 pub enum FsFileKind {
     /// Images kind.
     #[default]
     Images,
     /// Invalid/fallback kind.
     Invalids,
-}
-
-impl FsFileKind {
-    /// Convert the kind to a name used in the filesystem pathing.
-    ///
-    /// ```rust
-    /// use showtimes_fs::FsFileKind;
-    ///
-    /// let kind = FsFileKind::Images;
-    ///
-    /// assert_eq!(kind.to_name(), "images");
-    /// ```
-    pub fn as_path_name(&self) -> String {
-        self.to_name().to_ascii_lowercase()
-    }
 }
 
 /// The file object in the filesystem.
@@ -63,7 +49,7 @@ pub(crate) fn make_file_path(
     parent_id: Option<&str>,
     kind: Option<FsFileKind>,
 ) -> String {
-    let kind = kind.unwrap_or_default().as_path_name();
+    let kind = kind.unwrap_or_default().to_name();
 
     let mut path = format!("{}/", kind);
     if let Some(parent_id) = parent_id {

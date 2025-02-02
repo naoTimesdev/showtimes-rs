@@ -148,7 +148,7 @@ impl Migration for M20240726055250UpdateCovers {
             let cover_key = format!("cover.{}", cover_format);
             for project in &mut projects {
                 let image_meta = showtimes_db::m::ImageMetadata::new(
-                    FsFileKind::Images.as_path_name(),
+                    FsFileKind::Images.to_name(),
                     project.id.to_string(),
                     cover_key.to_string(),
                     cover_format.to_string(),

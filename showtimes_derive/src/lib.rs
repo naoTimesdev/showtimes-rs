@@ -106,3 +106,25 @@ pub fn derive_enum_name(input: TokenStream) -> TokenStream {
     // Generate the implementation of the trait
     enums::expand_enumname(&input)
 }
+
+/// Derive the `SerdeAutomata` trait for an enum
+///
+/// This will help create a [`serde::Serialize`] and [`serde::Deserialize`] implementation
+/// for an enum, you can also customize it with the `serde_automata` attribute
+///
+/// # Examples
+/// ```
+/// #[derive(SerdeAutomata)]
+/// pub enum ProjectStatus {
+///     Active,
+///     Completed,
+/// }
+/// ```
+#[proc_macro_derive(SerdeAutomata, attributes(serde_automata))]
+pub fn derive_serde_automata(input: TokenStream) -> TokenStream {
+    // Parse the input tokens into a syntax tree
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
+
+    // Generate the implementation of the trait
+    enums::serde_automata_expand(&input)
+}

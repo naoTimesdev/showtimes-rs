@@ -1116,7 +1116,7 @@ pub async fn mutate_projects_create(
                 })?;
 
             showtimes_db::m::ImageMetadata::new(
-                showtimes_fs::FsFileKind::Images.as_path_name(),
+                showtimes_fs::FsFileKind::Images.to_name(),
                 project.id,
                 &filename,
                 format.as_extension(),
@@ -1163,7 +1163,7 @@ pub async fn mutate_projects_create(
                 })?;
 
             showtimes_db::m::ImageMetadata::new(
-                showtimes_fs::FsFileKind::Images.as_path_name(),
+                showtimes_fs::FsFileKind::Images.to_name(),
                 project.id,
                 &cover_key,
                 cover_format,
@@ -1171,7 +1171,7 @@ pub async fn mutate_projects_create(
             )
         }
         (None, None) => showtimes_db::m::ImageMetadata::new(
-            showtimes_fs::FsFileKind::Invalids.as_path_name(),
+            showtimes_fs::FsFileKind::Invalids.to_name(),
             "project",
             "default.png",
             "png",
@@ -1519,7 +1519,7 @@ pub async fn mutate_projects_delete(
 
     // Delete poster
     let poster_info = &prj_info.poster.image;
-    if poster_info.kind == showtimes_fs::FsFileKind::Images.as_path_name() {
+    if poster_info.kind == showtimes_fs::FsFileKind::Images.to_name() {
         // TODO: Propagate error properly
         storages
             .file_delete(
@@ -1945,7 +1945,7 @@ async fn update_single_project(
                 })?;
 
             let image_meta = showtimes_db::m::ImageMetadata::new(
-                showtimes_fs::FsFileKind::Images.as_path_name(),
+                showtimes_fs::FsFileKind::Images.to_name(),
                 prj_id,
                 &filename,
                 format.as_extension(),
@@ -2194,13 +2194,13 @@ pub async fn mutate_projects_update(
                     return GQLError::new(
                         format!(
                             "Provider `{}` not supported for metadata sync",
-                            provider.kind()
+                            provider.kind().to_name()
                         ),
                         GQLErrorCode::MetadataUnknownSource,
                     )
                     .extend(|e| {
                         e.set("id", provider.id());
-                        e.set("provider", provider.kind().to_string());
+                        e.set("provider", provider.kind().to_name());
                     })
                     .into();
                 }

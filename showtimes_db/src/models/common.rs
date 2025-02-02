@@ -68,86 +68,61 @@ impl Default for ImageMetadata {
 
 /// The list of possible integration types.
 #[derive(
-    Debug, Copy, Clone, PartialEq, Eq, tosho_macros::DeserializeEnum, tosho_macros::SerializeEnum,
+    Debug, Copy, Clone, PartialEq, Eq, showtimes_derive::SerdeAutomata, showtimes_derive::EnumName,
 )]
+#[serde_automata(serialize_rename_all = "SCREAMING_SNAKE_CASE", case_sensitive = false)]
 pub enum IntegrationType {
     // Related to Discord
     /// A Discord Role ID
+    #[serde_automata(deser_rename = "discordrole, discord_role")]
     DiscordRole,
     /// A Discord User ID
+    #[serde_automata(deser_rename = "discorduser, discord_user")]
     DiscordUser,
     /// A Discord Text Channel ID
+    #[serde_automata(
+        ser_rename = "DISCORD_TEXT_CHANNEL",
+        deser_rename = "discordchannel, discord_channel, discord_text_channel"
+    )]
     DiscordChannel,
     /// A Discord Guild ID
+    #[serde_automata(deser_rename = "discordguild, discord_guild")]
     DiscordGuild,
     // Related to FansubDB
     /// Your group FansubDB ID
+    #[serde_automata(ser_rename = "FANSUBDB_ID", deser_rename = "fansubdb, fansubdb_id")]
     FansubDB,
     /// A FansubDB Project ID
+    #[serde_automata(
+        ser_rename = "FANSUBDB_PROJECT_ID",
+        deser_rename = "fansubdbproject, fansubdb_project, fansubdb_project_id"
+    )]
     FansubDBProject,
     /// A FansubDB Shows ID
+    #[serde_automata(
+        ser_rename = "FANSUBDB_SHOWS_ID",
+        deser_rename = "fansubdbshows, fansubdb_shows, fansubdb_shows_id"
+    )]
     FansubDBShows,
     // Related to Providers
     /// Anilist ID
+    #[serde_automata(
+        ser_rename = "PVD_ANILIST",
+        deser_rename = "provideranilist, pvd_anilist, anilist"
+    )]
     ProviderAnilist,
     /// Anilist MAL ID mapping
+    #[serde_automata(
+        ser_rename = "PVD_ANILIST_MAL",
+        deser_rename = "provideranilistmal, pvd_anilistmal, pvd_anilist_mal, anilistmal, anilist_mal"
+    )]
     ProviderAnilistMal,
     /// VNDB ID
+    #[serde_automata(ser_rename = "PVD_VNDB", deser_rename = "providervndb, pvd_vndb, vndb")]
     ProviderVndb,
     /// TMDB ID
+    #[serde_automata(ser_rename = "PVD_TMDB", deser_rename = "providertmdb, pvd_tmdb, tmdb")]
     ProviderTmdb,
-}
-
-tosho_macros::enum_error!(IntegrationTypeFromStrError);
-
-impl std::str::FromStr for IntegrationType {
-    type Err = IntegrationTypeFromStrError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // lowercase the string
-        let s_lower = s.to_lowercase();
-        match s_lower.as_str() {
-            "discordrole" | "discord_role" => Ok(IntegrationType::DiscordRole),
-            "discorduser" | "discord_user" => Ok(IntegrationType::DiscordUser),
-            "discordchannel" | "discord_channel" | "discord_text_channel" => {
-                Ok(IntegrationType::DiscordChannel)
-            }
-            "discordguild" | "discord_guild" => Ok(IntegrationType::DiscordGuild),
-            "fansubdb" | "fansubdb_id" => Ok(IntegrationType::FansubDB),
-            "fansubdbproject" | "fansubdb_project" | "fansubdb_project_id" => {
-                Ok(IntegrationType::FansubDBProject)
-            }
-            "fansubdbshows" | "fansubdb_shows" | "fansubdb_shows_id" => {
-                Ok(IntegrationType::FansubDBShows)
-            }
-            "provideranilist" | "pvd_anilist" | "anilist" => Ok(IntegrationType::ProviderAnilist),
-            "provideranilistmal" | "pvd_anilistmal" | "pvd_anilist_mal" | "anilistmal"
-            | "anilist_mal" => Ok(IntegrationType::ProviderAnilistMal),
-            "providervndb" | "pvd_vndb" | "vndb" => Ok(IntegrationType::ProviderVndb),
-            "providertmdb" | "pvd_tmdb" | "tmdb" => Ok(IntegrationType::ProviderTmdb),
-            _ => Err(IntegrationTypeFromStrError {
-                original: s.to_string(),
-            }),
-        }
-    }
-}
-
-impl std::fmt::Display for IntegrationType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IntegrationType::DiscordRole => write!(f, "DISCORD_ROLE"),
-            IntegrationType::DiscordUser => write!(f, "DISCORD_USER"),
-            IntegrationType::DiscordChannel => write!(f, "DISCORD_TEXT_CHANNEL"),
-            IntegrationType::DiscordGuild => write!(f, "DISCORD_GUILD"),
-            IntegrationType::FansubDB => write!(f, "FANSUBDB_ID"),
-            IntegrationType::FansubDBProject => write!(f, "FANSUBDB_PROJECT_ID"),
-            IntegrationType::FansubDBShows => write!(f, "FANSUBDB_SHOWS_ID"),
-            IntegrationType::ProviderAnilist => write!(f, "PVD_ANILIST"),
-            IntegrationType::ProviderAnilistMal => write!(f, "PVD_ANILIST_MAL"),
-            IntegrationType::ProviderVndb => write!(f, "PVD_VNDB"),
-            IntegrationType::ProviderTmdb => write!(f, "PVD_TMDB"),
-        }
-    }
 }
 
 impl IntegrationType {

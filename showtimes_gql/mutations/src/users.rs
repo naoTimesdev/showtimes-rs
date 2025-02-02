@@ -247,7 +247,7 @@ pub async fn mutate_users_update(
             })?;
 
         let image_meta = showtimes_db::m::ImageMetadata::new(
-            showtimes_fs::FsFileKind::Images.as_path_name(),
+            showtimes_fs::FsFileKind::Images.to_name(),
             user_info.id,
             &filename,
             format.as_extension(),

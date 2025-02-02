@@ -3105,7 +3105,6 @@ dependencies = [
  "serde",
  "showtimes-derive",
  "showtimes-shared",
- "tosho-macros",
  "url",
 ]
 
@@ -3117,6 +3116,7 @@ dependencies = [
  "convert_case 0.6.0",
  "proc-macro2",
  "quote",
+ "serde",
  "syn 2.0.96",
 ]
 
@@ -3151,8 +3151,8 @@ dependencies = [
  "quick-xml",
  "reqwest",
  "rusty-s3",
+ "showtimes-derive",
  "tokio",
- "tosho-macros",
  "tracing",
 ]
 
@@ -3301,8 +3301,8 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "showtimes-derive",
  "tokio",
- "tosho-macros",
 ]
 
 [[package]]
@@ -3907,17 +3907,6 @@ dependencies = [
  "serde_spanned",
  "toml_datetime",
  "winnow",
-]
-
-[[package]]
-name = "tosho-macros"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1840d068a80f4ab6cd97a3909b2c21d503bff07c90d4453a054bed8700f5022a"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.96",
 ]
 
 [[package]]

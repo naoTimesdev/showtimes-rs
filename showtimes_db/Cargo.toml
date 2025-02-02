@@ -21,4 +21,3 @@ bson.workspace = true
 
 showtimes-shared = { path = "../showtimes_shared" }
 showtimes-derive = { path = "../showtimes_derive" }
-tosho-macros.workspace = true

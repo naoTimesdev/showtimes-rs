@@ -89,49 +89,24 @@ static DEFAULT_ROLES_UNKNOWN: LazyLock<Vec<Role>> =
     LazyLock::new(|| vec![Role::new("TL", "Translator").expect("Failed to create role TL")]);
 
 /// The list of enums holding the project kinds.
-#[derive(Debug, Copy, Clone, tosho_macros::SerializeEnum, tosho_macros::DeserializeEnum)]
+#[derive(Debug, Copy, Clone, showtimes_derive::SerdeAutomata)]
+#[serde_automata(serialize_rename_all = "SCREAMING_SNAKE_CASE", case_sensitive = false)]
 pub enum ProjectKind {
     /// The project is a show.
+    #[serde_automata(deser_rename = "show, shows")]
     Shows,
     /// The project is a literature.
+    #[serde_automata(deser_rename = "literature, literatures, book, books, novel, novels")]
     Literature,
     /// The project is a manga or comics.
+    #[serde_automata(deser_rename = "manga, comic, comics")]
     Manga,
     /// The project is a game.
+    #[serde_automata(deser_rename = "game, games")]
     Games,
     /// The project is an unknown kind.
+    #[serde_automata(skip)]
     Unknown,
-}
-
-tosho_macros::enum_error!(ProjectKindFromStrError);
-
-impl std::str::FromStr for ProjectKind {
-    type Err = ProjectKindFromStrError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s_low = s.to_lowercase();
-        match s_low.as_str() {
-            "shows" | "show" => Ok(ProjectKind::Shows),
-            "literature" | "literatures" | "books" | "book" => Ok(ProjectKind::Literature),
-            "manga" | "comics" => Ok(ProjectKind::Manga),
-            "games" | "game" => Ok(ProjectKind::Games),
-            _ => Err(ProjectKindFromStrError {
-                original: s.to_string(),
-            }),
-        }
-    }
-}
-
-impl std::fmt::Display for ProjectKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ProjectKind::Shows => write!(f, "SHOWS"),
-            ProjectKind::Literature => write!(f, "LITERATURE"),
-            ProjectKind::Manga => write!(f, "MANGA"),
-            ProjectKind::Games => write!(f, "GAMES"),
-            ProjectKind::Unknown => write!(f, "UNKNOWN"),
-        }
-    }
 }
 
 impl ProjectKind {
@@ -147,68 +122,39 @@ impl ProjectKind {
 }
 
 /// The list of enums holding the project types.
-#[derive(
-    Debug, Copy, Clone, Default, tosho_macros::SerializeEnum, tosho_macros::DeserializeEnum,
-)]
+#[derive(Debug, Copy, Clone, Default, showtimes_derive::SerdeAutomata)]
+#[serde_automata(serialize_rename_all = "SCREAMING_SNAKE_CASE", case_sensitive = false)]
 pub enum ProjectType {
     /// The project is a movie.
+    #[serde_automata(deser_rename = "movie, movies")]
     Movies,
     /// The project is a series
+    #[serde_automata(deser_rename = "show, shows, series")]
     #[default]
     Series,
     /// Oneshots of a series.
+    #[serde_automata(ser_rename = "OVAs", deser_rename = "ova, ovas")]
     OVAs,
     /// The project is a standard literature books.
+    #[serde_automata(deser_rename = "book, books")]
     Books,
     /// The project is a manga.
+    #[serde_automata(deser_rename = "manga, comic, comics")]
     Manga,
     /// The project is a light novel.
+    #[serde_automata(deser_rename = "ln, lns, lightnovel, light_novel, lightnovels, light_novels")]
     LightNovel,
     /// The project is a standard games.
+    #[serde_automata(deser_rename = "game, games")]
     Games,
     /// The project is a visual novel.
+    #[serde_automata(
+        deser_rename = "vn, vns, visualnovel, visual_novel, visualnovels, visual_novels"
+    )]
     VisualNovel,
     /// The project is an unknown type.
+    #[serde_automata(skip)]
     Unknown,
-}
-
-tosho_macros::enum_error!(ProjectTypeFromStrError);
-
-impl std::str::FromStr for ProjectType {
-    type Err = ProjectTypeFromStrError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s_low = s.to_lowercase();
-        match s_low.as_str() {
-            "movies" | "movie" => Ok(ProjectType::Movies),
-            "series" | "shows" | "show" => Ok(ProjectType::Series),
-            "ovas" | "ova" => Ok(ProjectType::OVAs),
-            "books" | "book" => Ok(ProjectType::Books),
-            "manga" => Ok(ProjectType::Manga),
-            "light_novel" | "lightnovel" | "ln" => Ok(ProjectType::LightNovel),
-            "games" | "game" => Ok(ProjectType::Games),
-            "visual_novel" | "vn" => Ok(ProjectType::VisualNovel),
-            _ => Err(ProjectTypeFromStrError {
-                original: s.to_string(),
-            }),
-        }
-    }
-}
-
-impl std::fmt::Display for ProjectType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ProjectType::Movies => write!(f, "MOVIES"),
-            ProjectType::Series => write!(f, "SERIES"),
-            ProjectType::OVAs => write!(f, "OVAs"),
-            ProjectType::Books => write!(f, "BOOKS"),
-            ProjectType::Manga => write!(f, "MANGA"),
-            ProjectType::LightNovel => write!(f, "LIGHT_NOVEL"),
-            ProjectType::Games => write!(f, "GAMES"),
-            ProjectType::VisualNovel => write!(f, "VISUAL_NOVEL"),
-            ProjectType::Unknown => write!(f, "UNKNOWN"),
-        }
-    }
 }
 
 impl ProjectType {

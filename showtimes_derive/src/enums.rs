@@ -185,3 +185,384 @@ pub(crate) fn expand_enumname(input: &syn::DeriveInput) -> TokenStream {
 
     tokens.into()
 }
+
+#[derive(Debug, Clone)]
+struct SerdeAutomataAttr {
+    /// Rename field to
+    rename: Vec<String>,
+    ser_rename: Vec<String>,
+    deser_rename: Vec<String>,
+    /// Globally convert field to
+    rename_all: convert_case::Case,
+    /// Deserialize field rename
+    deserialize_rename_all: Option<convert_case::Case>,
+    /// For serializing
+    serialize_rename_all: Option<convert_case::Case>,
+    /// Strict mode, default true
+    ///
+    /// Will check if all variants have unique values
+    strict: bool,
+    skip: bool,
+    case_sensitive: bool,
+}
+
+impl Default for SerdeAutomataAttr {
+    fn default() -> Self {
+        SerdeAutomataAttr {
+            rename: vec![],
+            ser_rename: vec![],
+            deser_rename: vec![],
+            rename_all: convert_case::Case::Pascal,
+            deserialize_rename_all: None,
+            serialize_rename_all: None,
+            strict: true,
+            skip: false,
+            case_sensitive: false,
+        }
+    }
+}
+
+fn split_lit_str(lit: &LitStr) -> Vec<String> {
+    lit.value()
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .collect()
+}
+
+fn get_serde_automata_attr(attrs: &[Attribute]) -> Result<SerdeAutomataAttr, syn::Error> {
+    let mut rename = vec![];
+    let mut ser_rename = vec![];
+    let mut deser_rename = vec![];
+    let mut rename_all = convert_case::Case::Pascal;
+    let mut deserialize_rename_all = None;
+    let mut serialize_rename_all = None;
+    let mut strict = true;
+    let mut case_sensitive = false;
+    let mut skip = false;
+
+    for attr in attrs {
+        if attr.path().is_ident("serde_automata") {
+            let nested = attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
+            for meta in nested {
+                if let Meta::NameValue(nameval) = meta {
+                    if nameval.path.is_ident("rename") {
+                        // Is a string
+                        if let Expr::Lit(lit) = nameval.value {
+                            if let Lit::Str(val) = lit.lit {
+                                // Split by comma, then trim whitespace
+                                rename = split_lit_str(&val);
+                            } else {
+                                return Err(syn::Error::new_spanned(
+                                    lit,
+                                    "Expected a string value for `rename`",
+                                ));
+                            }
+                        } else {
+                            return Err(syn::Error::new_spanned(
+                                nameval.value,
+                                "Expected a string value for `rename`",
+                            ));
+                        }
+                    } else if nameval.path.is_ident("ser_rename") {
+                        // Is a string
+                        if let Expr::Lit(lit) = nameval.value {
+                            if let Lit::Str(val) = lit.lit {
+                                // Split by comma, then trim whitespace
+                                ser_rename = split_lit_str(&val);
+                            } else {
+                                return Err(syn::Error::new_spanned(
+                                    lit,
+                                    "Expected a string value for `ser_rename`",
+                                ));
+                            }
+                        } else {
+                            return Err(syn::Error::new_spanned(
+                                nameval.value,
+                                "Expected a string value for `ser_rename`",
+                            ));
+                        }
+                    } else if nameval.path.is_ident("deser_rename") {
+                        // Is a string
+                        if let Expr::Lit(lit) = nameval.value {
+                            if let Lit::Str(val) = lit.lit {
+                                // Split by comma, then trim whitespace
+                                deser_rename = split_lit_str(&val);
+                            } else {
+                                return Err(syn::Error::new_spanned(
+                                    lit,
+                                    "Expected a string value for `deser_rename`",
+                                ));
+                            }
+                        } else {
+                            return Err(syn::Error::new_spanned(
+                                nameval.value,
+                                "Expected a string value for `deser_rename`",
+                            ));
+                        }
+                    } else if nameval.path.is_ident("rename_all") {
+                        // Is a string
+                        if let Expr::Lit(lit) = nameval.value {
+                            if let Lit::Str(val) = lit.lit {
+                                rename_all = map_convert_case(&val.value(), &val)?;
+                            } else {
+                                return Err(syn::Error::new_spanned(
+                                    lit,
+                                    "Expected a string value for `rename_all`",
+                                ));
+                            }
+                        } else {
+                            return Err(syn::Error::new_spanned(
+                                nameval.value,
+                                "Expected a string value for `rename_all`",
+                            ));
+                        }
+                    } else if nameval.path.is_ident("strict") {
+                        // Is a boolean
+                        if let Expr::Lit(lit) = nameval.value {
+                            if let Lit::Bool(val) = lit.lit {
+                                strict = val.value;
+                            } else {
+                                return Err(syn::Error::new_spanned(
+                                    lit,
+                                    "Expected a boolean value for `strict`",
+                                ));
+                            }
+                        } else {
+                            return Err(syn::Error::new_spanned(
+                                nameval.value,
+                                "Expected a boolean value for `strict`",
+                            ));
+                        }
+                    } else if nameval.path.is_ident("case_sensitive") {
+                        // Is a boolean
+                        if let Expr::Lit(lit) = nameval.value {
+                            if let Lit::Bool(val) = lit.lit {
+                                case_sensitive = val.value;
+                            } else {
+                                return Err(syn::Error::new_spanned(
+                                    lit,
+                                    "Expected a boolean value for `case_sensitive`",
+                                ));
+                            }
+                        } else {
+                            return Err(syn::Error::new_spanned(
+                                nameval.value,
+                                "Expected a boolean value for `case_sensitive`",
+                            ));
+                        }
+                    } else if nameval.path.is_ident("deserialize_rename_all") {
+                        // Is a string
+                        if let Expr::Lit(lit) = nameval.value {
+                            if let Lit::Str(val) = lit.lit {
+                                deserialize_rename_all =
+                                    Some(map_convert_case(&val.value(), &val)?);
+                            } else {
+                                return Err(syn::Error::new_spanned(
+                                    lit,
+                                    "Expected a string value for `deserialize_rename_all`",
+                                ));
+                            }
+                        }
+                    } else if nameval.path.is_ident("serialize_rename_all") {
+                        // Is a string
+                        if let Expr::Lit(lit) = nameval.value {
+                            if let Lit::Str(val) = lit.lit {
+                                serialize_rename_all = Some(map_convert_case(&val.value(), &val)?);
+                            } else {
+                                return Err(syn::Error::new_spanned(
+                                    lit,
+                                    "Expected a string value for `serialize_rename_all`",
+                                ));
+                            }
+                        }
+                    }
+                } else if let Meta::Path(pathval) = meta {
+                    if pathval.is_ident("skip") {
+                        skip = true;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(SerdeAutomataAttr {
+        rename,
+        ser_rename,
+        deser_rename,
+        rename_all,
+        deserialize_rename_all,
+        serialize_rename_all,
+        strict,
+        case_sensitive,
+        skip,
+    })
+}
+
+pub(crate) fn serde_automata_expand(input: &syn::DeriveInput) -> TokenStream {
+    let name = &input.ident;
+
+    // check if ast is an enum
+    let variants = match &input.data {
+        syn::Data::Enum(v) => &v.variants,
+        _ => {
+            return syn::Error::new(
+                input.span(),
+                "`SerdeAutomata` can only be derived for enums",
+            )
+            .to_compile_error()
+            .into()
+        }
+    };
+
+    let root_attrs = match get_serde_automata_attr(&input.attrs) {
+        Ok(attrs) => attrs,
+        Err(err) => return err.to_compile_error().into(),
+    };
+
+    let mut registered_ser: HashMap<String, &syn::Ident> = HashMap::new();
+    let mut registered_deser: HashMap<String, &syn::Ident> = HashMap::new();
+    let mut arms_serialize = Vec::new();
+    let mut arms_deserialize = Vec::new();
+    for variant in variants {
+        let vardent = &variant.ident;
+        let var_name = vardent.to_string();
+        let variant_attrs = match get_serde_automata_attr(&variant.attrs) {
+            Ok(attrs) => attrs,
+            Err(err) => return err.to_compile_error().into(),
+        };
+
+        let serialize_str =
+            if variant_attrs.rename.is_empty() && variant_attrs.ser_rename.is_empty() {
+                if let Some(ser_case) = root_attrs.serialize_rename_all {
+                    vec![var_name.to_case(ser_case)]
+                } else {
+                    vec![var_name.to_case(root_attrs.rename_all)]
+                }
+            } else {
+                if variant_attrs.ser_rename.is_empty() {
+                    variant_attrs.rename.clone()
+                } else {
+                    variant_attrs.ser_rename
+                }
+            };
+
+        for ser_arm in serialize_str.iter() {
+            if let Some(dupe_ident) = registered_ser.get(ser_arm) {
+                if root_attrs.strict {
+                    let dupe_name = dupe_ident.to_string();
+                    return syn::Error::new_spanned(
+                        vardent,
+                        format!(
+                            "Duplicate name value for serialization: `{}`, conflict with `{}`",
+                            &ser_arm, &dupe_name
+                        ),
+                    )
+                    .to_compile_error()
+                    .into();
+                }
+            }
+
+            registered_ser.insert(ser_arm.clone(), vardent);
+        }
+
+        // Select first arm for serialize
+        if let Some(ser_arm) = serialize_str.first() {
+            arms_serialize.push(quote::quote! {
+                #name::#vardent => #ser_arm,
+            })
+        } else {
+            return syn::Error::new_spanned(
+                vardent,
+                format!("Unknown variant for serialization: `{}`", &vardent),
+            )
+            .to_compile_error()
+            .into();
+        }
+
+        if variant_attrs.skip {
+            // skip deser, since ser is required
+            continue;
+        }
+
+        let deserialize_str =
+            if variant_attrs.rename.is_empty() && variant_attrs.deser_rename.is_empty() {
+                if let Some(deser_case) = root_attrs.deserialize_rename_all {
+                    vec![var_name.to_case(deser_case)]
+                } else {
+                    vec![var_name.to_case(root_attrs.rename_all)]
+                }
+            } else {
+                if variant_attrs.deser_rename.is_empty() {
+                    variant_attrs.rename.clone()
+                } else {
+                    variant_attrs.deser_rename
+                }
+            };
+
+        for deser_arm in deserialize_str.iter() {
+            if let Some(dupe_ident) = registered_deser.get(deser_arm) {
+                if root_attrs.strict {
+                    let dupe_name = dupe_ident.to_string();
+                    return syn::Error::new_spanned(
+                        vardent,
+                        format!(
+                            "Duplicate name value for deserialization: `{}`, conflict with `{}`",
+                            &deser_arm, &dupe_name
+                        ),
+                    )
+                    .to_compile_error()
+                    .into();
+                }
+            }
+
+            registered_deser.insert(deser_arm.clone(), vardent);
+        }
+
+        // Make each serialize to "string_a" | "string_b" => Ok(#name::#vardent)
+        arms_deserialize.push(quote::quote! {
+            #(#deserialize_str)|* => Ok(#name::#vardent),
+        });
+    }
+
+    // Merge #name + FromStrError
+    // Deserialize arms
+    let deser_arm_root = if root_attrs.case_sensitive {
+        quote::quote! {
+            let value = String::deserialize(deserializer)?;
+        }
+    } else {
+        quote::quote! {
+            let original = String::deserialize(deserializer)?;
+            let value = original.to_lowercase();
+        }
+    };
+
+    let tokens = quote::quote! {
+        impl serde::Serialize for #name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: serde::Serializer
+            {
+                let matched = match self {
+                    #(#arms_serialize)*
+                };
+                serializer.serialize_str(matched)
+            }
+        }
+
+        impl<'de> serde::Deserialize<'de> for #name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                #deser_arm_root
+                match value.as_str() {
+                    #(#arms_deserialize)*
+                    _ => Err(serde::de::Error::custom(format!("Unknown variant for deserialization: `{}`", value)))
+                }
+            }
+        }
+    };
+
+    tokens.into()
+}

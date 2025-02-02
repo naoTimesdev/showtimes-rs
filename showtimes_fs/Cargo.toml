@@ -23,4 +23,4 @@ mime_guess.workspace = true
 rusty-s3.workspace = true
 reqwest.workspace = true
 
-tosho-macros.workspace = true
+showtimes-derive = { path = "../showtimes_derive" }
