@@ -438,12 +438,10 @@ pub(crate) fn serde_automata_expand(input: &syn::DeriveInput) -> TokenStream {
                 } else {
                     vec![var_name.to_case(root_attrs.rename_all)]
                 }
+            } else if variant_attrs.ser_rename.is_empty() {
+                variant_attrs.rename.clone()
             } else {
-                if variant_attrs.ser_rename.is_empty() {
-                    variant_attrs.rename.clone()
-                } else {
-                    variant_attrs.ser_rename
-                }
+                variant_attrs.ser_rename
             };
 
         for ser_arm in serialize_str.iter() {
@@ -491,12 +489,10 @@ pub(crate) fn serde_automata_expand(input: &syn::DeriveInput) -> TokenStream {
                 } else {
                     vec![var_name.to_case(root_attrs.rename_all)]
                 }
+            } else if variant_attrs.deser_rename.is_empty() {
+                variant_attrs.rename.clone()
             } else {
-                if variant_attrs.deser_rename.is_empty() {
-                    variant_attrs.rename.clone()
-                } else {
-                    variant_attrs.deser_rename
-                }
+                variant_attrs.deser_rename
             };
 
         for deser_arm in deserialize_str.iter() {
