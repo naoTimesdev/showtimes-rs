@@ -888,6 +888,17 @@ pub async fn mutate_servers_delete(
             f.set("creator", server.id.to_string());
         })?;
 
+    // Delete premium related
+    let premium_handler = showtimes_db::ServerPremiumHandler::new(db);
+    premium_handler
+        .delete_by(doc! {
+            "target": server.id.to_string()
+        })
+        .await
+        .extend_error(GQLErrorCode::ServerPremiumDeleteError, |f| {
+            f.set("server_id", server.id.to_string());
+        })?;
+
     // Delete assets
     storages
         .directory_delete(server.id, None, Some(showtimes_fs::FsFileKind::Images))
