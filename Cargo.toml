@@ -22,7 +22,7 @@ members = [
 
     # Binary
     "showtimes_migrate",
-    "showtimes",
+    "showtimes", "showtimes_fansubdb",
 ]
 
 [workspace.package]
@@ -37,6 +37,7 @@ rust-version = "1.81" # MSRV to 1.81 due to async-graphql
 [workspace.dependencies]
 # Essential stuff
 anyhow = "1"
+ahash = "0.8.11"
 
 # Serde
 serde = { version = "1.0.217", features = ["derive"] }
@@ -44,12 +45,12 @@ serde_json = "1.0.138"
 serde_repr = "0.1.19"
 
 # Parsing data
-uuid = { version = "1.12.1", default-features = false, features = ["v4", "v7", "fast-rng"] }
+uuid = { version = "~1.12.1", default-features = false, features = ["v4", "v7", "fast-rng"] }
 ulid = "1.1.4"
 chrono = "0.4.39"
 time = "0.3.37"
 nom = "8.0.0"
-toml = { version = "0.8.19", default-features = false, features = ["parse", "preserve_order"] }
+toml = { version = "0.8.20", default-features = false, features = ["parse", "preserve_order"] }
 
 # Async/Futures
 tokio = { version = "1.43.0", features = ["full", "tracing"] }
@@ -57,7 +58,7 @@ tokio-stream = "0.1.17"
 tokio-cron-scheduler = "0.13.0"
 futures-util = { version = "0.3.31", default-features = false, features = ["std"] }
 futures-channel = { version = "0.3.31", default-features = false, features = ["std"] }
-async-trait = "0.1.85"
+async-trait = "0.1.86"
 
 # File server
 mime_guess = "2.0.5"
@@ -82,8 +83,8 @@ axum = { version = "0.8.1", default-features = false, features = [
     "ws",
 ] }
 axum-extra = { version = "0.10.0", default-features = false, features = ["tracing", "async-read-body"] }
-async-graphql = { version = "7.0.14", default-features = false, features = ["tracing", "unblock", "dataloader", "graphiql", "tempfile"] }
-async-graphql-axum = "7.0.14"
+async-graphql = { version = "7.0.15", default-features = false, features = ["tracing", "unblock", "dataloader", "graphiql", "tempfile"] }
+async-graphql-axum = "7.0.15"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tracing-appender = "0.2.3"
@@ -93,12 +94,12 @@ tower-layer = "0.3.3"
 urlencoding = "2.1.3"
 
 # Database
-mongodb = { version = "3.2.0", default-features = false, features = ["compat-3-0-0", "rustls-tls"] }
+mongodb = { version = "3.2.1", default-features = false, features = ["compat-3-0-0", "rustls-tls"] }
 bson = { version = "2.13.0", features = ["chrono-0_4"] }
 redis = { version = "0.28.2", default-features = false, features = ["acl", "keep-alive", "tokio-comp"] }
 clickhouse = { version = "0.13.1", features = ["uuid", "time"] }
 meilisearch-sdk = "0.27.1"
-jsonwebtoken = { version = "9.3.0", default-features = false }
+jsonwebtoken = { version = "9.3.1", default-features = false }
 
 # FansubRSS/Network
 url = { version = "2.5.4", features = ["serde"] }
@@ -115,7 +116,7 @@ pulldown-cmark-escape = "0.11.0"
 htmd = "0.1.6"
 
 # CLI
-clap = { version = "4.5.27", features = ["derive"] }
+clap = { version = "4.5.28", features = ["derive"] }
 dotenvy = "0.15.7"
 
 [profile.dev]
@@ -211,7 +212,7 @@ codegen-units = 1
 opt-level = "s"
 codegen-units = 1
 
-[patch.crates-io]
-# XXX: Fix for mongodb 3.2.0, this is temporary until the patch is published.
-mongodb = { git = "https://github.com/mongodb/mongo-rust-driver.git", rev = "2eb8d34fcc5daae0205c2846172ef660b9c534d7" }
-bson = { git = "https://github.com/mongodb/bson-rust.git", rev = "098e1a17e34cbe7f28aac87609eeea2a191b93a3" }
+## Showtimes Database
+[profile.release.package.showtimes-fansubdb]
+opt-level = "s"
+codegen-units = 1
