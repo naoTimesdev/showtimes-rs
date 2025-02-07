@@ -52,6 +52,7 @@ serde_repr = "0.1.19"
 # Parsing data
 nom = "8.0.0"
 toml = { version = "0.8.20", default-features = false, features = ["parse", "preserve_order"] }
+fastnomicon = { git = "https://github.com/naoTimesdev/fastnomicon.git", version = "0.2.0", default-features = false }
 
 # Async/Futures
 tokio = { version = "1.43.0", features = ["full", "tracing"] }

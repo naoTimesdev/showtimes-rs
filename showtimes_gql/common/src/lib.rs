@@ -124,6 +124,59 @@ impl From<&showtimes_shared::APIKey> for APIKeyGQL {
     }
 }
 
+/// A wrapper around the [`fastnomicon::timestring::TimeTuple`] to allow it to be used in GraphQL
+///
+/// See: https://naoti.me/docs/referensi/timestring
+pub struct TimeStringGQL(Vec<fastnomicon::timestring::TimeTuple>);
+
+impl Deref for TimeStringGQL {
+    type Target = Vec<fastnomicon::timestring::TimeTuple>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Description for TimeStringGQL {
+    fn description() -> &'static str {
+        "A simple time-string format to write time in a human-readable way\nSee syntax here: https://naoti.me/docs/referensi/timestring"
+    }
+}
+
+#[Scalar(use_type_description = true)]
+impl ScalarType for TimeStringGQL {
+    fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
+        match value {
+            async_graphql::Value::String(s) => {
+                let (_, time_tuples) =
+                    fastnomicon::timestring::parse_timestring(&s).map_err(|data| {
+                        async_graphql::InputValueError::custom(data.to_string())
+                            .with_extension("value", &s)
+                    })?;
+
+                Ok(TimeStringGQL(time_tuples))
+            }
+            _ => Err(async_graphql::InputValueError::expected_type(value)),
+        }
+    }
+
+    fn to_value(&self) -> async_graphql::Value {
+        async_graphql::Value::String(fastnomicon::timestring::expand_timestring(&self.0, false))
+    }
+}
+
+impl From<Vec<fastnomicon::timestring::TimeTuple>> for TimeStringGQL {
+    fn from(data: Vec<fastnomicon::timestring::TimeTuple>) -> Self {
+        TimeStringGQL(data)
+    }
+}
+
+impl From<&[fastnomicon::timestring::TimeTuple]> for TimeStringGQL {
+    fn from(data: &[fastnomicon::timestring::TimeTuple]) -> Self {
+        TimeStringGQL(data.to_vec())
+    }
+}
+
 /// A wrapper around `DateTime<Utc>` to allow it to be used in GraphQL
 #[derive(Clone, Copy)]
 pub struct DateTimeGQL(
