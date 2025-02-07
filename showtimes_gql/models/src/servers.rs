@@ -6,7 +6,11 @@ use showtimes_db::{
     m::{APIKeyCapability, ServerUser},
     mongodb::bson::doc,
 };
-use showtimes_gql_common::{data_loader::UserDataLoader, queries::MinimalServerUsers, *};
+use showtimes_gql_common::{
+    data_loader::{ServerDataLoader, ServerPremiumLoader, ServerPremiumServer, UserDataLoader},
+    queries::MinimalServerUsers,
+    *,
+};
 use showtimes_gql_paginator::projects::ProjectQuery;
 
 use crate::common::PaginatedGQL;
@@ -218,6 +222,136 @@ impl ServerGQL {
 
         Ok(PaginatedGQL::new(mapped_nodes, *results.page_info()))
     }
+
+    /// The list of server premium information
+    async fn premiums(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+        #[graphql(desc = "Only return currently active premium, default to true")]
+        active_only: Option<bool>,
+    ) -> async_graphql::Result<Vec<ServerPremiumGQL>> {
+        let active_only = active_only.unwrap_or(true);
+
+        let loader = ctx.data_unchecked::<DataLoader<ServerPremiumLoader>>();
+
+        let current_time = chrono::Utc::now();
+        let results = loader
+            .load_one(ServerPremiumServer::from(self.id))
+            .await?
+            .unwrap_or_default();
+
+        Ok(results
+            .iter()
+            .filter_map(|p| {
+                if active_only && p.ends_at < current_time {
+                    None
+                } else {
+                    let premi = ServerPremiumGQL::from(p).with_server_disabled();
+                    if let Some(user) = self.current_user {
+                        Some(premi.with_current_user(user))
+                    } else {
+                        Some(premi)
+                    }
+                }
+            })
+            .collect())
+    }
+}
+
+/// Implementation of Premium metadata for [`ServerQQL`]
+pub struct ServerPremiumGQL {
+    id: showtimes_shared::ulid::Ulid,
+    target: showtimes_shared::ulid::Ulid,
+    ends_at: chrono::DateTime<chrono::Utc>,
+    created: chrono::DateTime<chrono::Utc>,
+    updated: chrono::DateTime<chrono::Utc>,
+    disable_server: bool,
+    current_user: Option<showtimes_shared::ulid::Ulid>,
+}
+
+#[Object]
+impl ServerPremiumGQL {
+    /// The server premium ID instance
+    async fn id(&self) -> UlidGQL {
+        self.id.into()
+    }
+
+    /// The server premium target
+    ///
+    /// You will be unable to fetch the server if you're already
+    /// requesting this premium information from a server query
+    async fn server(
+        &self,
+        ctx: &async_graphql::Context<'_>,
+    ) -> async_graphql::Result<Option<ServerGQL>> {
+        if self.disable_server {
+            return GQLError::new(
+                "Server fetch from this context is disabled to avoid looping",
+                GQLErrorCode::ServerFetchDisabled,
+            )
+            .extend(|e| {
+                e.set("id", self.target.to_string());
+                e.set("root", "premium");
+            })
+            .into();
+        }
+
+        let loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
+
+        let result = loader.load_one(self.target).await?;
+
+        Ok(result.map(|ok| {
+            let srv = ServerGQL::from(ok);
+            if let Some(user) = self.current_user {
+                srv.with_current_user(user)
+            } else {
+                srv
+            }
+        }))
+    }
+
+    /// The server premium ends at
+    async fn ends_at(&self) -> DateTimeGQL {
+        self.ends_at.into()
+    }
+
+    /// The server premium created at
+    async fn created(&self) -> DateTimeGQL {
+        self.created.into()
+    }
+
+    /// The server premium updated at
+    async fn updated(&self) -> DateTimeGQL {
+        self.updated.into()
+    }
+}
+
+impl From<showtimes_db::m::ServerPremium> for ServerPremiumGQL {
+    fn from(premium: showtimes_db::m::ServerPremium) -> Self {
+        ServerPremiumGQL {
+            id: premium.id,
+            target: premium.target,
+            ends_at: premium.ends_at,
+            created: premium.created,
+            updated: premium.updated,
+            disable_server: false,
+            current_user: None,
+        }
+    }
+}
+
+impl From<&showtimes_db::m::ServerPremium> for ServerPremiumGQL {
+    fn from(premium: &showtimes_db::m::ServerPremium) -> Self {
+        ServerPremiumGQL {
+            id: premium.id,
+            target: premium.target,
+            ends_at: premium.ends_at,
+            created: premium.created,
+            updated: premium.updated,
+            disable_server: false,
+            current_user: None,
+        }
+    }
 }
 
 impl From<showtimes_db::m::Server> for ServerGQL {
@@ -262,6 +396,20 @@ impl ServerGQL {
     /// Disable project fetch
     pub fn with_projects_disabled(mut self) -> Self {
         self.disable_projects = true;
+        self
+    }
+}
+
+impl ServerPremiumGQL {
+    /// Add the current user to the server guard
+    pub fn with_current_user(mut self, user_id: showtimes_shared::ulid::Ulid) -> Self {
+        self.current_user = Some(user_id);
+        self
+    }
+
+    /// Disable server fetch
+    pub fn with_server_disabled(mut self) -> Self {
+        self.disable_server = true;
         self
     }
 }

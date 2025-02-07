@@ -59,6 +59,10 @@ pub fn create_schema(db_pool: &DatabaseShared) -> ShowtimesGQLSchema {
             data_loader::RSSFeedLoader::new(db_pool),
             tokio::spawn,
         ))
+        .data(showtimes_gql_common::DataLoader::new(
+            data_loader::ServerPremiumLoader::new(db_pool),
+            tokio::spawn,
+        ))
         .finish()
 }
 

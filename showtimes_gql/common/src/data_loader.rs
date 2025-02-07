@@ -788,3 +788,132 @@ impl Loader<RSSFeedServer> for RSSFeedLoader {
         Ok(mapped_res)
     }
 }
+
+/// A data loader for the RSS feed model
+pub struct ServerPremiumLoader {
+    col: showtimes_db::ServerPremiumHandler,
+}
+
+impl ServerPremiumLoader {
+    /// Create a new server sync data loader
+    pub fn new(col: &DatabaseShared) -> Self {
+        let col = showtimes_db::ServerPremiumHandler::new(col);
+        ServerPremiumLoader { col }
+    }
+
+    /// Get the collection handler
+    pub fn get_inner(&self) -> &showtimes_db::ServerPremiumHandler {
+        &self.col
+    }
+}
+
+impl Loader<Ulid> for ServerPremiumLoader {
+    type Value = showtimes_db::m::ServerPremium;
+    type Error = FieldError;
+
+    async fn load(&self, keys: &[Ulid]) -> Result<HashMap<Ulid, Self::Value>, Self::Error> {
+        let keys_to_string = keys.iter().map(|k| k.to_string()).collect::<Vec<_>>();
+        let result = self
+            .col
+            .get_collection()
+            .find(doc! {
+                "id": { "$in": keys_to_string.clone() }
+            })
+            .await
+            .extend_error(GQLErrorCode::ServerPremiumRequestFails, |e| {
+                e.set("ids", keys_to_string.clone());
+                e.set("where", GQLDataLoaderWhere::ServerPremiumLoaderId);
+            })?;
+
+        let all_results = result
+            .try_collect::<Vec<showtimes_db::m::ServerPremium>>()
+            .await
+            .extend_error(GQLErrorCode::ServerPremiumRequestFails, |e| {
+                e.set("ids", keys_to_string.clone());
+                e.set("where", GQLDataLoaderWhere::ServerPremiumLoaderCollect);
+                e.set("where_req", GQLDataLoaderWhere::ServerPremiumLoaderId);
+            })?;
+
+        let mapped_res: HashMap<Ulid, showtimes_db::m::ServerPremium> = all_results
+            .iter()
+            .map(|rss| (rss.id, rss.clone()))
+            .collect();
+
+        Ok(mapped_res)
+    }
+}
+
+/// A data loader server key for the Server Premium
+///
+/// Based on the server ULID
+#[derive(Clone)]
+pub struct ServerPremiumServer(Ulid);
+
+impl std::hash::Hash for ServerPremiumServer {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state)
+    }
+}
+
+impl std::cmp::PartialEq for ServerPremiumServer {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl std::cmp::Eq for ServerPremiumServer {}
+
+impl Deref for ServerPremiumServer {
+    type Target = Ulid;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<Ulid> for ServerPremiumServer {
+    fn from(id: Ulid) -> Self {
+        ServerPremiumServer(id)
+    }
+}
+
+impl Loader<ServerPremiumServer> for ServerPremiumLoader {
+    type Value = Vec<showtimes_db::m::ServerPremium>;
+    type Error = FieldError;
+
+    async fn load(
+        &self,
+        keys: &[ServerPremiumServer],
+    ) -> Result<HashMap<ServerPremiumServer, Self::Value>, Self::Error> {
+        let keys_to_string = keys.iter().map(|k| k.0.to_string()).collect::<Vec<_>>();
+        let result = self
+            .col
+            .get_collection()
+            .find(doc! {
+                "target": { "$in": keys_to_string.clone() }
+            })
+            .await
+            .extend_error(GQLErrorCode::ServerPremiumRequestFails, |e| {
+                e.set("creator", keys_to_string.clone());
+                e.set("where", GQLDataLoaderWhere::ServerPremiumLoaderServerId);
+            })?;
+
+        let all_results: Vec<showtimes_db::m::ServerPremium> = result
+            .try_collect::<Vec<showtimes_db::m::ServerPremium>>()
+            .await
+            .extend_error(GQLErrorCode::ServerPremiumRequestFails, |e| {
+                e.set("creator", keys_to_string.clone());
+                e.set("where", GQLDataLoaderWhere::ServerPremiumLoaderCollect);
+                e.set("where_req", GQLDataLoaderWhere::ServerPremiumLoaderServerId);
+            })?;
+
+        let mapped_res: HashMap<ServerPremiumServer, Vec<showtimes_db::m::ServerPremium>> =
+            all_results.iter().fold(HashMap::new(), |mut acc, item| {
+                acc.entry(ServerPremiumServer::from(item.target))
+                    .or_default()
+                    .push(item.clone());
+                acc
+            });
+
+        Ok(mapped_res)
+    }
+}

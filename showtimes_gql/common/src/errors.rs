@@ -402,6 +402,12 @@ pub enum GQLDataLoaderWhere {
     RSSFeedLoaderServerId,
     /// RSS feed loader db collection
     RSSFeedLoaderCollect,
+    /// Server premium loader (ULID ID)
+    ServerPremiumLoaderId,
+    /// Server premium loader (Server ID)
+    ServerPremiumLoaderServerId,
+    /// Server premium loader db collection
+    ServerPremiumLoaderCollect,
 }
 
 impl From<GQLErrorCode> for async_graphql::Value {
