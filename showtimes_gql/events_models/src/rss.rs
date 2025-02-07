@@ -12,6 +12,7 @@ use showtimes_rss::FeedEntryCloned;
 
 /// A rendered text data for an RSS entry
 #[derive(SimpleObject)]
+#[graphql(name = "RSSEventFormatValueGQL")]
 pub struct RSSEventFormatValueGQL {
     /// Markdown formatted text, this is the default format
     markdown: String,
@@ -25,6 +26,7 @@ pub struct RSSEventFormatValueGQL {
 ///
 /// This structure follows Discord rich embeds formatting.
 #[derive(SimpleObject)]
+#[graphql(name = "RSSEventEmbedFormatValueGQL")]
 pub struct RSSEventEmbedFormatValueGQL {
     /// Title of the embed
     title: Option<RSSEventFormatValueGQL>,
@@ -52,6 +54,7 @@ pub struct RSSEventEmbedFormatValueGQL {
 
 /// A rendered entries of the RSS event without the integrations
 #[derive(SimpleObject)]
+#[graphql(name = "RSSFeedRenderedGQL")]
 pub struct RSSFeedRenderedGQL {
     /// The base message of the render text
     message: RSSEventFormatValueGQL,
@@ -61,6 +64,7 @@ pub struct RSSFeedRenderedGQL {
 
 /// A rendered entries of the RSS event
 #[derive(SimpleObject)]
+#[graphql(name = "RSSEventRenderedGQL")]
 pub struct RSSEventRenderedGQL {
     /// The base message of the render text
     message: RSSEventFormatValueGQL,
@@ -80,7 +84,7 @@ pub struct RSSEventGQL {
     timestamp: DateTimeGQL,
 }
 
-#[Object]
+#[Object(name = "RSSEventGQL")]
 impl RSSEventGQL {
     /// The ID of the event
     async fn id(&self) -> UlidGQL {

@@ -73,7 +73,7 @@ pub struct RSSFeedDisplayGQL {
     embed: Option<RSSFeedEmbedDisplay>,
 }
 
-#[Object]
+#[Object(name = "RSSFeedDisplayGQL")]
 impl RSSFeedDisplayGQL {
     /// The message of the RSS feed
     async fn message(&self) -> Option<String> {
@@ -112,7 +112,7 @@ pub struct RSSFeedEmbedDisplayGQL {
     timestamped: bool,
 }
 
-#[Object]
+#[Object(name = "RSSFeedEmbedDisplayGQL")]
 impl RSSFeedEmbedDisplayGQL {
     /// The title of the RSS feed.
     async fn title(&self) -> Option<String> {

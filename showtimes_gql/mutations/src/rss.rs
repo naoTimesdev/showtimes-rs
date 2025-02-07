@@ -17,6 +17,7 @@ use crate::{
 
 /// The RSS feed input object for creating a new RSS feed
 #[derive(InputObject)]
+#[graphql(name = "RSSFeedCreateInputGQL")]
 pub struct RSSFeedCreateInputGQL {
     /// The RSS URL
     #[graphql(validator(url))]
@@ -52,6 +53,7 @@ impl RSSFeedCreateInputGQL {
 
 /// The RSS display embed feed input object for updating an existing RSS feed
 #[derive(InputObject)]
+#[graphql(name = "RSSFeedEmbedDisplayUpdateInputGQL")]
 pub struct RSSFeedEmbedDisplayUpdateInputGQL {
     /// The title of the RSS feed.
     title: Option<String>,
@@ -139,6 +141,7 @@ impl RSSFeedEmbedDisplayUpdateInputGQL {
 
 /// The RSS display feed input object for updating an existing RSS feed
 #[derive(InputObject)]
+#[graphql(name = "RSSFeedDisplayUpdateInputGQL")]
 pub struct RSSFeedDisplayUpdateInputGQL {
     /// The message that will be send, maximum of 1500 characters
     ///
@@ -158,6 +161,7 @@ pub struct RSSFeedDisplayUpdateInputGQL {
 
 /// The RSS display feed input object for previewing an existing RSS feed
 #[derive(InputObject)]
+#[graphql(name = "RSSFeedDisplayPreviewInputGQL")]
 pub struct RSSFeedDisplayPreviewInputGQL {
     /// The message that will be send, maximum of 1500 characters
     ///
@@ -178,6 +182,7 @@ impl RSSFeedDisplayUpdateInputGQL {
 
 /// The RSS feed input object for updating an existing RSS feed
 #[derive(InputObject)]
+#[graphql(name = "RSSFeedUpdateInputGQL")]
 pub struct RSSFeedUpdateInputGQL {
     /// The RSS URL
     #[graphql(validator(url))]

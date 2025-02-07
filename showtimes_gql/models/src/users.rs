@@ -27,6 +27,7 @@ pub struct UserGQL {
 
 /// The API key and the capabilities associated with it
 #[derive(SimpleObject)]
+#[graphql(name = "APIKeyDataGQL")]
 pub struct APIKeyDataGQL {
     /// The API key
     key: APIKeyGQL,

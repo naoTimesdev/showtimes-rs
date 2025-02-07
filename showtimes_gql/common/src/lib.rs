@@ -91,7 +91,7 @@ impl Description for APIKeyGQL {
     }
 }
 
-#[Scalar(use_type_description = true)]
+#[Scalar(name = "APIKeyGQL", use_type_description = true)]
 impl ScalarType for APIKeyGQL {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
         match value {
@@ -360,6 +360,7 @@ impl std::fmt::Display for IntegrationTypeGQL {
 /// This capabilities is also limited to what a user can do without API key.
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, EnumName)]
 #[graphql(
+    name = "APIKeyCapabilityGQL",
     remote = "showtimes_db::m::APIKeyCapability",
     rename_items = "SCREAMING_SNAKE_CASE"
 )]
