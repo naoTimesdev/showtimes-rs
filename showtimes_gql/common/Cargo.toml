@@ -11,6 +11,7 @@ description = "Common library for GraphQL definitions of Showtimes API"
 
 [dependencies]
 chrono.workspace = true
+ahash.workspace = true
 
 tokio.workspace = true
 futures-util.workspace = true

@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use ahash::{HashMap, HashMapExt};
 use convert_case::Casing;
 use proc_macro::TokenStream;
 use syn::{punctuated::Punctuated, spanned::Spanned, Attribute, Expr, Lit, LitStr, Meta, Token};

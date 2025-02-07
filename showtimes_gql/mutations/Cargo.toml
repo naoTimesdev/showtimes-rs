@@ -12,6 +12,7 @@ description = "Mutations library for GraphQL definitions of Showtimes API"
 [dependencies]
 chrono.workspace = true
 url.workspace = true
+ahash.workspace = true
 
 tokio.workspace = true
 

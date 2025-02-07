@@ -11,6 +11,7 @@ description = "Paginator library for GraphQL definitions of Showtimes API"
 
 [dependencies]
 serde.workspace = true
+ahash.workspace = true
 
 futures-util.workspace = true
 

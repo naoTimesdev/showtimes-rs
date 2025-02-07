@@ -16,6 +16,8 @@ serde_json.workspace = true
 time.workspace = true
 slab.workspace = true
 uuid.workspace = true
+ahash.workspace = true
+rustc-hash.workspace = true
 
 tokio.workspace = true
 futures-util.workspace = true

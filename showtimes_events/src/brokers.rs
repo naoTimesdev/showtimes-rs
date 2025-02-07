@@ -6,20 +6,23 @@
 
 use std::{
     any::{Any, TypeId},
-    collections::HashMap,
     marker::PhantomData,
     pin::Pin,
     sync::{LazyLock, Mutex},
     task::{Context, Poll},
 };
 
+use ahash::{HashMap, HashMapExt};
 use futures_channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures_util::{Stream, StreamExt};
+use rustc_hash::FxHashMap;
 use slab::Slab;
 
 use crate::models::{RSSEvent, SHEvent};
 
-type Brokers = HashMap<TypeId, Box<dyn Any + Send>>;
+// Use FxHashMap since TypeId will be hashed faster compared to aHash
+type Brokers = FxHashMap<TypeId, Box<dyn Any + Send>>;
+// Use aHash since it's faster compared to SipHash
 type RSSBrokers = HashMap<showtimes_shared::ulid::Ulid, Box<dyn Any + Send>>;
 
 static BROKERS: LazyLock<Mutex<Brokers>> = LazyLock::new(|| Mutex::new(Brokers::new()));

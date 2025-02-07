@@ -1,8 +1,6 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{collections::BTreeMap, sync::Arc};
 
+use ahash::{HashMap, HashMapExt};
 use chrono::TimeZone;
 use futures_util::TryStreamExt;
 use mongodb::bson::doc;

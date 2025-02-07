@@ -12,6 +12,7 @@ description = "A library to fetch metadata information of a shows or books, data
 [dependencies]
 chrono.workspace = true
 nom.workspace = true
+rustc-hash.workspace = true
 
 tokio.workspace = true
 
@@ -21,7 +22,6 @@ reqwest.workspace = true
 
 image.workspace = true
 kmeans_colors.workspace = true
-fxhash.workspace = true
 palette.workspace = true
 
 showtimes-derive = { path = "../showtimes_derive" }

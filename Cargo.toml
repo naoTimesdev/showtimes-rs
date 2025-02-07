@@ -38,6 +38,11 @@ rust-version = "1.81" # MSRV to 1.81 due to async-graphql
 # Essential stuff
 anyhow = "1"
 ahash = "0.8.11"
+chrono = "0.4.39"
+time = "0.3.37"
+ulid = "1.1.4"
+uuid = { version = "~1.12.1", default-features = false, features = ["v4", "v7", "fast-rng"] }
+rustc-hash = { version = "2.1.1", features = ["std"] }
 
 # Serde
 serde = { version = "1.0.217", features = ["derive"] }
@@ -45,10 +50,6 @@ serde_json = "1.0.138"
 serde_repr = "0.1.19"
 
 # Parsing data
-uuid = { version = "~1.12.1", default-features = false, features = ["v4", "v7", "fast-rng"] }
-ulid = "1.1.4"
-chrono = "0.4.39"
-time = "0.3.37"
 nom = "8.0.0"
 toml = { version = "0.8.20", default-features = false, features = ["parse", "preserve_order"] }
 
@@ -69,7 +70,6 @@ slab = "0.4.9"
 image = { version = "0.25.5", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
 kmeans_colors = { version = "0.6.0", default-features = false, features = ["palette_color"] }
 palette = { version = "0.7.6", default-features = false, features = ["std"] }
-fxhash = "0.2.1"
 
 # Web server
 axum = { version = "0.8.1", default-features = false, features = [
@@ -83,7 +83,14 @@ axum = { version = "0.8.1", default-features = false, features = [
     "ws",
 ] }
 axum-extra = { version = "0.10.0", default-features = false, features = ["tracing", "async-read-body"] }
-async-graphql = { version = "7.0.15", default-features = false, features = ["tracing", "unblock", "dataloader", "graphiql", "tempfile"] }
+async-graphql = { version = "7.0.15", default-features = false, features = [
+    "tracing",
+    "unblock",
+    "dataloader",
+    "dataloader_ahash",
+    "graphiql",
+    "tempfile",
+] }
 async-graphql-axum = "7.0.15"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
@@ -216,3 +223,7 @@ codegen-units = 1
 [profile.release.package.showtimes-fansubdb]
 opt-level = "s"
 codegen-units = 1
+
+[patch.crates-io]
+async-graphql = { git = "https://github.com/naoTimesdev/async-graphql.git", rev = "62f4eb5bded6d2b4f7b0d016f3294b9562697a5e" }
+async-graphql-axum = { git = "https://github.com/naoTimesdev/async-graphql.git", rev = "62f4eb5bded6d2b4f7b0d016f3294b9562697a5e" }

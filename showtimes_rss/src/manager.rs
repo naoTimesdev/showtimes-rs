@@ -1,8 +1,8 @@
 //! The manager for RSS data, powered via Redis/Valkey
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
+use ahash::HashMap;
 use redis::cmd;
 use redis::AsyncCommands;
 use redis::RedisResult;

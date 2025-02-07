@@ -1,7 +1,8 @@
 //! Data loader implementations
 
-use std::{collections::HashMap, ops::Deref};
+use std::ops::Deref;
 
+use ahash::{HashMap, HashMapExt};
 use async_graphql::{dataloader::Loader, FieldError};
 use futures_util::TryStreamExt;
 use showtimes_db::{

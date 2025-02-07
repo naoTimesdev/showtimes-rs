@@ -1,5 +1,6 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
+use ahash::{HashMap, HashMapExt};
 use showtimes_db::{m::RSSFeed, mongodb::bson::doc};
 use showtimes_rss::parse_feed;
 use tokio_cron_scheduler::{JobScheduler, JobSchedulerError};
@@ -158,7 +159,7 @@ async fn tasks_rss_common(
     tracing::debug!("Running RSS fetch with query: {:?}", &query_feeds);
     let result_feeds = handler_rss.find_all_by(query_feeds).await?;
 
-    // Map to HashMap for each "server"/"creator"
+    // Map to AHashMap for each "server"/"creator"
     let mut mapped_feeds: HashMap<showtimes_shared::ulid::Ulid, Vec<RSSFeed>> = HashMap::new();
     for feed in result_feeds {
         let map = mapped_feeds.entry(feed.creator).or_default();

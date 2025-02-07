@@ -1,4 +1,8 @@
 disallowed-types = [
     { path = "async_graphql::ErrorExtensions", reason = "use `showtimes_gql_common::GQLErrorExt` instead." },
-    # { path = "async_graphql::Error", reason = "use `showtimes_gql_common::GQLError` instead." }
+    # { path = "async_graphql::Error", reason = "use `showtimes_gql_common::GQLError` instead." },
+    { path = "std::collections::HashMap", reason = "use aHash variant instead whenever possible." },
+    { path = "std::collections::HashSet", reason = "use aHash variant instead whenever possible." },
+    { path = "ahash::AHashMap", reason = "use `ahash::HashMap` instead." },
+    { path = "ahash::AHashSet", reason = "use `ahash::HashSet` instead." },
 ]

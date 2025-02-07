@@ -1,7 +1,6 @@
 //! Project related queries
 
-use std::collections::HashMap;
-
+use ahash::HashMap;
 use futures_util::TryStreamExt;
 use showtimes_db::{
     m::UserPrivilege,

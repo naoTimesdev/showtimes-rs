@@ -11,6 +11,8 @@ use palette::{
     cast::ComponentsAs, rgb::channels::Rgba, white_point::D65, IntoColor, Lab, Srgb, Srgba,
 };
 
+type CachedSRGBA = rustc_hash::FxHashMap<[u8; 3], Lab<D65, f32>>;
+
 /// Gets the dominant colors of an image given as a byte array.
 ///
 /// Returns a vector of up to 5 colors in the format of u32, which is a 32-bit maximum
@@ -28,7 +30,7 @@ use palette::{
 /// If the image is a valid image, but the k-means clustering algorithm fails
 /// to find any dominant colors, the function will also return a [`MetadataImageError::NoDominantColor`].
 pub fn get_dominant_colors(image_bytes: &[u8]) -> Result<Vec<u32>, MetadataError> {
-    let mut lab_cache = fxhash::FxHashMap::default();
+    let mut lab_cache = CachedSRGBA::default();
     let mut lab_pixels: Vec<Lab<D65, f32>> = Vec::new();
 
     let img = image::load_from_memory(image_bytes)
@@ -74,7 +76,7 @@ pub fn get_dominant_colors(image_bytes: &[u8]) -> Result<Vec<u32>, MetadataError
     }
 }
 
-/// Optimized conversion of colors from Srgb to Lab using a hashmap for caching
+/// Optimized conversion of colors from Srgb to Lab using a (a)hashmap for caching
 /// of expensive color conversions.
 ///
 /// Additionally, converting from Srgb to Linear Srgb is special-cased in
@@ -82,7 +84,7 @@ pub fn get_dominant_colors(image_bytes: &[u8]) -> Result<Vec<u32>, MetadataError
 /// using `color.into_format().into_color()`.
 fn cached_srgba_to_lab<'a>(
     rgb: impl Iterator<Item = &'a Srgba<u8>>,
-    map: &mut fxhash::FxHashMap<[u8; 3], Lab<D65, f32>>,
+    map: &mut CachedSRGBA,
     lab_pixels: &mut Vec<Lab<D65, f32>>,
 ) {
     lab_pixels.extend(rgb.map(|color| {

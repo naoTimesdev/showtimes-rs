@@ -1,8 +1,6 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-};
+use std::{collections::VecDeque, sync::Arc};
 
+use ahash::HashMapExt;
 use async_graphql::{dataloader::DataLoader, CustomValidator, Enum, InputObject, Upload};
 use chrono::TimeZone;
 use showtimes_db::{m::UserKind, mongodb::bson::doc, DatabaseShared, ProjectHandler};
@@ -894,7 +892,7 @@ async fn fetch_project_collaborators(
 
             let loaded_projects = prj_loader.load_many(other_projects).await?;
 
-            // Get values of hashmap
+            // Get values of (a)hashmap
             Ok(loaded_projects.values().cloned().collect())
         }
         None => Ok(vec![]),
@@ -1569,7 +1567,7 @@ async fn update_single_project(
     project: &mut showtimes_db::m::Project,
     input: &ProjectUpdateInputGQL,
     metadata: Option<&ExternalMediaFetchResult>,
-    loaded_users: &HashMap<showtimes_shared::ulid::Ulid, showtimes_db::m::User>,
+    loaded_users: &ahash::HashMap<showtimes_shared::ulid::Ulid, showtimes_db::m::User>,
     is_main: bool,
 ) -> async_graphql::Result<(
     showtimes_events::m::ProjectUpdatedEvent,
@@ -2135,8 +2133,8 @@ pub async fn mutate_projects_update(
     };
 
     // Preload all user if we need to update assignees
-    let mut loaded_users: HashMap<showtimes_shared::ulid::Ulid, showtimes_db::m::User> =
-        HashMap::new();
+    let mut loaded_users: ahash::HashMap<showtimes_shared::ulid::Ulid, showtimes_db::m::User> =
+        ahash::HashMap::new();
     if let Some(assignees_update) = &input.assignees {
         let user_ids_keys = assignees_update
             .iter()

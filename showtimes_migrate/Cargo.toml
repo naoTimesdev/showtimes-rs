@@ -13,6 +13,7 @@ description = "A tools to migrate Showtimes database models and more"
 anyhow.workspace = true
 chrono.workspace = true
 serde.workspace = true
+ahash.workspace = true
 
 tokio.workspace = true
 futures-util.workspace = true

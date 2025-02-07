@@ -1,5 +1,4 @@
-use std::collections::HashMap;
-
+use ahash::{HashMap, HashMapExt};
 use chrono::TimeZone;
 use mongodb::bson::doc;
 use showtimes_db::{ClientShared, DatabaseShared};

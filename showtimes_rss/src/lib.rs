@@ -5,8 +5,7 @@ pub mod manager;
 pub mod markdown;
 pub mod template;
 
-use std::collections::HashMap;
-
+use ahash::{HashMap, HashMapExt};
 use chrono::{DateTime, Utc};
 use feed_rs::model::{MediaContent, MediaThumbnail};
 use markdown::expand_url;
