@@ -302,8 +302,7 @@ impl SubscriptionRoot {
     /// Watch for RSS entry feed event for specific RSS feed
     #[graphql(
         name = "watchRSS",
-        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)",
-        visible = "guard::visible_minimum_admin"
+        guard = "guard::AuthUserMinimumGuard::new(UserKindGQL::Admin)"
     )]
     async fn watch_rss_entry(
         &self,
