@@ -17,6 +17,8 @@ pub enum JWTMode {
     RSA,
     /// ECDSA mode in PKCS#8 format
     ECDSA,
+    /// EdDSA mode in x25519 format
+    EDDSA,
 }
 
 /// JWT SHA encoding mode
@@ -318,7 +320,7 @@ impl Config {
                     bail_verify!(Required, "JWT secret")
                 }
             }
-            JWTMode::ECDSA | JWTMode::RSA => {
+            JWTMode::ECDSA | JWTMode::RSA | JWTMode::EDDSA => {
                 if let Some(public_key) = &self.jwt.public_key {
                     // Test read
                     match std::fs::exists(public_key) {

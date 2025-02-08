@@ -15,6 +15,7 @@ We support the following algorithm:
 - `HS256`, `HS384`, `HS512`
 - `PS256`, `PS384`, `PS512` (We do not support `RS256`, `RS384`, `RS512`)
 - `ES256`, `ES384`
+- `EdDSA`
 
 You can create the specific algorithm with the `ShowtimesEncodingKey::new_*` function.
 
@@ -39,6 +40,50 @@ The verification process will check the following:
 - The token expiration date must be greater than the current time.
 - The token audience must be `user` or `discord-auth`.
 - The token metadata must be a valid ULID or a valid URL (this will be done on another crates).
+
+## Generating PEM
+
+### RSA
+For RSA, you can do the following:
+```bash
+openssl genpkey -algorithm RSA-PSS -out private_key.pem -pkeyopt rsa_keygen_bits:4096 -pkeyopt rsa_pss_keygen_md:sha384 -pkeyopt rsa_pss_keygen_mgf1_md:sha384 -pkeyopt rsa_pss_keygen_saltlen:32 -out ./keys/priv.key
+```
+
+This will generate a private key with the following properties:
+- 4096 bits
+
+Then generate the public key with the following command:
+```bash
+openssl rsa -pubout -in ./keys/priv.key -out ./keys/pub.pem
+```
+
+### ECDSA
+For ECDSA, you can do the following:
+```bash
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out ./keys/priv.key
+```
+
+This will generate a private key with the following properties:
+- Curve: NIST P-256
+
+Then generate the public key with the following command:
+```bash
+openssl ec -pubout -in ./keys/priv.key -out ./keys/pub.pem
+```
+
+### EdDSA
+For EdDSA, you can do the following:
+```bash
+openssl genpkey -algorithm ed25519 -out ./keys/priv.key
+```
+
+This will generate a private key with the following properties:
+- Curve: Ed25519 (Which is the only supported one currently)
+
+Then generate the public key with the following command:
+```bash
+openssl pkey -pubout -in ./keys/priv.key -out ./keys/pub.pem
+```
 
 ## License
 

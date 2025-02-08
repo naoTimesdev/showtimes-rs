@@ -132,6 +132,17 @@ impl ShowtimesEncodingKey {
         })
     }
 
+    /// Create a new encoding key in EdDSA mode
+    ///
+    /// Only accept PEM encoded key, this must be in PKCS#8 mode.
+    pub fn new_eddsa(public: &[u8], private: &[u8]) -> Result<Self, jsonwebtoken::errors::Error> {
+        Ok(Self {
+            key: EncodingKey::from_ed_pem(private)?,
+            decode_key: DecodingKey::from_ed_pem(public)?,
+            header: Header::new(Algorithm::EdDSA),
+        })
+    }
+
     /// Do the actual encoding
     fn encode<T: Serialize>(&self, claims: &T) -> Result<String, jsonwebtoken::errors::Error> {
         jsonwebtoken::encode(&self.header, claims, &self.key)

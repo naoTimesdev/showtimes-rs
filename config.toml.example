@@ -11,16 +11,16 @@ log-directory = ""
 [jwt]
 # JWT mode
 # Note: For RSA, ensure you generate the key in PSS/PKCS#1 v2.1 mode instead of PKCS#1 v1.5
-mode = "hmac" # Either `hmac`, `rsa`, `ecdsa` (pkcs#8 mode)
+mode = "hmac" # Either `hmac`, `rsa`, `ecdsa`, `eddsa` (x25519)
 # SHA variant to be used
-variant = 384 # Either 256, 384, or 512 (variant-512 only available for hmac, rsa)
+variant = 384 # Either 256, 384, or 512 (variant-512 only available for hmac, rsa. Ignored on `eddsa` mode)
 # JWT HMAC secret, if using hmac
 secret = "super-duper-secret-jwt-key"
 # JWT expiration time
 expiration = 604800
-# JWT public key path, for rsa, and ecdsa
+# JWT public key path, for rsa, ecdsa, and eddsa
 # public_key = "./keys/pub.pem"
-# JWT private key path, for rsa, ecdsa, or pkcs8 mode
+# JWT private key path, for rsa, ecdsa, and eddsa
 # private_key = "./keys/priv.key"
 
 # Database connection string

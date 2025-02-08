@@ -112,7 +112,9 @@ async fn entrypoint() -> anyhow::Result<()> {
                 jwt_variant,
             )
         }
-        showtimes_shared::config::JWTMode::RSA => {
+        showtimes_shared::config::JWTMode::RSA
+        | showtimes_shared::config::JWTMode::ECDSA
+        | showtimes_shared::config::JWTMode::EDDSA => {
             // read the public key
             let public_key = tokio::fs::read(
                 config
@@ -131,36 +133,28 @@ async fn entrypoint() -> anyhow::Result<()> {
             )
             .await?;
 
-            showtimes_session::ShowtimesEncodingKey::new_rsa(
-                &public_key,
-                &private_key,
-                jwt_variant,
-            )?
-        }
-        showtimes_shared::config::JWTMode::ECDSA => {
-            // read the public key
-            let public_key = tokio::fs::read(
-                config
-                    .jwt
-                    .public_key
-                    .clone()
-                    .expect("JWT public key is missing"),
-            )
-            .await?;
-            let private_key = tokio::fs::read(
-                config
-                    .jwt
-                    .private_key
-                    .clone()
-                    .expect("JWT private key is missing"),
-            )
-            .await?;
-
-            showtimes_session::ShowtimesEncodingKey::new_ecdsa(
-                &public_key,
-                &private_key,
-                jwt_variant,
-            )?
+            match config.jwt.mode {
+                showtimes_shared::config::JWTMode::ECDSA => {
+                    showtimes_session::ShowtimesEncodingKey::new_ecdsa(
+                        &public_key,
+                        &private_key,
+                        jwt_variant,
+                    )?
+                }
+                showtimes_shared::config::JWTMode::EDDSA => {
+                    showtimes_session::ShowtimesEncodingKey::new_eddsa(&public_key, &private_key)?
+                }
+                showtimes_shared::config::JWTMode::RSA => {
+                    showtimes_session::ShowtimesEncodingKey::new_rsa(
+                        &public_key,
+                        &private_key,
+                        jwt_variant,
+                    )?
+                }
+                _ => {
+                    unreachable!("This JWT branch should not be reachable");
+                }
+            }
         }
     };
 
