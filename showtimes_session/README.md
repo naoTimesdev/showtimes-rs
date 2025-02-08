@@ -11,7 +11,14 @@ This library contains four main functions:
   - `create_discord_session_state`: Create a anti-CSRF state for Discord OAuth2.
 - `verify_session`: Verify a session token with the expected audience.
 
-We use `HS512` for the algorithm that contains the following payload:
+We support the following algorithm:
+- `HS256`, `HS384`, `HS512`
+- `PS256`, `PS384`, `PS512` (We do not support `RS256`, `RS384`, `RS512`)
+- `ES256`, `ES384`
+
+You can create the specific algorithm with the `ShowtimesEncodingKey::new_*` function.
+
+The following is the example payload:
 ```jsonc
 {
     // The token issue date

@@ -305,11 +305,12 @@ pub async fn mutate_users_authenticate(
     let config = ctx.data_unchecked::<Arc<showtimes_shared::Config>>();
     let event_manager = ctx.data_unchecked::<showtimes_events::SharedSHClickHouse>();
     let sess_manager = ctx.data_unchecked::<SharedSessionManager>();
+    let jwt_secret = ctx.data_unchecked::<Arc<showtimes_session::ShowtimesEncodingKey>>();
 
     tracing::info!("Authenticating user with token: {}", &token);
     showtimes_session::verify_session(
         &state,
-        &config.jwt.secret,
+        jwt_secret,
         showtimes_session::ShowtimesAudience::DiscordAuth,
     )
     .map_err(|err| {
@@ -411,7 +412,7 @@ pub async fn mutate_users_authenticate(
                         f.set("expiry", expiry_u64);
                     })
                 })?,
-                &config.jwt.secret,
+                jwt_secret,
             )
             .extend_error(GQLErrorCode::SessionCreateError, |f| {
                 f.set("id", user.id.to_string());
@@ -528,7 +529,7 @@ pub async fn mutate_users_authenticate(
                         f.set("expiry", expiry_u64);
                     })
                 })?,
-                &config.jwt.secret,
+                jwt_secret,
             )
             .extend_error(GQLErrorCode::SessionCreateError, |f| {
                 f.set("id", user.id.to_string());

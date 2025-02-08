@@ -7,6 +7,8 @@ use redis::cmd;
 use redis::AsyncCommands;
 use redis::RedisResult;
 
+use crate::ShowtimesEncodingKey;
+
 use super::{
     verify_refresh_session, verify_session, ShowtimesAudience, ShowtimesRefreshSession,
     ShowtimesUserClaims, ShowtimesUserSession,
@@ -23,7 +25,7 @@ const SESSION_REFRESH_MANAGER: &str = "showtimes:session:refresh";
 #[derive(Debug, Clone)]
 pub struct SessionManager {
     connection: redis::aio::MultiplexedConnection,
-    secret: String,
+    secret: Arc<ShowtimesEncodingKey>,
 }
 
 /// The kind of session.
@@ -81,7 +83,10 @@ impl From<SessionKind> for ShowtimesAudience {
 
 impl SessionManager {
     /// Create a new session manager.
-    pub async fn new(client: &Arc<redis::Client>, secret: impl Into<String>) -> RedisResult<Self> {
+    pub async fn new(
+        client: &Arc<redis::Client>,
+        secret: &Arc<ShowtimesEncodingKey>,
+    ) -> RedisResult<Self> {
         let client_name = format!("showtimes-rs/{}", env!("CARGO_PKG_VERSION"));
 
         let mut con = client.get_multiplexed_async_connection().await?;
@@ -97,8 +102,13 @@ impl SessionManager {
 
         Ok(Self {
             connection: con,
-            secret: secret.into(),
+            secret: secret.clone(),
         })
+    }
+
+    /// Get reference to the internal [`ShowtimesEncodingKey`]
+    pub fn get_secret(&self) -> &ShowtimesEncodingKey {
+        &self.secret
     }
 
     /// Delete a session from the session manager.

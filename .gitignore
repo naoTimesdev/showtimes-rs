@@ -31,5 +31,6 @@ _data_test/
 /**/tests/*.json
 /sandbox
 
+/keys
 /storages
 /logs

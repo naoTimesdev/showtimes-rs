@@ -5,6 +5,7 @@ use std::sync::LazyLock;
 
 use chrono::TimeZone;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use showtimes_shared::unix_timestamp_serializer;
 
@@ -20,8 +21,18 @@ pub use jsonwebtoken::errors::ErrorKind as SessionErrorKind;
 static ISSUER: LazyLock<String> =
     LazyLock::new(|| format!("showtimes-rs-session/{}", env!("CARGO_PKG_VERSION")));
 const REFRESH_AUDIENCE: &str = "refresh-session";
-// The algorithm we use for our tokens
-const ALGORITHM: Algorithm = Algorithm::HS512;
+
+/// The algorithm we use for our tokens
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum ShowtimesSHAMode {
+    /// SHA-256
+    SHA256,
+    /// SHA-384
+    #[default]
+    SHA384,
+    /// SHA-512, unavailable for ECDSA
+    SHA512,
+}
 
 /// The audience for the token, we use an enum to ensure we only use the correct values
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -46,6 +57,112 @@ impl std::fmt::Display for ShowtimesAudience {
             ShowtimesAudience::APIKey => write!(f, "api-key"),
             ShowtimesAudience::MasterKey => write!(f, "master-key"),
         }
+    }
+}
+
+/// The encoding system used to sign/verify tokens
+#[derive(Clone)]
+pub struct ShowtimesEncodingKey {
+    key: EncodingKey,
+    decode_key: DecodingKey,
+    header: Header,
+}
+
+impl std::fmt::Debug for ShowtimesEncodingKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "EncodingKey {{ header: {:?} }}", self.header)
+    }
+}
+
+impl ShowtimesEncodingKey {
+    /// Create a new encoding key in HMAC mode
+    pub fn new_hmac(secret: impl Into<String>, mode: ShowtimesSHAMode) -> Self {
+        let secret_str: String = secret.into();
+
+        Self {
+            key: EncodingKey::from_secret(secret_str.as_ref()),
+            decode_key: DecodingKey::from_secret(secret_str.as_ref()),
+            header: match mode {
+                ShowtimesSHAMode::SHA256 => Header::new(Algorithm::HS256),
+                ShowtimesSHAMode::SHA384 => Header::new(Algorithm::HS384),
+                ShowtimesSHAMode::SHA512 => Header::new(Algorithm::HS512),
+            },
+        }
+    }
+
+    /// Create a new encoding key in RSA mode
+    ///
+    /// Only accept PEM encoded key.
+    ///
+    /// The accepted RSA should be generated with RSA-PSS/PKCS#1 v2.1 mode
+    pub fn new_rsa(
+        public: &[u8],
+        private: &[u8],
+        mode: ShowtimesSHAMode,
+    ) -> Result<Self, jsonwebtoken::errors::Error> {
+        Ok(Self {
+            key: EncodingKey::from_rsa_pem(private)?,
+            decode_key: DecodingKey::from_rsa_pem(public)?,
+            header: match mode {
+                ShowtimesSHAMode::SHA256 => Header::new(Algorithm::PS256),
+                ShowtimesSHAMode::SHA384 => Header::new(Algorithm::PS384),
+                ShowtimesSHAMode::SHA512 => Header::new(Algorithm::PS512),
+            },
+        })
+    }
+
+    /// Create a new encoding key in ECDSA mode
+    ///
+    /// Only accept PEM encoded key, this must be in PKCS#8 mode.
+    ///
+    /// Note: If you use SHA512 mode, this will automatically use SHA384
+    pub fn new_ecdsa(
+        public: &[u8],
+        private: &[u8],
+        mode: ShowtimesSHAMode,
+    ) -> Result<Self, jsonwebtoken::errors::Error> {
+        Ok(Self {
+            key: EncodingKey::from_ec_pem(private)?,
+            decode_key: DecodingKey::from_ec_pem(public)?,
+            header: match mode {
+                ShowtimesSHAMode::SHA256 => Header::new(Algorithm::ES256),
+                ShowtimesSHAMode::SHA384 => Header::new(Algorithm::ES384),
+                ShowtimesSHAMode::SHA512 => Header::new(Algorithm::ES384),
+            },
+        })
+    }
+
+    /// Do the actual encoding
+    fn encode<T: Serialize>(&self, claims: &T) -> Result<String, jsonwebtoken::errors::Error> {
+        jsonwebtoken::encode(&self.header, claims, &self.key)
+    }
+
+    /// Do the actual decoding
+    fn decode<T: DeserializeOwned>(
+        &self,
+        token: &str,
+        audience: impl std::fmt::Display,
+    ) -> Result<jsonwebtoken::TokenData<T>, jsonwebtoken::errors::Error> {
+        let mut validation = Validation::new(self.header.alg);
+        validation.set_issuer(&[&*ISSUER]);
+        validation.set_audience(&[audience]);
+        validation.set_required_spec_claims(&["iat", "iss", "aud"]);
+        jsonwebtoken::decode(token, &self.decode_key, &validation)
+    }
+
+    /// Test encode
+    pub fn test_encode(&self) -> Result<String, jsonwebtoken::errors::Error> {
+        let stub_user =
+            ShowtimesUserClaims::new_api("test-api-key".to_string(), ShowtimesAudience::APIKey);
+        self.encode(&stub_user)
+    }
+
+    /// Test decode
+    pub fn test_decode(
+        &self,
+        token: &str,
+    ) -> Result<jsonwebtoken::TokenData<ShowtimesUserClaims>, jsonwebtoken::errors::Error> {
+        self.decode(token, ShowtimesAudience::APIKey)
     }
 }
 
@@ -246,20 +363,16 @@ impl ShowtimesRefreshSession {
 pub fn create_session(
     user_id: showtimes_shared::ulid::Ulid,
     expires_in: i64,
-    secret: impl Into<String>,
+    secret: &ShowtimesEncodingKey,
 ) -> Result<(ShowtimesUserSession, String), SessionError> {
     let user = ShowtimesUserClaims::new(user_id, expires_in);
 
-    let header = Header::new(ALGORITHM);
-    let secret_str: String = secret.into();
-    let secret = EncodingKey::from_secret(secret_str.as_bytes());
-
-    let token = jsonwebtoken::encode(&header, &user, &secret)?;
+    let token = secret.encode(&user)?;
 
     let session = ShowtimesUserSession::new(&token, user);
     let refresh_claims = ShowtimesRefreshClaims::new(user_id);
 
-    let refresh_token = jsonwebtoken::encode(&header, &refresh_claims, &secret)?;
+    let refresh_token = secret.encode(&refresh_claims)?;
 
     Ok((session, refresh_token))
 }
@@ -267,8 +380,8 @@ pub fn create_session(
 /// Create a new API key session for the given API key and expiration time.
 pub fn create_api_key_session(
     api_key: impl Into<String>,
-    secret: impl Into<String>,
     audience: ShowtimesAudience,
+    secret: &ShowtimesEncodingKey,
 ) -> Result<String, SessionError> {
     match audience {
         ShowtimesAudience::APIKey | ShowtimesAudience::MasterKey => {}
@@ -277,25 +390,17 @@ pub fn create_api_key_session(
 
     let user = ShowtimesUserClaims::new_api(api_key.into(), audience);
 
-    let header = Header::new(ALGORITHM);
-    let secret_str: String = secret.into();
-    let secret = EncodingKey::from_secret(secret_str.as_bytes());
-
-    jsonwebtoken::encode(&header, &user, &secret)
+    secret.encode(&user)
 }
 
 /// Create a new Discord session state for the given redirect URL and secret.
 pub fn create_discord_session_state(
     redirect_url: impl Into<String>,
-    secret: impl Into<String>,
+    secret: &ShowtimesEncodingKey,
 ) -> Result<String, SessionError> {
     let user = ShowtimesUserClaims::new_state(redirect_url);
 
-    let header = Header::new(ALGORITHM);
-    let secret_str: String = secret.into();
-    let secret = EncodingKey::from_secret(secret_str.as_bytes());
-
-    jsonwebtoken::encode(&header, &user, &secret)
+    secret.encode(&user)
 }
 
 /// Verify an active JWT session token.
@@ -304,20 +409,10 @@ pub fn create_discord_session_state(
 /// Otherwise, return an error
 pub fn verify_session(
     token: &str,
-    secret: impl Into<String>,
+    secret: &ShowtimesEncodingKey,
     expect_audience: ShowtimesAudience,
 ) -> Result<ShowtimesUserClaims, SessionError> {
-    let secret_str: String = secret.into();
-
-    let secret = DecodingKey::from_secret(secret_str.as_bytes());
-    let mut validation = Validation::new(ALGORITHM);
-
-    validation.set_issuer(&[&*ISSUER]);
-    validation.set_audience(&[expect_audience]);
-    validation.set_required_spec_claims(&["iat", "iss", "aud"]);
-
-    // Verify `exp` if -1 then no expiration
-    match jsonwebtoken::decode::<ShowtimesUserClaims>(token, &secret, &validation) {
+    match secret.decode::<ShowtimesUserClaims>(token, expect_audience) {
         Ok(data) => {
             // 2 minutes allowance
             let current_time = chrono::Utc::now() - chrono::Duration::minutes(2);
@@ -335,23 +430,13 @@ pub fn verify_session(
 /// Refresh a JWT session token.
 pub fn refresh_session(
     token: &str,
-    secret: impl Into<String>,
+    secret: &ShowtimesEncodingKey,
     expires_in: i64,
 ) -> Result<ShowtimesUserSession, SessionError> {
-    let secret_str: String = secret.into();
-
-    let secret = DecodingKey::from_secret(secret_str.as_bytes());
-    let mut validation = Validation::new(ALGORITHM);
-
-    validation.set_issuer(&[&*ISSUER]);
-    validation.set_audience(&[REFRESH_AUDIENCE]);
-    validation.set_required_spec_claims(&["iat", "iss", "aud"]);
-
-    // First, we verify refresh token
-    match jsonwebtoken::decode::<ShowtimesRefreshClaims>(token, &secret, &validation) {
+    match secret.decode::<ShowtimesRefreshClaims>(token, REFRESH_AUDIENCE) {
         Ok(data) => {
             // Create session
-            let (session, _) = create_session(data.claims.get_user(), expires_in, secret_str)?;
+            let (session, _) = create_session(data.claims.get_user(), expires_in, secret)?;
             Ok(session)
         }
         Err(e) => Err(e),
@@ -361,19 +446,9 @@ pub fn refresh_session(
 /// Verify a Refresh JWT session token.
 pub(crate) fn verify_refresh_session(
     token: &str,
-    secret: impl Into<String>,
+    secret: &ShowtimesEncodingKey,
 ) -> Result<ShowtimesRefreshClaims, SessionError> {
-    let secret_str: String = secret.into();
-
-    let secret = DecodingKey::from_secret(secret_str.as_bytes());
-    let mut validation = Validation::new(ALGORITHM);
-
-    validation.set_issuer(&[&*ISSUER]);
-    validation.set_audience(&[REFRESH_AUDIENCE]);
-    validation.set_required_spec_claims(&["iat", "iss", "aud"]);
-
-    // First, we verify refresh token
-    match jsonwebtoken::decode::<ShowtimesRefreshClaims>(token, &secret, &validation) {
+    match secret.decode::<ShowtimesRefreshClaims>(token, REFRESH_AUDIENCE) {
         Ok(data) => Ok(data.claims),
         Err(e) => Err(e),
     }
@@ -385,17 +460,17 @@ mod tests {
 
     use super::*;
 
-    const SECRET: &str = "super-duper-secret-for-testing";
     const REDIRECT_URL: &str = "/oauth2/test/discord";
+    static SECRET_INFO: LazyLock<ShowtimesEncodingKey> = LazyLock::new(|| {
+        ShowtimesEncodingKey::new_hmac("super-duper-secret-for-testing", ShowtimesSHAMode::SHA512)
+    });
 
     #[test]
     fn test_valid_session() {
         let user_id = ulid_serializer::default();
-        let (_, token) = create_session(user_id, 3600, SECRET).unwrap();
+        let (_, token) = create_session(user_id, 3600, &SECRET_INFO).unwrap();
 
-        println!("{}", token);
-
-        let claims = verify_session(&token, SECRET, ShowtimesAudience::User).unwrap();
+        let claims = verify_session(&token, &SECRET_INFO, ShowtimesAudience::User).unwrap();
 
         assert_eq!(claims.get_metadata(), &user_id.to_string());
         assert_eq!(claims.get_issuer(), &*ISSUER);
@@ -405,9 +480,9 @@ mod tests {
     #[test]
     fn test_valid_session_with_invalid_aud() {
         let user_id = ulid_serializer::default();
-        let (_, token) = create_session(user_id, 3600, SECRET).unwrap();
+        let (_, token) = create_session(user_id, 3600, &SECRET_INFO).unwrap();
 
-        let result = verify_session(&token, SECRET, ShowtimesAudience::DiscordAuth);
+        let result = verify_session(&token, &SECRET_INFO, ShowtimesAudience::DiscordAuth);
 
         match result {
             Err(e) => {
@@ -419,9 +494,9 @@ mod tests {
 
     #[test]
     fn test_valid_discord_session_state() {
-        let token = create_discord_session_state(REDIRECT_URL, SECRET).unwrap();
+        let token = create_discord_session_state(REDIRECT_URL, &SECRET_INFO).unwrap();
 
-        let claims = verify_session(&token, SECRET, ShowtimesAudience::DiscordAuth).unwrap();
+        let claims = verify_session(&token, &SECRET_INFO, ShowtimesAudience::DiscordAuth).unwrap();
 
         assert_eq!(claims.get_metadata(), REDIRECT_URL);
         assert_eq!(claims.get_issuer(), &*ISSUER);
@@ -430,9 +505,9 @@ mod tests {
 
     #[test]
     fn test_valid_discord_session_state_with_invalid_aud() {
-        let token = create_discord_session_state(REDIRECT_URL, SECRET).unwrap();
+        let token = create_discord_session_state(REDIRECT_URL, &SECRET_INFO).unwrap();
 
-        let result = verify_session(&token, SECRET, ShowtimesAudience::User);
+        let result = verify_session(&token, &SECRET_INFO, ShowtimesAudience::User);
 
         match result {
             Err(e) => {
@@ -445,10 +520,10 @@ mod tests {
     #[test]
     fn test_with_valid_header() {
         let user_id = ulid_serializer::default();
-        let (_, token) = create_session(user_id, 3600, SECRET).unwrap();
+        let (_, token) = create_session(user_id, 3600, &SECRET_INFO).unwrap();
 
         let header = jsonwebtoken::decode_header(&token).unwrap();
-        let expected = Header::new(ALGORITHM);
+        let expected = Header::new(Algorithm::HS512);
 
         assert_eq!(header, expected);
     }
@@ -456,7 +531,7 @@ mod tests {
     #[test]
     fn test_with_invalid_header() {
         let user_id = ulid_serializer::default();
-        let (_, token) = create_session(user_id, 3600, SECRET).unwrap();
+        let (_, token) = create_session(user_id, 3600, &SECRET_INFO).unwrap();
 
         let header = jsonwebtoken::decode_header(&token).unwrap();
         let expected = Header::new(Algorithm::HS256);

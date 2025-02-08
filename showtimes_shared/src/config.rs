@@ -1,22 +1,58 @@
 //! Shared config handler for Showtimes
 
 use serde::Deserialize;
+use serde_repr::Deserialize_repr;
 
 const DEFAULT_SECRET: &str = "super-duper-secret-jwt-key";
 const DEFAULT_MASTER_KEY: &str = "masterkey";
 const EXPIRY_DEFAULT: u64 = 7 * 24 * 60 * 60;
 
+/// JWT mode
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum JWTMode {
+    /// HMAC mode
+    HMAC,
+    /// RSA-PSS/PKCS#1 v2.1 mode
+    RSA,
+    /// ECDSA mode in PKCS#8 format
+    ECDSA,
+}
+
+/// JWT SHA encoding mode
+#[derive(Debug, Clone, Copy, Default, Deserialize_repr)]
+#[repr(u16)]
+pub enum JWTSHAMode {
+    /// SHA-256
+    SHA256 = 256,
+    /// SHA-384 (default)
+    #[default]
+    SHA384 = 384,
+    /// SHA-512
+    SHA512 = 512,
+}
+
 /// JWT session configuration
 #[derive(Debug, Clone, Deserialize)]
 pub struct JwtSession {
+    /// The mode for the JWT session
+    pub mode: JWTMode,
+    /// The variant for the JWT session
+    ///
+    /// SHA512 is not available for ECDSA which will automatically fallback to SHA384
+    pub variant: Option<JWTSHAMode>,
     /// The secret key for the JWT session
-    pub secret: String,
+    pub secret: Option<String>,
     /// The expiration time for the JWT session
     ///
     /// By default, it is set to 7 days.
     /// Set to 0 to disable expiration.
     #[serde(default)]
     pub expiration: Option<u64>,
+    /// The path to the public key PEM for the JWT session
+    pub public_key: Option<String>,
+    /// The path to the private key PEM for the JWT session
+    pub private_key: Option<String>,
 }
 
 impl JwtSession {
@@ -269,11 +305,60 @@ impl Config {
         }
 
         // Verify JWT
-        if self.jwt.secret.is_empty() {
-            bail_verify!(Required, "JWT secret")
-        }
-        if self.jwt.secret == DEFAULT_SECRET {
-            bail_verify!(NoDefault, "JWT secret")
+        match self.jwt.mode {
+            JWTMode::HMAC => {
+                if let Some(secret) = &self.jwt.secret {
+                    if secret.is_empty() {
+                        bail_verify!(Required, "JWT secret")
+                    }
+                    if secret == DEFAULT_SECRET {
+                        bail_verify!(NoDefault, "JWT secret")
+                    }
+                } else {
+                    bail_verify!(Required, "JWT secret")
+                }
+            }
+            JWTMode::ECDSA | JWTMode::RSA => {
+                if let Some(public_key) = &self.jwt.public_key {
+                    // Test read
+                    match std::fs::exists(public_key) {
+                        Ok(true) => (),
+                        Ok(false) => bail_verify!(MissingFile, "JWT public key"),
+                        Err(err) => {
+                            if err.kind() == std::io::ErrorKind::NotFound {
+                                bail_verify!(MissingFile, "JWT public key")
+                            } else {
+                                return Err(ConfigError::VerifyError(ConfigVerifyError::IOError(
+                                    "JWT public key".to_string(),
+                                    err,
+                                )));
+                            }
+                        }
+                    }
+                } else {
+                    bail_verify!(Required, "JWT public key")
+                }
+
+                if let Some(private_key) = &self.jwt.private_key {
+                    // Test read
+                    match std::fs::exists(private_key) {
+                        Ok(true) => (),
+                        Ok(false) => bail_verify!(MissingFile, "JWT private key"),
+                        Err(err) => {
+                            if err.kind() == std::io::ErrorKind::NotFound {
+                                bail_verify!(MissingFile, "JWT private key")
+                            } else {
+                                return Err(ConfigError::VerifyError(ConfigVerifyError::IOError(
+                                    "JWT private key".to_string(),
+                                    err,
+                                )));
+                            }
+                        }
+                    }
+                } else {
+                    bail_verify!(Required, "JWT private key")
+                }
+            }
         }
 
         // --> Database will be verified when loading the connection
@@ -395,6 +480,10 @@ pub enum ConfigVerifyError {
     NoDefaultOrNull(String),
     /// Minimum amount is not satisfied
     MinimumAmount(String, usize),
+    /// File does not exist
+    MissingFile(String),
+    /// IO error
+    IOError(String, std::io::Error),
 }
 
 impl From<toml::de::Error> for ConfigError {
@@ -442,6 +531,14 @@ impl std::fmt::Display for ConfigVerifyError {
                 "Minimum amount of '{}' {} is not satisfied, please change it!",
                 item, amount
             ),
+            ConfigVerifyError::MissingFile(item) => write!(
+                f,
+                "File `{}` does not exist, please ensure it exists!",
+                item
+            ),
+            ConfigVerifyError::IOError(item, e) => {
+                write!(f, "IO error occurred for {}: {}", item, e)
+            }
         }
     }
 }

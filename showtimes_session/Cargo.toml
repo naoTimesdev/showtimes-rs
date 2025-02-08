@@ -20,6 +20,7 @@ tracing.workspace = true
 
 redis.workspace = true
 jsonwebtoken.workspace = true
+jsonwebtoken.features = ["use_pem"]
 reqwest.workspace = true
 
 # Showtimes related

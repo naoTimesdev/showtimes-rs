@@ -18,14 +18,13 @@ The minimum supported Rust version is `1.81.0`
 
 ## Usages
 1. Clone the repository
-2. Run `cargo build --release --all`
-3. Do configuration using `config.toml` file (see `config.toml.example` for reference)
-4. Build the binary with `cargo build --locked --release --bin showtimes`
+2. Do configuration using `config.toml` file (see `config.toml.example` for reference)
+3. Build the binary with `cargo build --locked --release --bin showtimes`
    - Or use the `--profile production` flag for a more optimized build
-5. Run the binary with: `./target/release/showtimes`
+4. Run the binary with: `./target/release/showtimes`
    - Or in Windows: `.\target\release\showtimes.exe`
    - For production build, use `./target/production/showtimes` (or `.\target\production\showtimes.exe`)
-6. Access the API at `http://127.0.0.1:5560` by default
+5. Access the API at `http://127.0.0.1:5560` by default
 
 ## License
 

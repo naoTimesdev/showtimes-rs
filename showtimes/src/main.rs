@@ -98,13 +98,103 @@ async fn entrypoint() -> anyhow::Result<()> {
         }
     }
 
+    // Initialize JWT session
+    tracing::info!("🔌🔑 Initializing JWT keys...");
+    let jwt_variant = match config.jwt.variant.unwrap_or_default() {
+        showtimes_shared::config::JWTSHAMode::SHA256 => showtimes_session::ShowtimesSHAMode::SHA256,
+        showtimes_shared::config::JWTSHAMode::SHA384 => showtimes_session::ShowtimesSHAMode::SHA384,
+        showtimes_shared::config::JWTSHAMode::SHA512 => showtimes_session::ShowtimesSHAMode::SHA512,
+    };
+    let jwt_key = match &config.jwt.mode {
+        showtimes_shared::config::JWTMode::HMAC => {
+            showtimes_session::ShowtimesEncodingKey::new_hmac(
+                config.jwt.secret.clone().expect("JWT secret is missing"),
+                jwt_variant,
+            )
+        }
+        showtimes_shared::config::JWTMode::RSA => {
+            // read the public key
+            let public_key = tokio::fs::read(
+                config
+                    .jwt
+                    .public_key
+                    .clone()
+                    .expect("JWT public key is missing"),
+            )
+            .await?;
+            let private_key = tokio::fs::read(
+                config
+                    .jwt
+                    .private_key
+                    .clone()
+                    .expect("JWT private key is missing"),
+            )
+            .await?;
+
+            showtimes_session::ShowtimesEncodingKey::new_rsa(
+                &public_key,
+                &private_key,
+                jwt_variant,
+            )?
+        }
+        showtimes_shared::config::JWTMode::ECDSA => {
+            // read the public key
+            let public_key = tokio::fs::read(
+                config
+                    .jwt
+                    .public_key
+                    .clone()
+                    .expect("JWT public key is missing"),
+            )
+            .await?;
+            let private_key = tokio::fs::read(
+                config
+                    .jwt
+                    .private_key
+                    .clone()
+                    .expect("JWT private key is missing"),
+            )
+            .await?;
+
+            showtimes_session::ShowtimesEncodingKey::new_ecdsa(
+                &public_key,
+                &private_key,
+                jwt_variant,
+            )?
+        }
+    };
+
+    // Test JWT encode/deocde process
+    tracing::info!("🔌🔑🔒 Testing encoding key...");
+    match jwt_key.test_encode() {
+        Ok(key) => {
+            tracing::info!("🔌🔑🔒✅ Encoding key tested and successful");
+            tracing::info!("🔌🔑🔓 Testing token decoding...");
+            match jwt_key.test_decode(&key) {
+                Ok(_) => {
+                    tracing::info!("🔌🔑🔓✅ Decoding key tested and successful");
+                }
+                Err(e) => {
+                    tracing::error!("🔌🔑🔓⚠️ Decoding key test failed: {}", e);
+                    anyhow::bail!("Decoding key test failed");
+                }
+            }
+        }
+        Err(e) => {
+            tracing::error!("🔌🔑🔒⚠️ Encoding key test failed: {}", e);
+            anyhow::bail!("Encoding key test failed");
+        }
+    }
+
+    let arc_jwt = Arc::new(jwt_key);
+
     // Start loading database, storage, and other services
     tracing::info!("🔌 Loading services...");
     tracing::info!("🔌📒 Loading Redis cache...");
     let redis_conn = Arc::new(redis::Client::open(config.database.redis.clone())?);
     tracing::info!("🔌🔒 Loading session manager...");
     let session_manager =
-        showtimes_session::manager::SessionManager::new(&redis_conn, &config.jwt.secret).await?;
+        showtimes_session::manager::SessionManager::new(&redis_conn, &arc_jwt).await?;
     tracing::info!("🔌📰 Loading RSS manager...");
     let rss_manager = showtimes_rss::manager::RSSManager::new(&redis_conn).await?;
 
@@ -193,6 +283,7 @@ async fn entrypoint() -> anyhow::Result<()> {
         config: Arc::new(config.clone()),
         schema,
         session: Arc::new(Mutex::new(session_manager)),
+        jwt: arc_jwt,
         rss_manager: Arc::new(Mutex::new(rss_manager)),
         anilist_provider: Arc::new(Mutex::new(anilist_provider)),
         tmdb_provider,

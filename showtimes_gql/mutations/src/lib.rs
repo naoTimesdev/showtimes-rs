@@ -580,17 +580,15 @@ impl MutationRoot {
         let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
         let session = ctx.data_unchecked::<SharedSessionManager>();
         let config = ctx.data_unchecked::<Arc<showtimes_shared::config::Config>>();
+        let jwt = ctx.data_unchecked::<Arc<showtimes_session::ShowtimesEncodingKey>>();
         let user = loader.load_one(*id).await?.ok_or_else(|| {
             GQLError::new("User not found", GQLErrorCode::UserNotFound)
                 .extend(|e| e.set("id", id.to_string()))
         })?;
 
         // Create actual session
-        let (claims, _) = showtimes_session::create_session(
-            user.id,
-            config.jwt.get_expiration() as i64,
-            &config.jwt.secret,
-        )?;
+        let (claims, _) =
+            showtimes_session::create_session(user.id, config.jwt.get_expiration() as i64, jwt)?;
 
         // We don't create refresh token session for this custom orchestration.
         let mut sess_mutex = session.lock().await;

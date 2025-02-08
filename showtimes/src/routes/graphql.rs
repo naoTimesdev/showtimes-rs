@@ -143,6 +143,7 @@ pub async fn graphql_handler(
     req = req.data(state.meili.clone());
     req = req.data(state.clickhouse.clone());
     req = req.data(state.session.clone());
+    req = req.data(state.jwt.clone());
     req = req.data(state.storage.clone());
     req = req.data(state.anilist_provider.clone());
     if let Some(tmdb_provider) = state.tmdb_provider.as_ref() {
@@ -207,7 +208,7 @@ pub async fn graphql_handler(
         if let Some((refresh_session, _)) = active_refresh {
             let refreshed_data = showtimes_session::refresh_session(
                 refresh_session.get_token(),
-                &state.config.jwt.secret,
+                &state.jwt,
                 state.config.jwt.get_expiration() as i64,
             );
 

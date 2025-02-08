@@ -18,8 +18,7 @@ pub async fn oauth2_discord_authorize(
     let decoded_url = urlencoding::decode(&redirect_url).unwrap().to_string();
 
     let state_jack =
-        showtimes_session::create_discord_session_state(&decoded_url, &state.config.jwt.secret)
-            .unwrap();
+        showtimes_session::create_discord_session_state(&decoded_url, &state.jwt).unwrap();
 
     let scopes = ["identify", "email", "guilds", "guilds.members.read"];
 
