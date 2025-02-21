@@ -33,7 +33,7 @@ static VALID_API_AUDIENCES: LazyLock<HashSet<String>> = LazyLock::new(|| {
     set
 });
 const REFRESH_AUDIENCE: &str = "refresh-session";
-const ISSUER: &str = "showtimes-rs-session";
+const ISSUER: &str = "naoTimes/showtimes-rs";
 
 /// The audience for the token, we use an enum to ensure we only use the correct values
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
