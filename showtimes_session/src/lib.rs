@@ -2,6 +2,7 @@
 #![doc = include_str!("../README.md")]
 
 use std::sync::LazyLock;
+#[allow(clippy::disallowed_types)]
 use std::{collections::HashSet, sync::Arc};
 
 use chrono::TimeZone;
@@ -23,7 +24,9 @@ pub use jwt_lc_rs::errors::ValidationError as SessionValidationError;
 pub type SharedSigner = Arc<jwt_lc_rs::Signer>;
 
 // The issuer of the token, we use a LazyLock to ensure it's only created once
+#[allow(clippy::disallowed_types)]
 static VALID_API_AUDIENCES: LazyLock<HashSet<String>> = LazyLock::new(|| {
+    #[allow(clippy::disallowed_types)]
     let mut set = HashSet::new();
     set.insert(ShowtimesAudience::APIKey.to_string());
     set.insert(ShowtimesAudience::MasterKey.to_string());

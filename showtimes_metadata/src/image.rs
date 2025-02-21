@@ -1,14 +1,14 @@
 //! Some image related functions to handle cover image
 
 use crate::errors::{MetadataError, MetadataImageError};
-use kmeans_colors::{get_kmeans_hamerly, Kmeans, Sort};
+use kmeans_colors::{Kmeans, Sort, get_kmeans_hamerly};
 use nom::{
+    IResult, Parser,
     bytes::complete::{tag, take_while_m_n},
     combinator::map_res,
-    IResult, Parser,
 };
 use palette::{
-    cast::ComponentsAs, rgb::channels::Rgba, white_point::D65, IntoColor, Lab, Srgb, Srgba,
+    IntoColor, Lab, Srgb, Srgba, cast::ComponentsAs, rgb::channels::Rgba, white_point::D65,
 };
 
 type CachedSRGBA = rustc_hash::FxHashMap<[u8; 3], Lab<D65, f32>>;
@@ -116,7 +116,7 @@ pub fn hex_to_u32(hex: &str) -> Result<u32, MetadataError> {
         .parse(input)
         .map_err(|_| MetadataImageError::InvalidHexColor(hex.to_string()))?;
 
-    Ok((red as u32) << 16 | (green as u32) << 8 | blue as u32)
+    Ok(((red as u32) << 16) | ((green as u32) << 8) | blue as u32)
 }
 
 #[cfg(test)]
