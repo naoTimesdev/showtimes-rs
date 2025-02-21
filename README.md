@@ -5,7 +5,7 @@ A big rewrite in progress...
 ## Requirements
 
 The following project was built with the following requirements in mind:
-- Rust `1.81.0` or newer
+- Rust `1.85.0` or newer
 - MongoDB 6.x or newer
 - Redis/Valkey 7.x or newer (Redis (Labs) 7.4+ CE is NOT supported/recommended)
 - Meilisearch 1.8.x or newer
@@ -14,7 +14,7 @@ The following project was built with the following requirements in mind:
 
 ### MSRV
 
-The minimum supported Rust version is `1.81.0`
+The minimum supported Rust version is `1.85.0`
 
 ## Usages
 1. Clone the repository
