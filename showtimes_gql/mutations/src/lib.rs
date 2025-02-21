@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use async_graphql::{dataloader::DataLoader, Context, Object};
+use async_graphql::{Context, Object, dataloader::DataLoader};
 
 mod collaborations;
 mod common;
@@ -16,10 +16,10 @@ pub(crate) use common::*;
 
 use showtimes_db::m::APIKeyCapability;
 use showtimes_gql_common::{
+    GQLErrorCode, GQLErrorExt, OkResponse, Orchestrator, UserKindGQL,
     data_loader::UserDataLoader,
     errors::GQLError,
     guard::{APIKeyVerify, AuthUserAndAPIKeyGuard, AuthUserMinimumGuard},
-    GQLErrorCode, GQLErrorExt, OkResponse, Orchestrator, UserKindGQL,
 };
 use showtimes_gql_events_models::rss::RSSFeedRenderedGQL;
 use showtimes_gql_models::{
@@ -29,7 +29,7 @@ use showtimes_gql_models::{
     servers::ServerGQL,
     users::{UserGQL, UserSessionGQL},
 };
-use showtimes_session::{manager::SharedSessionManager, ShowtimesUserSession};
+use showtimes_session::{ShowtimesUserSession, manager::SharedSessionManager};
 
 /// The main Mutation Root type for the GraphQL schema. This is where all the mutation are defined.
 pub struct MutationRoot;
@@ -580,7 +580,7 @@ impl MutationRoot {
         let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
         let session = ctx.data_unchecked::<SharedSessionManager>();
         let config = ctx.data_unchecked::<Arc<showtimes_shared::config::Config>>();
-        let jwt = ctx.data_unchecked::<Arc<showtimes_session::ShowtimesEncodingKey>>();
+        let jwt = ctx.data_unchecked::<showtimes_session::SharedSigner>();
         let user = loader.load_one(*id).await?.ok_or_else(|| {
             GQLError::new("User not found", GQLErrorCode::UserNotFound)
                 .extend(|e| e.set("id", id.to_string()))

@@ -154,6 +154,8 @@ pub enum GQLErrorCode {
     UserInsufficientPrivilege = 1005,
     /// User is owner and cannot be modified or do anything "user"-like
     UserSuperuserMode = 1006,
+    /// Invalid signature when authenticating
+    UserInvalidSignature = 1007,
     /// Failed to create user
     UserCreateError = 1010,
     /// Failed to create user in search database

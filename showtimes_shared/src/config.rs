@@ -13,12 +13,17 @@ const EXPIRY_DEFAULT: u64 = 7 * 24 * 60 * 60;
 pub enum JWTMode {
     /// HMAC mode
     HMAC,
-    /// RSA-PSS/PKCS#1 v2.1 mode
+    /// RSA v1.5 mode
     RSA,
+    /// RSA-PSS v2.1 mode
+    #[serde(rename = "rsa-pss")]
+    RSAPSS,
     /// ECDSA mode in PKCS#8 format
     ECDSA,
-    /// EdDSA mode in x25519 format
+    /// EdDSA mode in x25519 format (PKCS#8)
     EDDSA,
+    /// ECDSA secp256k1/P256-K1 mode
+    ES256K1,
 }
 
 /// JWT SHA encoding mode
@@ -320,7 +325,7 @@ impl Config {
                     bail_verify!(Required, "JWT secret")
                 }
             }
-            JWTMode::ECDSA | JWTMode::RSA | JWTMode::EDDSA => {
+            JWTMode::ECDSA | JWTMode::RSA | JWTMode::RSAPSS | JWTMode::EDDSA | JWTMode::ES256K1 => {
                 if let Some(public_key) = &self.jwt.public_key {
                     // Test read
                     match std::fs::exists(public_key) {

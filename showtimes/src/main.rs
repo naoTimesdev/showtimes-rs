@@ -2,7 +2,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use axum::{response::IntoResponse, routing::get, Router};
+use axum::{Router, response::IntoResponse, routing::get};
 use routes::graphql::{GRAPHQL_ROUTE, GRAPHQL_WS_ROUTE};
 use serde_json::json;
 use showtimes_fs::s3::S3FsCredentials;
@@ -101,20 +101,21 @@ async fn entrypoint() -> anyhow::Result<()> {
     // Initialize JWT session
     tracing::info!("🔌🔑 Initializing JWT keys...");
     let jwt_variant = match config.jwt.variant.unwrap_or_default() {
-        showtimes_shared::config::JWTSHAMode::SHA256 => showtimes_session::ShowtimesSHAMode::SHA256,
-        showtimes_shared::config::JWTSHAMode::SHA384 => showtimes_session::ShowtimesSHAMode::SHA384,
-        showtimes_shared::config::JWTSHAMode::SHA512 => showtimes_session::ShowtimesSHAMode::SHA512,
+        showtimes_shared::config::JWTSHAMode::SHA256 => showtimes_session::signer::SHALevel::SHA256,
+        showtimes_shared::config::JWTSHAMode::SHA384 => showtimes_session::signer::SHALevel::SHA384,
+        showtimes_shared::config::JWTSHAMode::SHA512 => showtimes_session::signer::SHALevel::SHA512,
     };
     let jwt_key = match &config.jwt.mode {
         showtimes_shared::config::JWTMode::HMAC => {
-            showtimes_session::ShowtimesEncodingKey::new_hmac(
-                config.jwt.secret.clone().expect("JWT secret is missing"),
-                jwt_variant,
-            )
+            let secret = config.jwt.secret.clone().expect("JWT secret is missing");
+            let hmac_alg = showtimes_session::signer::HmacAlgorithm::new(jwt_variant, secret);
+            showtimes_session::signer::Signer::Hmac(hmac_alg)
         }
         showtimes_shared::config::JWTMode::RSA
+        | showtimes_shared::config::JWTMode::RSAPSS
         | showtimes_shared::config::JWTMode::ECDSA
-        | showtimes_shared::config::JWTMode::EDDSA => {
+        | showtimes_shared::config::JWTMode::EDDSA
+        | showtimes_shared::config::JWTMode::ES256K1 => {
             // read the public key
             let public_key = tokio::fs::read(
                 config
@@ -135,21 +136,42 @@ async fn entrypoint() -> anyhow::Result<()> {
 
             match config.jwt.mode {
                 showtimes_shared::config::JWTMode::ECDSA => {
-                    showtimes_session::ShowtimesEncodingKey::new_ecdsa(
-                        &public_key,
-                        &private_key,
+                    let ecdsa_alg = showtimes_session::signer::EcdsaAlgorithm::new_pem(
                         jwt_variant,
-                    )?
+                        private_key,
+                        public_key,
+                    )?;
+                    showtimes_session::signer::Signer::Ecdsa(ecdsa_alg)
+                }
+                showtimes_shared::config::JWTMode::ES256K1 => {
+                    let secp256k1_alg = showtimes_session::signer::Secp256k1Algorithm::new_pem(
+                        private_key,
+                        public_key,
+                    )?;
+                    showtimes_session::signer::Signer::Secp256k1(secp256k1_alg)
                 }
                 showtimes_shared::config::JWTMode::EDDSA => {
-                    showtimes_session::ShowtimesEncodingKey::new_eddsa(&public_key, &private_key)?
+                    let eddsa_alg = showtimes_session::signer::Ed25519Algorithm::new_pem(
+                        private_key,
+                        public_key,
+                    )?;
+                    showtimes_session::signer::Signer::Ed25519(eddsa_alg)
                 }
                 showtimes_shared::config::JWTMode::RSA => {
-                    showtimes_session::ShowtimesEncodingKey::new_rsa(
-                        &public_key,
-                        &private_key,
+                    let rsa_alg = showtimes_session::signer::RsaAlgorithm::new_pem(
                         jwt_variant,
-                    )?
+                        private_key,
+                        public_key,
+                    )?;
+                    showtimes_session::signer::Signer::Rsa(rsa_alg)
+                }
+                showtimes_shared::config::JWTMode::RSAPSS => {
+                    let rsa_pss_alg = showtimes_session::signer::RsaPssAlgorithm::new_pem(
+                        jwt_variant,
+                        private_key,
+                        public_key,
+                    )?;
+                    showtimes_session::signer::Signer::RsaPss(rsa_pss_alg)
                 }
                 _ => {
                     unreachable!("This JWT branch should not be reachable");
@@ -160,11 +182,11 @@ async fn entrypoint() -> anyhow::Result<()> {
 
     // Test JWT encode/deocde process
     tracing::info!("🔌🔑🔒 Testing encoding key...");
-    match jwt_key.test_encode() {
+    match showtimes_session::signer::test_encode(&jwt_key) {
         Ok(key) => {
             tracing::info!("🔌🔑🔒✅ Encoding key tested and successful");
             tracing::info!("🔌🔑🔓 Testing token decoding...");
-            match jwt_key.test_decode(&key) {
+            match showtimes_session::signer::test_decode(&key, &jwt_key) {
                 Ok(_) => {
                     tracing::info!("🔌🔑🔓✅ Decoding key tested and successful");
                 }

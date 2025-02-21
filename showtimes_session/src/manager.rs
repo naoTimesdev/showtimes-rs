@@ -2,16 +2,14 @@
 
 use std::sync::Arc;
 
-use jsonwebtoken::errors::ErrorKind;
-use redis::cmd;
+use jwt_lc_rs::errors::ValidationError;
 use redis::AsyncCommands;
 use redis::RedisResult;
-
-use crate::ShowtimesEncodingKey;
+use redis::cmd;
 
 use super::{
-    verify_refresh_session, verify_session, ShowtimesAudience, ShowtimesRefreshSession,
-    ShowtimesUserClaims, ShowtimesUserSession,
+    ShowtimesAudience, ShowtimesRefreshSession, ShowtimesUserClaims, ShowtimesUserSession,
+    verify_refresh_session, verify_session,
 };
 
 /// The shared [`SessionManager`] instance for the showtimes service.
@@ -22,10 +20,10 @@ const SESSION_MANAGER: &str = "showtimes:session";
 const SESSION_REFRESH_MANAGER: &str = "showtimes:session:refresh";
 
 /// Redis-managed session state for the showtimes service.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SessionManager {
     connection: redis::aio::MultiplexedConnection,
-    secret: Arc<ShowtimesEncodingKey>,
+    signer: Arc<jwt_lc_rs::Signer>,
 }
 
 /// The kind of session.
@@ -85,7 +83,7 @@ impl SessionManager {
     /// Create a new session manager.
     pub async fn new(
         client: &Arc<redis::Client>,
-        secret: &Arc<ShowtimesEncodingKey>,
+        signer: &Arc<jwt_lc_rs::Signer>,
     ) -> RedisResult<Self> {
         let client_name = format!("showtimes-rs/{}", env!("CARGO_PKG_VERSION"));
 
@@ -102,13 +100,13 @@ impl SessionManager {
 
         Ok(Self {
             connection: con,
-            secret: secret.clone(),
+            signer: signer.clone(),
         })
     }
 
-    /// Get reference to the internal [`ShowtimesEncodingKey`]
-    pub fn get_secret(&self) -> &ShowtimesEncodingKey {
-        &self.secret
+    /// Get reference to the internal [`jwt_lc_rs::Signer`]
+    pub fn get_signer(&self) -> &Arc<jwt_lc_rs::Signer> {
+        &self.signer
     }
 
     /// Delete a session from the session manager.
@@ -166,12 +164,16 @@ impl SessionManager {
                             }
                         }
 
-                        let session_res = verify_session(&token, &self.secret, kind.into())
+                        let session_res = verify_session(&token, &self.signer, kind.into())
                             .map_err(|e| {
                                 tracing::error!("Failed to verify session: {:?}", e);
-                                match e.kind() {
-                                    ErrorKind::ExpiredSignature => SessionError::ExpiredSession,
-                                    ErrorKind::InvalidSignature => SessionError::InvalidSignature,
+                                match e {
+                                    jwt_lc_rs::errors::Error::ValidationError(
+                                        ValidationError::TokenExpired(_, _),
+                                    ) => SessionError::ExpiredSession,
+                                    jwt_lc_rs::errors::Error::InvalidSignature => {
+                                        SessionError::InvalidSignature
+                                    }
                                     _ => SessionError::InvalidSession,
                                 }
                             });
@@ -229,11 +231,15 @@ impl SessionManager {
         match token_session {
             None => Err(SessionError::SessionNotFound),
             Some(token_session) => {
-                let refresh_res = verify_refresh_session(&token, &self.secret).map_err(|e| {
+                let refresh_res = verify_refresh_session(&token, &self.signer).map_err(|e| {
                     tracing::error!("Failed to verify refresh session: {:?}", e);
-                    match e.kind() {
-                        ErrorKind::ExpiredSignature => SessionError::ExpiredSession,
-                        ErrorKind::InvalidSignature => SessionError::InvalidSignature,
+                    match e {
+                        jwt_lc_rs::errors::Error::ValidationError(
+                            ValidationError::TokenExpired(_, _),
+                        ) => SessionError::ExpiredSession,
+                        jwt_lc_rs::errors::Error::InvalidSignature => {
+                            SessionError::InvalidSignature
+                        }
                         _ => SessionError::InvalidSession,
                     }
                 });

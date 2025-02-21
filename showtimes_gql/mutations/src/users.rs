@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
-use async_graphql::{dataloader::DataLoader, InputObject, Upload};
-use showtimes_db::{m::UserKind, DatabaseShared, UserHandler};
+use async_graphql::{InputObject, Upload, dataloader::DataLoader};
+use showtimes_db::{DatabaseShared, UserHandler, m::UserKind};
 use showtimes_fs::FsPool;
 use showtimes_search::SearchClientShared;
 use showtimes_session::{manager::SharedSessionManager, oauth2::discord::DiscordClient};
 use tokio::io::AsyncSeekExt;
 
 use showtimes_gql_common::{
+    GQLErrorCode, GQLErrorExt, UserKindGQL,
     data_loader::{DiscordIdLoad, UserDataLoader},
     errors::GQLError,
-    GQLErrorCode, GQLErrorExt, UserKindGQL,
 };
 use showtimes_gql_models::users::{UserGQL, UserSessionGQL};
 
@@ -46,7 +46,7 @@ impl UserInputGQL {
     }
 
     fn dump_query(&self, ctx: &mut async_graphql::ErrorExtensionValues) {
-        if let Some(ref username) = &self.username {
+        if let Some(username) = &self.username {
             ctx.set("username", username.to_string());
         }
         if let Some(kind) = &self.kind {
@@ -305,7 +305,7 @@ pub async fn mutate_users_authenticate(
     let config = ctx.data_unchecked::<Arc<showtimes_shared::Config>>();
     let event_manager = ctx.data_unchecked::<showtimes_events::SharedSHClickHouse>();
     let sess_manager = ctx.data_unchecked::<SharedSessionManager>();
-    let jwt_secret = ctx.data_unchecked::<Arc<showtimes_session::ShowtimesEncodingKey>>();
+    let jwt_secret = ctx.data_unchecked::<showtimes_session::SharedSigner>();
 
     tracing::info!("Authenticating user with token: {}", &token);
     showtimes_session::verify_session(
@@ -314,11 +314,14 @@ pub async fn mutate_users_authenticate(
         showtimes_session::ShowtimesAudience::DiscordAuth,
     )
     .map_err(|err| {
-        let sel_error = match err.kind() {
-            showtimes_session::SessionErrorKind::ExpiredSignature => GQLErrorCode::ExpiredToken,
-            showtimes_session::SessionErrorKind::InvalidAudience => {
-                GQLErrorCode::UserInvalidAudience
-            }
+        let sel_error = match err {
+            showtimes_session::SessionError::ValidationError(
+                showtimes_session::SessionValidationError::TokenExpired(_, _),
+            ) => GQLErrorCode::ExpiredToken,
+            showtimes_session::SessionError::ValidationError(
+                showtimes_session::SessionValidationError::InvalidAudience(_),
+            ) => GQLErrorCode::UserInvalidAudience,
+            showtimes_session::SessionError::InvalidSignature => GQLErrorCode::UserInvalidSignature,
             _ => GQLErrorCode::InvalidToken,
         };
         GQLError::new(err.to_string(), sel_error).extend(|e| {

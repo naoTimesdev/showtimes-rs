@@ -19,7 +19,7 @@ pub struct ShowtimesState {
     /// The redis session handler
     pub session: showtimes_session::manager::SharedSessionManager,
     /// The JWT session key encoder/decoder
-    pub jwt: Arc<showtimes_session::ShowtimesEncodingKey>,
+    pub jwt: showtimes_session::SharedSigner,
     /// The redis RSS manager handler
     pub rss_manager: showtimes_rss::manager::SharedRSSManager,
     /// External metadata providers (Anilist)
