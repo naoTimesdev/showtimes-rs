@@ -8,13 +8,80 @@ use showtimes_session::{manager::SharedSessionManager, oauth2::discord::DiscordC
 use tokio::io::AsyncSeekExt;
 
 use showtimes_gql_common::{
-    GQLErrorCode, GQLErrorExt, UserKindGQL,
+    APIKeyCapabilityGQL, APIKeyGQL, GQLErrorCode, GQLErrorExt, UserKindGQL,
     data_loader::{DiscordIdLoad, UserDataLoader},
     errors::GQLError,
 };
 use showtimes_gql_models::users::{UserGQL, UserSessionGQL};
 
 use crate::{execute_search_events, is_string_set};
+
+/// The input information of an API key
+#[derive(InputObject)]
+pub struct UserAPIKeyInputGQL {
+    /// The current API key to be reset or match with
+    ///
+    /// If not provided, we're assuming we're creating a new key
+    /// so make sure to set `capabilities`
+    key: Option<APIKeyGQL>,
+    /// Reset the API key
+    reset: Option<bool>,
+    /// Remove the API key
+    remove: Option<bool>,
+    /// The privilege level of the API key
+    #[graphql(validator(min_items = 1))]
+    capabilities: Option<Vec<APIKeyCapabilityGQL>>,
+}
+
+impl UserAPIKeyInputGQL {
+    /// Check if any field is set
+    fn is_any_set(&self) -> bool {
+        self.reset.is_some_and(|d| d)
+            || self.capabilities.is_some()
+            || self.key.is_some()
+            || self.remove.is_some_and(|d| d)
+    }
+
+    fn capabilities(&self) -> Option<Vec<showtimes_db::m::APIKeyCapability>> {
+        match &self.capabilities {
+            Some(capabilities) => Some(
+                capabilities
+                    .iter()
+                    .map(|d| (*d).into())
+                    .collect::<Vec<showtimes_db::m::APIKeyCapability>>(),
+            ),
+            None => None,
+        }
+    }
+
+    fn dump_query(
+        &self,
+        ctx: &mut async_graphql::indexmap::IndexMap<async_graphql::Name, async_graphql::Value>,
+    ) {
+        if let Some(key) = &self.key {
+            ctx.insert(
+                async_graphql::Name::new("key"),
+                async_graphql::Value::String(key.to_string()),
+            );
+        }
+        if let Some(reset) = self.reset {
+            ctx.insert(
+                async_graphql::Name::new("reset"),
+                async_graphql::Value::Boolean(reset),
+            );
+        }
+        if let Some(capabilities) = &self.capabilities {
+            let capabilities_map = capabilities
+                .iter()
+                .map(|d| async_graphql::Value::String(d.to_name().to_string()))
+                .collect::<Vec<async_graphql::Value>>();
+            ctx.insert(
+                async_graphql::Name::new("capabilities"),
+                async_graphql::Value::List(capabilities_map),
+            );
+        }
+    }
+}
 
 /// The user input object on what to update
 ///
@@ -36,13 +103,18 @@ pub struct UserInputGQL {
     kind: Option<UserKindGQL>,
     /// The user's avatar
     avatar: Option<Upload>,
-    // TODO: Implement back API key modification
+    /// Modify the user's API keys
+    api_keys: Option<Vec<UserAPIKeyInputGQL>>,
 }
 
 impl UserInputGQL {
     /// Check if any field is set
     fn is_any_set(&self) -> bool {
-        is_string_set(&self.username) || self.kind.is_some() || self.avatar.is_some()
+        let is_api_set = self
+            .api_keys
+            .as_ref()
+            .is_some_and(|d| d.iter().any(|d| d.is_any_set()));
+        is_string_set(&self.username) || self.kind.is_some() || self.avatar.is_some() || is_api_set
     }
 
     fn dump_query(&self, ctx: &mut async_graphql::ErrorExtensionValues) {
@@ -53,6 +125,19 @@ impl UserInputGQL {
             ctx.set("kind", kind.to_name());
         }
         ctx.set("avatar_change", self.avatar.is_some());
+        if let Some(api_keys) = &self.api_keys {
+            ctx.set(
+                "api_keys",
+                api_keys
+                    .iter()
+                    .map(|d| {
+                        let mut f_new = async_graphql::indexmap::IndexMap::new();
+                        d.dump_query(&mut f_new);
+                        async_graphql::Value::Object(f_new)
+                    })
+                    .collect::<Vec<async_graphql::Value>>(),
+            );
+        }
     }
 }
 
@@ -166,16 +251,82 @@ pub async fn mutate_users_update(
     let mut user_info = user_info.clone();
     let mut user_before = showtimes_events::m::UserUpdatedDataEvent::default();
     let mut user_after = showtimes_events::m::UserUpdatedDataEvent::default();
-    if let Some(ref username) = input.username {
+
+    if let Some(username) = &input.username {
         user_before.set_name(&user_info.username);
         user_info.username = username.to_string();
         user_after.set_name(&user_info.username);
     }
+
     if let Some(kind) = input.kind {
         user_before.set_kind(user_info.kind);
         user_info.kind = kind.into();
         user_after.set_kind(user_info.kind);
     }
+
+    // Update API keys
+    if let Some(api_keys) = &input.api_keys {
+        // set before
+        user_before.set_api_key(&user_info.api_key);
+
+        let mut any_api_changes = false;
+
+        for api_key in api_keys {
+            match &api_key.key {
+                Some(key) => {
+                    // find
+                    let matched = user_info.api_key.iter_mut().find(|d| d.key == **key);
+                    if let Some(matched) = matched {
+                        if let Some(remove) = api_key.remove {
+                            if remove {
+                                let current_len = user_info.api_key.len();
+                                user_info.api_key.retain(|d| d.key != **key);
+                                if current_len != user_info.api_key.len() {
+                                    any_api_changes = true;
+                                }
+                                // Jump!
+                                continue;
+                            }
+                        }
+
+                        // Reset API key
+                        if let Some(reset) = api_key.reset {
+                            if reset {
+                                matched.key = showtimes_shared::APIKey::new();
+                                any_api_changes = true;
+                            }
+                        }
+                        if let Some(capabilities) = &api_key.capabilities() {
+                            matched.capabilities = capabilities.to_vec();
+                            any_api_changes = true;
+                        }
+                    }
+                }
+                None => {
+                    // create, check
+                    let capabilities: Vec<showtimes_db::m::APIKeyCapability> = api_key
+                        .capabilities()
+                        .unwrap_or_else(|| showtimes_db::m::APIKeyCapability::all().to_vec());
+
+                    let key = showtimes_shared::APIKey::new();
+                    user_info
+                        .api_key
+                        .push(showtimes_db::m::APIKey::new(key, capabilities));
+                    any_api_changes = true;
+                }
+            }
+        }
+
+        // If any API key changed, update
+        if any_api_changes {
+            user_after.set_api_key(&user_info.api_key);
+        } else {
+            // flush before
+            user_before.clear_api_key();
+        }
+    }
+
+    // Update avatar
     if let Some(avatar_upload) = input.avatar {
         let info_up = avatar_upload.value(ctx).map_err(|err| {
             GQLError::new(
