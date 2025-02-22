@@ -2,7 +2,7 @@
 
 use proc_macro::TokenStream;
 use quote::ToTokens;
-use syn::{punctuated::Punctuated, Attribute, Expr, Lit, Meta, Token};
+use syn::{Attribute, Expr, Lit, Meta, Token, punctuated::Punctuated};
 
 static KNOWN_COPYABLE_FIELD: &[&str; 16] = &[
     "u8", "u16", "u32", "u64", "u128", "i8", "i16", "i32", "i64", "i128", "f32", "f64", "f128",
@@ -25,20 +25,24 @@ fn get_eventsmodel_attr(attrs: Vec<Attribute>) -> Result<EventModelAttr, syn::Er
                 if let Meta::NameValue(nameval) = meta {
                     if nameval.path.is_ident("unref") {
                         // Is a boolean
-                        if let Expr::Lit(lit) = nameval.value {
-                            if let Lit::Bool(val) = lit.lit {
-                                unref = val.value;
-                            } else {
+                        match nameval.value {
+                            Expr::Lit(lit) => match lit.lit {
+                                Lit::Bool(val) => {
+                                    unref = val.value;
+                                }
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        lit,
+                                        "Expected a boolean value for `unref`",
+                                    ));
+                                }
+                            },
+                            _ => {
                                 return Err(syn::Error::new_spanned(
-                                    lit,
+                                    nameval.value,
                                     "Expected a boolean value for `unref`",
                                 ));
                             }
-                        } else {
-                            return Err(syn::Error::new_spanned(
-                                nameval.value,
-                                "Expected a boolean value for `unref`",
-                            ));
                         }
                     }
                 }
@@ -373,10 +377,9 @@ fn get_inner_type_of_vec(ty: &syn::Type) -> Option<&syn::Type> {
 fn is_string_field(ty: &syn::Type) -> bool {
     // If Path, get the last segment and check if the Ident is "String"
     if let syn::Type::Path(type_path) = ty {
-        if let Some(last_segment) = type_path.path.segments.last() {
-            last_segment.ident == "String"
-        } else {
-            false
+        match type_path.path.segments.last() {
+            Some(last_segment) => last_segment.ident == "String",
+            _ => false,
         }
     } else {
         false

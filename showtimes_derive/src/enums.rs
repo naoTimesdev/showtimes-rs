@@ -1,7 +1,7 @@
 use ahash::{HashMap, HashMapExt};
 use convert_case::Casing;
 use proc_macro::TokenStream;
-use syn::{punctuated::Punctuated, spanned::Spanned, Attribute, Expr, Lit, LitStr, Meta, Token};
+use syn::{Attribute, Expr, Lit, LitStr, Meta, Token, punctuated::Punctuated, spanned::Spanned};
 
 #[derive(Debug, Clone)]
 struct EnumNameAttr {
@@ -55,54 +55,66 @@ fn get_enumname_attr(attrs: &[Attribute]) -> Result<EnumNameAttr, syn::Error> {
                 if let Meta::NameValue(nameval) = meta {
                     if nameval.path.is_ident("rename") {
                         // Is a string
-                        if let Expr::Lit(lit) = nameval.value {
-                            if let Lit::Str(val) = lit.lit {
-                                rename = Some(val.value());
-                            } else {
+                        match nameval.value {
+                            Expr::Lit(lit) => match lit.lit {
+                                Lit::Str(val) => {
+                                    rename = Some(val.value());
+                                }
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        lit,
+                                        "Expected a string value for `rename`",
+                                    ));
+                                }
+                            },
+                            _ => {
                                 return Err(syn::Error::new_spanned(
-                                    lit,
+                                    nameval.value,
                                     "Expected a string value for `rename`",
                                 ));
                             }
-                        } else {
-                            return Err(syn::Error::new_spanned(
-                                nameval.value,
-                                "Expected a string value for `rename`",
-                            ));
                         }
                     } else if nameval.path.is_ident("rename_all") {
                         // Is a string
-                        if let Expr::Lit(lit) = nameval.value {
-                            if let Lit::Str(val) = lit.lit {
-                                rename_all = map_convert_case(&val.value(), &val)?;
-                            } else {
+                        match nameval.value {
+                            Expr::Lit(lit) => match lit.lit {
+                                Lit::Str(val) => {
+                                    rename_all = map_convert_case(&val.value(), &val)?;
+                                }
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        lit,
+                                        "Expected a string value for `rename_all`",
+                                    ));
+                                }
+                            },
+                            _ => {
                                 return Err(syn::Error::new_spanned(
-                                    lit,
+                                    nameval.value,
                                     "Expected a string value for `rename_all`",
                                 ));
                             }
-                        } else {
-                            return Err(syn::Error::new_spanned(
-                                nameval.value,
-                                "Expected a string value for `rename_all`",
-                            ));
                         }
                     } else if nameval.path.is_ident("strict") {
                         // Is a boolean
-                        if let Expr::Lit(lit) = nameval.value {
-                            if let Lit::Bool(val) = lit.lit {
-                                strict = val.value;
-                            } else {
+                        match nameval.value {
+                            Expr::Lit(lit) => match lit.lit {
+                                Lit::Bool(val) => {
+                                    strict = val.value;
+                                }
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        lit,
+                                        "Expected a boolean value for `strict`",
+                                    ));
+                                }
+                            },
+                            _ => {
                                 return Err(syn::Error::new_spanned(
-                                    lit,
+                                    nameval.value,
                                     "Expected a boolean value for `strict`",
                                 ));
                             }
-                        } else {
-                            return Err(syn::Error::new_spanned(
-                                nameval.value,
-                                "Expected a boolean value for `strict`",
-                            ));
                         }
                     }
                 }
@@ -126,7 +138,7 @@ pub(crate) fn expand_enumname(input: &syn::DeriveInput) -> TokenStream {
         _ => {
             return syn::Error::new(input.span(), "`EnumName` can only be derived for enums")
                 .to_compile_error()
-                .into()
+                .into();
         }
     };
 
@@ -243,142 +255,185 @@ fn get_serde_automata_attr(attrs: &[Attribute]) -> Result<SerdeAutomataAttr, syn
         if attr.path().is_ident("serde_automata") {
             let nested = attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
             for meta in nested {
-                if let Meta::NameValue(nameval) = meta {
-                    if nameval.path.is_ident("rename") {
-                        // Is a string
-                        if let Expr::Lit(lit) = nameval.value {
-                            if let Lit::Str(val) = lit.lit {
-                                // Split by comma, then trim whitespace
-                                rename = split_lit_str(&val);
-                            } else {
-                                return Err(syn::Error::new_spanned(
-                                    lit,
-                                    "Expected a string value for `rename`",
-                                ));
+                match meta {
+                    Meta::NameValue(nameval) => {
+                        if nameval.path.is_ident("rename") {
+                            // Is a string
+                            match nameval.value {
+                                Expr::Lit(lit) => {
+                                    match lit.lit {
+                                        Lit::Str(val) => {
+                                            // Split by comma, then trim whitespace
+                                            rename = split_lit_str(&val);
+                                        }
+                                        _ => {
+                                            return Err(syn::Error::new_spanned(
+                                                lit,
+                                                "Expected a string value for `rename`",
+                                            ));
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        nameval.value,
+                                        "Expected a string value for `rename`",
+                                    ));
+                                }
                             }
-                        } else {
-                            return Err(syn::Error::new_spanned(
-                                nameval.value,
-                                "Expected a string value for `rename`",
-                            ));
-                        }
-                    } else if nameval.path.is_ident("ser_rename") {
-                        // Is a string
-                        if let Expr::Lit(lit) = nameval.value {
-                            if let Lit::Str(val) = lit.lit {
-                                // Split by comma, then trim whitespace
-                                ser_rename = split_lit_str(&val);
-                            } else {
-                                return Err(syn::Error::new_spanned(
-                                    lit,
-                                    "Expected a string value for `ser_rename`",
-                                ));
+                        } else if nameval.path.is_ident("ser_rename") {
+                            // Is a string
+                            match nameval.value {
+                                Expr::Lit(lit) => {
+                                    match lit.lit {
+                                        Lit::Str(val) => {
+                                            // Split by comma, then trim whitespace
+                                            ser_rename = split_lit_str(&val);
+                                        }
+                                        _ => {
+                                            return Err(syn::Error::new_spanned(
+                                                lit,
+                                                "Expected a string value for `ser_rename`",
+                                            ));
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        nameval.value,
+                                        "Expected a string value for `ser_rename`",
+                                    ));
+                                }
                             }
-                        } else {
-                            return Err(syn::Error::new_spanned(
-                                nameval.value,
-                                "Expected a string value for `ser_rename`",
-                            ));
-                        }
-                    } else if nameval.path.is_ident("deser_rename") {
-                        // Is a string
-                        if let Expr::Lit(lit) = nameval.value {
-                            if let Lit::Str(val) = lit.lit {
-                                // Split by comma, then trim whitespace
-                                deser_rename = split_lit_str(&val);
-                            } else {
-                                return Err(syn::Error::new_spanned(
-                                    lit,
-                                    "Expected a string value for `deser_rename`",
-                                ));
+                        } else if nameval.path.is_ident("deser_rename") {
+                            // Is a string
+                            match nameval.value {
+                                Expr::Lit(lit) => {
+                                    match lit.lit {
+                                        Lit::Str(val) => {
+                                            // Split by comma, then trim whitespace
+                                            deser_rename = split_lit_str(&val);
+                                        }
+                                        _ => {
+                                            return Err(syn::Error::new_spanned(
+                                                lit,
+                                                "Expected a string value for `deser_rename`",
+                                            ));
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        nameval.value,
+                                        "Expected a string value for `deser_rename`",
+                                    ));
+                                }
                             }
-                        } else {
-                            return Err(syn::Error::new_spanned(
-                                nameval.value,
-                                "Expected a string value for `deser_rename`",
-                            ));
-                        }
-                    } else if nameval.path.is_ident("rename_all") {
-                        // Is a string
-                        if let Expr::Lit(lit) = nameval.value {
-                            if let Lit::Str(val) = lit.lit {
-                                rename_all = map_convert_case(&val.value(), &val)?;
-                            } else {
-                                return Err(syn::Error::new_spanned(
-                                    lit,
-                                    "Expected a string value for `rename_all`",
-                                ));
+                        } else if nameval.path.is_ident("rename_all") {
+                            // Is a string
+                            match nameval.value {
+                                Expr::Lit(lit) => match lit.lit {
+                                    Lit::Str(val) => {
+                                        rename_all = map_convert_case(&val.value(), &val)?;
+                                    }
+                                    _ => {
+                                        return Err(syn::Error::new_spanned(
+                                            lit,
+                                            "Expected a string value for `rename_all`",
+                                        ));
+                                    }
+                                },
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        nameval.value,
+                                        "Expected a string value for `rename_all`",
+                                    ));
+                                }
                             }
-                        } else {
-                            return Err(syn::Error::new_spanned(
-                                nameval.value,
-                                "Expected a string value for `rename_all`",
-                            ));
-                        }
-                    } else if nameval.path.is_ident("strict") {
-                        // Is a boolean
-                        if let Expr::Lit(lit) = nameval.value {
-                            if let Lit::Bool(val) = lit.lit {
-                                strict = val.value;
-                            } else {
-                                return Err(syn::Error::new_spanned(
-                                    lit,
-                                    "Expected a boolean value for `strict`",
-                                ));
+                        } else if nameval.path.is_ident("strict") {
+                            // Is a boolean
+                            match nameval.value {
+                                Expr::Lit(lit) => match lit.lit {
+                                    Lit::Bool(val) => {
+                                        strict = val.value;
+                                    }
+                                    _ => {
+                                        return Err(syn::Error::new_spanned(
+                                            lit,
+                                            "Expected a boolean value for `strict`",
+                                        ));
+                                    }
+                                },
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        nameval.value,
+                                        "Expected a boolean value for `strict`",
+                                    ));
+                                }
                             }
-                        } else {
-                            return Err(syn::Error::new_spanned(
-                                nameval.value,
-                                "Expected a boolean value for `strict`",
-                            ));
-                        }
-                    } else if nameval.path.is_ident("case_sensitive") {
-                        // Is a boolean
-                        if let Expr::Lit(lit) = nameval.value {
-                            if let Lit::Bool(val) = lit.lit {
-                                case_sensitive = val.value;
-                            } else {
-                                return Err(syn::Error::new_spanned(
-                                    lit,
-                                    "Expected a boolean value for `case_sensitive`",
-                                ));
+                        } else if nameval.path.is_ident("case_sensitive") {
+                            // Is a boolean
+                            match nameval.value {
+                                Expr::Lit(lit) => match lit.lit {
+                                    Lit::Bool(val) => {
+                                        case_sensitive = val.value;
+                                    }
+                                    _ => {
+                                        return Err(syn::Error::new_spanned(
+                                            lit,
+                                            "Expected a boolean value for `case_sensitive`",
+                                        ));
+                                    }
+                                },
+                                _ => {
+                                    return Err(syn::Error::new_spanned(
+                                        nameval.value,
+                                        "Expected a boolean value for `case_sensitive`",
+                                    ));
+                                }
                             }
-                        } else {
-                            return Err(syn::Error::new_spanned(
-                                nameval.value,
-                                "Expected a boolean value for `case_sensitive`",
-                            ));
-                        }
-                    } else if nameval.path.is_ident("deserialize_rename_all") {
-                        // Is a string
-                        if let Expr::Lit(lit) = nameval.value {
-                            if let Lit::Str(val) = lit.lit {
-                                deserialize_rename_all =
-                                    Some(map_convert_case(&val.value(), &val)?);
-                            } else {
-                                return Err(syn::Error::new_spanned(
-                                    lit,
-                                    "Expected a string value for `deserialize_rename_all`",
-                                ));
+                        } else if nameval.path.is_ident("deserialize_rename_all") {
+                            // Is a string
+                            if let Expr::Lit(lit) = nameval.value {
+                                match lit.lit {
+                                    Lit::Str(val) => {
+                                        deserialize_rename_all =
+                                            Some(map_convert_case(&val.value(), &val)?);
+                                    }
+                                    _ => {
+                                        return Err(syn::Error::new_spanned(
+                                            lit,
+                                            "Expected a string value for `deserialize_rename_all`",
+                                        ));
+                                    }
+                                }
                             }
-                        }
-                    } else if nameval.path.is_ident("serialize_rename_all") {
-                        // Is a string
-                        if let Expr::Lit(lit) = nameval.value {
-                            if let Lit::Str(val) = lit.lit {
-                                serialize_rename_all = Some(map_convert_case(&val.value(), &val)?);
-                            } else {
-                                return Err(syn::Error::new_spanned(
-                                    lit,
-                                    "Expected a string value for `serialize_rename_all`",
-                                ));
+                        } else if nameval.path.is_ident("serialize_rename_all") {
+                            // Is a string
+                            if let Expr::Lit(lit) = nameval.value {
+                                match lit.lit {
+                                    Lit::Str(val) => {
+                                        serialize_rename_all =
+                                            Some(map_convert_case(&val.value(), &val)?);
+                                    }
+                                    _ => {
+                                        return Err(syn::Error::new_spanned(
+                                            lit,
+                                            "Expected a string value for `serialize_rename_all`",
+                                        ));
+                                    }
+                                }
                             }
                         }
                     }
-                } else if let Meta::Path(pathval) = meta {
-                    if pathval.is_ident("skip") {
-                        skip = true;
-                    }
+                    _ => match meta {
+                        Meta::Path(pathval) => {
+                            if pathval.is_ident("skip") {
+                                skip = true;
+                            }
+                        }
+                        _ => {}
+                    },
                 }
             }
         }
@@ -409,7 +464,7 @@ pub(crate) fn serde_automata_expand(input: &syn::DeriveInput) -> TokenStream {
                 "`SerdeAutomata` can only be derived for enums",
             )
             .to_compile_error()
-            .into()
+            .into();
         }
     };
 

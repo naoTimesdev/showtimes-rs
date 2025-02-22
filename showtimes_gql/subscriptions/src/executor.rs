@@ -2,8 +2,8 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use async_graphql::OutputType;
 use futures_util::{Stream, StreamExt};
-use serde::{de::DeserializeOwned, Serialize};
-use showtimes_gql_common::{queries::ServerQueryUser, UlidGQL};
+use serde::{Serialize, de::DeserializeOwned};
+use showtimes_gql_common::{UlidGQL, queries::ServerQueryUser};
 use showtimes_gql_events_models::{
     prelude::{EventGQL, QueryNew},
     rss::RSSEventGQL,
@@ -29,9 +29,9 @@ pub(crate) struct EventWatcherWithUser<
 }
 
 impl<
-        O: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + Debug + 'static,
-        T: for<'target> From<&'target O> + OutputType + 'static,
-    > EventWatcher<O, T>
+    O: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + Debug + 'static,
+    T: for<'target> From<&'target O> + OutputType + 'static,
+> EventWatcher<O, T>
 {
     pub(crate) fn new(kind: showtimes_events::m::EventKind) -> Self {
         Self {
@@ -45,7 +45,7 @@ impl<
         self,
         ctx: &async_graphql::Context<'_>,
         id: Option<UlidGQL>,
-    ) -> impl Stream<Item = EventGQL<T>> {
+    ) -> impl Stream<Item = EventGQL<T>> + use<O, T> {
         let mut stream_map = tokio_stream::StreamMap::new();
         let (tx_mem, rx_mem) = tokio::sync::mpsc::channel(100);
 
@@ -125,9 +125,9 @@ impl<
 }
 
 impl<
-        O: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + Debug + 'static,
-        T: QueryNew<O> + OutputType + 'static,
-    > EventWatcherWithUser<O, T>
+    O: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + Debug + 'static,
+    T: QueryNew<O> + OutputType + 'static,
+> EventWatcherWithUser<O, T>
 {
     pub(crate) fn new(kind: showtimes_events::m::EventKind, user: ServerQueryUser) -> Self {
         Self {
@@ -142,7 +142,7 @@ impl<
         self,
         ctx: &async_graphql::Context<'_>,
         id: Option<UlidGQL>,
-    ) -> impl Stream<Item = EventGQL<T>> {
+    ) -> impl Stream<Item = EventGQL<T>> + use<O, T> {
         let mut stream_map = tokio_stream::StreamMap::new();
         let (tx_mem, rx_mem) = tokio::sync::mpsc::channel(100);
 
@@ -225,7 +225,7 @@ pub(crate) fn stream_rss_events(
     ctx: &async_graphql::Context<'_>,
     feed_id: UlidGQL,
     id: Option<UlidGQL>,
-) -> impl Stream<Item = RSSEventGQL> {
+) -> impl Stream<Item = RSSEventGQL> + use<> {
     let mut stream_map = tokio_stream::StreamMap::new();
     let (tx_mem, rx_mem) = tokio::sync::mpsc::channel(100);
 

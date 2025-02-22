@@ -3,9 +3,9 @@ use std::fmt::Debug;
 use clickhouse::Client;
 
 use crate::{
+    RSS_TABLE_NAME, TABLE_NAME,
     m::EventKind,
     models::{RSSEvent, SHEvent},
-    RSS_TABLE_NAME, TABLE_NAME,
 };
 
 #[derive(Clone)]
@@ -186,10 +186,9 @@ where
             return true;
         }
 
-        if let Some(current) = &self.current {
-            current.len() < self.per_page
-        } else {
-            false
+        match &self.current {
+            Some(current) => current.len() < self.per_page,
+            _ => false,
         }
     }
 

@@ -86,10 +86,10 @@ impl FsErrorExt for quick_xml::DeError {
 /// Create a bail shortcut for FsError
 #[macro_export(local_inner_macros)]
 macro_rules! fs_bail {
-    ($source:ident, $message:expr, $($arg:tt)*) => {
+    ($source:ident, $message:expr_2021, $($arg:tt)*) => {
         return Err($crate::errors::FsError::new(std::format!($message, $($arg)*), $crate::errors::FsErrorSource::$source))
     };
-    ($source:ident, $message:expr) => {
+    ($source:ident, $message:expr_2021) => {
         return Err($crate::errors::FsError::new($message, $crate::errors::FsErrorSource::$source))
     }
 }
@@ -97,10 +97,10 @@ macro_rules! fs_bail {
 /// Create a macro shortcut for FsError
 #[macro_export(local_inner_macros)]
 macro_rules! fs_error {
-    ($source:ident, $message:expr, $($arg:tt)*) => {
+    ($source:ident, $message:expr_2021, $($arg:tt)*) => {
         $crate::errors::FsError::new(std::format!($message, $($arg)*), $crate::errors::FsErrorSource::$source)
     };
-    ($source:ident, $message:expr) => {
+    ($source:ident, $message:expr_2021) => {
         $crate::errors::FsError::new($message, $crate::errors::FsErrorSource::$source)
     }
 }

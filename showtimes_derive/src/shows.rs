@@ -1,7 +1,7 @@
 //! A custom derive collection macro for Database/MongoDB models
 
 use proc_macro::TokenStream;
-use syn::{spanned::Spanned, Lit};
+use syn::{Lit, spanned::Spanned};
 
 pub(crate) fn expand_showmodel(ast: &syn::DeriveInput) -> TokenStream {
     let name = &ast.ident;
@@ -32,8 +32,8 @@ pub(crate) fn expand_showmodel(ast: &syn::DeriveInput) -> TokenStream {
                 // Check if the field has the `#[serde(skip_serializing_if = "Object::is_none")]` attribute
                 let has_skip_serializing = id_field.attrs.iter().any(|attr| {
                     attr.path().is_ident("serde")
-                        && attr.parse_args::<syn::Meta>().is_ok_and(|meta| {
-                            if let syn::Meta::NameValue(meta) = meta {
+                        && attr.parse_args::<syn::Meta>().is_ok_and(|meta| match meta {
+                            syn::Meta::NameValue(meta) => {
                                 if let syn::Expr::Lit(lit) = &meta.value {
                                     if let syn::Lit::Str(litstr) = &lit.lit {
                                         return litstr.token().to_string() == "\"Option::is_none\""
@@ -41,9 +41,8 @@ pub(crate) fn expand_showmodel(ast: &syn::DeriveInput) -> TokenStream {
                                     }
                                 }
                                 false
-                            } else {
-                                false
                             }
+                            _ => false,
                         })
                 });
 
@@ -86,7 +85,7 @@ pub(crate) fn expand_showmodel(ast: &syn::DeriveInput) -> TokenStream {
                     return TokenStream::from(
                         syn::Error::new_spanned(attr, "Expected a string literal for `col_name`")
                             .to_compile_error(),
-                    )
+                    );
                 }
             }
         }
@@ -99,7 +98,7 @@ pub(crate) fn expand_showmodel(ast: &syn::DeriveInput) -> TokenStream {
             return TokenStream::from(
                 syn::Error::new_spanned(name, "Missing required attribute: `col_name`")
                     .to_compile_error(),
-            )
+            );
         }
     };
 

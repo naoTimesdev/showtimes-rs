@@ -277,7 +277,7 @@ async fn on_ws_init(
 
     let mut data = GQLData::default();
 
-    if let Ok(payload) = serde_json::from_value::<Payload>(value) {
+    match serde_json::from_value::<Payload>(value) { Ok(payload) => {
         // If master key, format is MasterKey
         let session_kind = if payload.token == state.config.master_key {
             SessionKind::MasterKey
@@ -311,7 +311,7 @@ async fn on_ws_init(
                 )));
             }
         }
-    } else if let Some((kind, token)) = get_token_or_bearer(&headers, &state.config) {
+    } _ => { match get_token_or_bearer(&headers, &state.config) { Some((kind, token)) => {
         match state.session.lock().await.get_session(token, kind).await {
             Ok(session) => {
                 tracing::debug!("[WS] Got session (from header): {:?}", session);
@@ -326,11 +326,11 @@ async fn on_ws_init(
                 )));
             }
         }
-    } else {
+    } _ => {
         tracing::error!("[WS] No token found in payload or header");
         // Close/deny the connection
         return Err(GQLError::new("No token found in payload or header"));
-    }
+    }}}}
 
     data.insert(state.db.clone());
     data.insert(state.config.clone());

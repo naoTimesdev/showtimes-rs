@@ -243,7 +243,7 @@ pub struct Config {
 
 /// This macro wraps [`ConfigVerifyError`] and the error item &str into a String
 macro_rules! bail_verify {
-    ($variant:ident, $item:expr) => {{
+    ($variant:ident, $item:expr_2021) => {{
         return Err(ConfigVerifyError::$variant($item.to_string()).into());
     }};
 }

@@ -9,8 +9,8 @@ pub mod models;
 mod streams;
 pub use brokers::MemoryBroker;
 pub use brokers::RSSBroker;
-pub use clickhouse::error::Error as ClickHouseError;
 use clickhouse::Client;
+pub use clickhouse::error::Error as ClickHouseError;
 pub use models as m;
 
 /// The shared [`SHClickHouse`] client
@@ -33,10 +33,9 @@ impl SHClickHouse {
         password: Option<impl Into<String>>,
     ) -> Result<Self, clickhouse::error::Error> {
         let ch_client = Client::default().with_url(url).with_user(username);
-        let ch_client = if let Some(password) = password {
-            ch_client.with_password(password)
-        } else {
-            ch_client
+        let ch_client = match password {
+            Some(password) => ch_client.with_password(password),
+            _ => ch_client,
         };
 
         let sh_client = Self::initialize(&ch_client).await?;
