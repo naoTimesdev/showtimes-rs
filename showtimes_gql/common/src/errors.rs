@@ -205,6 +205,8 @@ pub enum GQLErrorCode {
     ServerPremiumUpdateError = 2111,
     /// Failed to delete server premium data
     ServerPremiumDeleteError = 2112,
+    /// The provided end-time is in the past
+    ServerPremiumInvalidEndTime = 2113,
 
     // --> Project related
     /// Failed when requesting project

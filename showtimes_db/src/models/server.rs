@@ -400,7 +400,7 @@ impl ServerPremium {
     }
 
     /// Extend the end date to the given date.
-    pub fn extend_at(&mut self, ends_at: chrono::DateTime<chrono::Utc>) -> &mut Self {
+    pub fn extend_at(mut self, ends_at: chrono::DateTime<chrono::Utc>) -> Self {
         self.ends_at = ends_at;
         self
     }
@@ -408,7 +408,7 @@ impl ServerPremium {
     /// Extend the end date by the given duration.
     ///
     /// Returns `self` for chainability.
-    pub fn extend_by(&mut self, duration: chrono::Duration) -> &mut Self {
+    pub fn extend_by(mut self, duration: chrono::Duration) -> Self {
         self.ends_at += duration;
         self
     }

@@ -1,20 +1,25 @@
 use std::sync::Arc;
 
-use async_graphql::{dataloader::DataLoader, InputObject, Upload};
-use showtimes_db::{m::UserKind, mongodb::bson::doc, DatabaseShared, ServerHandler};
+use async_graphql::{InputObject, Upload, dataloader::DataLoader};
+use showtimes_db::{
+    DatabaseShared, ServerHandler,
+    m::{ShowModelHandler, UserKind},
+    mongodb::bson::doc,
+};
 use showtimes_fs::{FsFileKind, FsPool};
 use showtimes_search::SearchClientShared;
 use tokio::io::AsyncSeekExt;
 
 use showtimes_gql_common::{
-    data_loader::ServerDataLoader, errors::GQLError, GQLErrorCode, GQLErrorExt, OkResponse,
-    UlidGQL, UserKindGQL,
+    DateTimeGQL, GQLErrorCode, GQLErrorExt, OkResponse, UlidGQL, UserKindGQL,
+    data_loader::{ServerDataLoader, ServerPremiumLoader},
+    errors::GQLError,
 };
-use showtimes_gql_models::servers::ServerGQL;
+use showtimes_gql_models::servers::{ServerGQL, ServerPremiumGQL};
 
 use crate::{
-    execute_search_events, is_string_set, is_vec_set, IntegrationActionGQL, IntegrationInputGQL,
-    IntegrationValidator,
+    IntegrationActionGQL, IntegrationInputGQL, IntegrationValidator, execute_search_events,
+    is_string_set, is_vec_set,
 };
 
 /// The server input object for creating a new server
@@ -941,4 +946,110 @@ pub async fn mutate_servers_delete(
     execute_search_events(task_search, task_events).await?;
 
     Ok(OkResponse::ok("Server deleted"))
+}
+
+pub async fn mutate_servers_premium_create(
+    ctx: &async_graphql::Context<'_>,
+    id: UlidGQL,
+    ends_at: DateTimeGQL,
+) -> async_graphql::Result<ServerPremiumGQL> {
+    let user = ctx.data_unchecked::<showtimes_db::m::User>();
+
+    if user.kind < UserKind::Admin {
+        // Fails, needs admin perms minimum perms
+        return GQLError::new(
+            "This account cannot create a new premium status for a server",
+            GQLErrorCode::UserInsufficientPrivilege,
+        )
+        .extend(|e| {
+            e.set("id", id.to_string());
+            e.set("user_id", user.id.to_string());
+        })
+        .into();
+    }
+
+    // Check if server exist
+    let srv_loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
+    let server = srv_loader.load_one(*id).await?.ok_or_else(|| {
+        GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
+            .extend(|e| e.set("id", id.to_string()))
+    })?;
+
+    let loader = ctx.data_unchecked::<DataLoader<ServerPremiumLoader>>();
+    let handler = loader.loader().get_inner();
+
+    let current_time_bson = showtimes_db::mongodb::bson::DateTime::now();
+    let chrono_utc = current_time_bson.to_chrono();
+
+    // Check if ends_at is in the past
+    if chrono_utc > *ends_at {
+        return GQLError::new(
+            "Ends at time is in the past",
+            GQLErrorCode::ServerPremiumInvalidEndTime,
+        )
+        .extend(|e| {
+            e.set("id", server.id.to_string());
+            e.set("ends_at", ends_at.to_string());
+            e.set("current_time", chrono_utc.to_string());
+        })
+        .into();
+    }
+
+    // Find for an active premium
+    let active_premium = handler
+        .find_by(doc! {
+            "target": server.id.to_string(),
+            // Each premium ends at specific time, ensure we only get the one that is active right now.
+            "ends_at": { "$gte": current_time_bson }
+        })
+        .await
+        .extend_error(GQLErrorCode::ServerPremiumRequestFails, |e| {
+            e.set("id", server.id.to_string());
+        })?;
+
+    let mut premium = match active_premium {
+        Some(premium) => {
+            // Check if ends_at is less than the current active premium
+            // if yes, use extend_by method by the duration between ends_at and current time
+            if *ends_at < premium.ends_at {
+                let duration_diff = *ends_at - premium.ends_at;
+
+                if duration_diff.num_seconds() < 0 {
+                    // negative?!
+                    return GQLError::new(
+                        "Ends at time is in the past",
+                        GQLErrorCode::ServerPremiumInvalidEndTime,
+                    )
+                    .extend(|e| {
+                        e.set("id", server.id.to_string());
+                        e.set("ends_at", ends_at.to_string());
+                        e.set("current_time", premium.ends_at.to_string());
+                    })
+                    .into();
+                }
+
+                // extend by the diff
+                premium.extend_by(duration_diff)
+            } else {
+                // extend until ends_at
+                premium.extend_at(*ends_at)
+            }
+        }
+        None => {
+            // Create a new premium
+            showtimes_db::m::ServerPremium::new(server.id, *ends_at)
+        }
+    };
+
+    premium.updated();
+
+    // Commit to DB
+    handler.save_direct(&mut premium, None).await.map_err(|e| {
+        GQLError::new(e.to_string(), GQLErrorCode::ServerPremiumCreateError).extend(|f| {
+            f.set("id", server.id.to_string());
+            f.set("ends_at", ends_at.to_string());
+        })
+    })?;
+
+    Ok(ServerPremiumGQL::from(premium).with_current_user(user.id))
 }

@@ -16,7 +16,7 @@ pub(crate) use common::*;
 
 use showtimes_db::m::APIKeyCapability;
 use showtimes_gql_common::{
-    GQLErrorCode, GQLErrorExt, OkResponse, Orchestrator, UserKindGQL,
+    DateTimeGQL, GQLErrorCode, GQLErrorExt, OkResponse, Orchestrator, UserKindGQL,
     data_loader::UserDataLoader,
     errors::GQLError,
     guard::{APIKeyVerify, AuthUserAndAPIKeyGuard, AuthUserMinimumGuard},
@@ -26,7 +26,7 @@ use showtimes_gql_models::{
     collaborations::{CollaborationInviteGQL, CollaborationSyncGQL},
     projects::ProjectGQL,
     rss::RSSFeedGQL,
-    servers::ServerGQL,
+    servers::{ServerGQL, ServerPremiumGQL},
     users::{UserGQL, UserSessionGQL},
 };
 use showtimes_session::{ShowtimesUserSession, manager::SharedSessionManager};
@@ -603,6 +603,27 @@ impl MutationRoot {
         Ok(UserSessionGQL::new(&user, claims.get_token()))
     }
 
+    /// Create or update a server premium status.
+    ///
+    /// There is some gotcha's with the implementation:
+    /// - If there is no current active premium status, this will create a new one.
+    /// - If there is an existing one, it will be either:
+    ///   - Updated to the `ends_at` if it is newer than the existing one.
+    ///   - Extended by the `ends_at` difference with current time if it is older than the existing one.
+    #[graphql(
+        name = "createOrUpdateServerPremium",
+        guard = "AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+    )]
+    async fn create_or_update_server_premium(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The server ID to create/update premium status for")]
+        id: showtimes_gql_common::UlidGQL,
+        #[graphql(desc = "The end date of the premium status")] ends_at: DateTimeGQL,
+    ) -> async_graphql::Result<ServerPremiumGQL> {
+        servers::mutate_servers_premium_create(ctx, id, ends_at).await
+    }
+
     /// Preview RSS feed template or display.
     ///
     /// This will use the latest data from the RSS feed to generate the preview.
@@ -614,8 +635,8 @@ impl MutationRoot {
     async fn preview_rss_feed(
         &self,
         ctx: &Context<'_>,
-        id: showtimes_gql_common::UlidGQL,
-        input: rss::RSSFeedDisplayPreviewInputGQL,
+        #[graphql(desc = "The RSS feed ID to preview")] id: showtimes_gql_common::UlidGQL,
+        #[graphql(desc = "The input to preview")] input: rss::RSSFeedDisplayPreviewInputGQL,
     ) -> async_graphql::Result<Option<RSSFeedRenderedGQL>> {
         rss::mutate_rss_feed_preview(ctx, id, input).await
     }
