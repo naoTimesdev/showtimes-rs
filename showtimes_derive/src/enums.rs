@@ -426,14 +426,13 @@ fn get_serde_automata_attr(attrs: &[Attribute]) -> Result<SerdeAutomataAttr, syn
                             }
                         }
                     }
-                    _ => match meta {
-                        Meta::Path(pathval) => {
+                    _ => {
+                        if let Meta::Path(pathval) = meta {
                             if pathval.is_ident("skip") {
                                 skip = true;
                             }
                         }
-                        _ => {}
-                    },
+                    }
                 }
             }
         }

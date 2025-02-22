@@ -43,15 +43,12 @@ impl UserAPIKeyInputGQL {
     }
 
     fn capabilities(&self) -> Option<Vec<showtimes_db::m::APIKeyCapability>> {
-        match &self.capabilities {
-            Some(capabilities) => Some(
-                capabilities
-                    .iter()
-                    .map(|d| (*d).into())
-                    .collect::<Vec<showtimes_db::m::APIKeyCapability>>(),
-            ),
-            None => None,
-        }
+        self.capabilities.as_ref().map(|capabilities| {
+            capabilities
+                .iter()
+                .map(|d| (*d).into())
+                .collect::<Vec<showtimes_db::m::APIKeyCapability>>()
+        })
     }
 
     fn dump_query(
