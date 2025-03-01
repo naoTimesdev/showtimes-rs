@@ -1053,3 +1053,107 @@ pub async fn mutate_servers_premium_create(
 
     Ok(ServerPremiumGQL::from(premium).with_current_user(user.id))
 }
+
+pub async fn mutate_servers_premium_delete(
+    ctx: &async_graphql::Context<'_>,
+    id: UlidGQL,
+) -> async_graphql::Result<OkResponse> {
+    let user = ctx.data_unchecked::<showtimes_db::m::User>();
+    let db = ctx.data_unchecked::<DatabaseShared>();
+
+    if user.kind < UserKind::Admin {
+        return GQLError::new(
+            "This account cannot delete a premium status for a server",
+            GQLErrorCode::UserInsufficientPrivilege,
+        )
+        .extend(|e| {
+            e.set("id", id.to_string());
+            e.set("user_id", user.id.to_string());
+        })
+        .into();
+    }
+
+    // Load premium information
+    let loader = ctx.data_unchecked::<DataLoader<ServerPremiumLoader>>();
+
+    let premium = loader.load_one(*id).await?.ok_or_else(|| {
+        GQLError::new(
+            "Premium status not found",
+            GQLErrorCode::ServerPremiumNotFound,
+        )
+        .extend(|e| e.set("id", id.to_string()))
+    })?;
+
+    // Get server information
+    let srv_loader = ctx.data_unchecked::<DataLoader<ServerDataLoader>>();
+    let server = srv_loader.load_one(premium.target).await?.ok_or_else(|| {
+        GQLError::new("Server not found", GQLErrorCode::ServerNotFound)
+            .extend(|e| e.set("id", premium.target.to_string()))
+    })?;
+
+    // Handle RSS feeds that may need to be disabled
+    let rss_handler = showtimes_db::RSSFeedHandler::new(db);
+    let rss_feeds = rss_handler
+        .find_all_by(doc! {
+            "creator": server.id.to_string()
+        })
+        .await
+        .extend_error(GQLErrorCode::RSSFeedRequestFails, |e| {
+            e.set("server_id", server.id.to_string());
+        })?;
+
+    // Get server config for max RSS feeds without premium
+    let config = ctx.data_unchecked::<Arc<showtimes_shared::Config>>();
+    let max_standard_feeds = config.rss.standard_limit.unwrap_or(2);
+
+    // If there are more RSS feeds than allowed without premium, disable newer ones
+    let to_be_disabled: Vec<String> = if rss_feeds.len() > max_standard_feeds as usize {
+        // Sort by creation date, ascending (oldest first)
+        let mut sorted_feeds = rss_feeds.clone();
+        sorted_feeds.sort_by(|a, b| a.created.cmp(&b.created));
+
+        // Skip the max allowed feeds (keep oldest ones) and disable the rest
+        sorted_feeds
+            .iter()
+            .skip(max_standard_feeds as usize)
+            .map(|feed| feed.id.to_string())
+            .collect()
+    } else {
+        vec![]
+    };
+
+    if !to_be_disabled.is_empty() {
+        // Disable the RSS feeds
+        rss_handler
+            .get_collection()
+            .update_many(
+                doc! {
+                    "id": {
+                        "$in": to_be_disabled
+                    }
+                },
+                doc! {
+                    "$set": {
+                        "enabled": false
+                    }
+                },
+            )
+            .await
+            .extend_error(GQLErrorCode::RSSFeedUpdateError, |e| {
+                e.set("server_id", server.id.to_string());
+            })?;
+    }
+
+    // Delete the premium status
+    loader
+        .loader()
+        .get_inner()
+        .delete(&premium)
+        .await
+        .extend_error(GQLErrorCode::ServerPremiumDeleteError, |e| {
+            e.set("id", premium.id.to_string());
+            e.set("server_id", server.id.to_string());
+        })?;
+
+    Ok(OkResponse::ok("Server premium deleted"))
+}

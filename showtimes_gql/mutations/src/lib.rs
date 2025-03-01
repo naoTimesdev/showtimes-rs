@@ -624,6 +624,20 @@ impl MutationRoot {
         servers::mutate_servers_premium_create(ctx, id, ends_at).await
     }
 
+    /// Delete a server premium status.
+    #[graphql(
+        name = "deleteServerPremium",
+        guard = "AuthUserMinimumGuard::new(UserKindGQL::Admin)"
+    )]
+    async fn delete_server_premium(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The server ID to delete premium status for")]
+        id: showtimes_gql_common::UlidGQL,
+    ) -> async_graphql::Result<OkResponse> {
+        servers::mutate_servers_premium_delete(ctx, id).await
+    }
+
     /// Preview RSS feed template or display.
     ///
     /// This will use the latest data from the RSS feed to generate the preview.
