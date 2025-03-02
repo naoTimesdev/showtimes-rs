@@ -38,7 +38,7 @@ rust-version = "1.85"
 # Essential stuff
 anyhow = "1"
 ahash = "0.8.11"
-chrono = "0.4.39"
+chrono = "0.4.40"
 time = "0.3.37"
 ulid = "1.2.0"
 uuid = { version = "1.14.0", default-features = false, features = ["v4", "v7", "fast-rng"] }
@@ -104,7 +104,7 @@ urlencoding = "2.1.3"
 # Database
 mongodb = { version = "3.2.1", default-features = false, features = ["compat-3-0-0", "rustls-tls"] }
 bson = { version = "2.13.0", features = ["chrono-0_4"] }
-redis = { version = "0.29.0", default-features = false, features = ["acl", "keep-alive", "tokio-comp"] }
+redis = { version = "0.29.1", default-features = false, features = ["acl", "keep-alive", "tokio-comp"] }
 clickhouse = { version = "0.13.1", features = ["uuid", "time"] }
 meilisearch-sdk = "0.28.0"
 jwt-lc-rs = { git = "https://github.com/noaione/jwt-lc-rs.git", rev = "7a4261fdce8ea1e631f1c4711e57fc5b73926787", features = [
@@ -126,7 +126,7 @@ pulldown-cmark-escape = "0.11.0"
 htmd = "0.1.6"
 
 # CLI
-clap = { version = "4.5.30", features = ["derive"] }
+clap = { version = "4.5.31", features = ["derive"] }
 dotenvy = "0.15.7"
 
 [profile.dev]
