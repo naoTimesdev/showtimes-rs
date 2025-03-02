@@ -21,6 +21,7 @@ async-graphql.workspace = true
 showtimes-shared = { path = "../../showtimes_shared" }
 showtimes-db = { path = "../../showtimes_db" }
 showtimes-metadata = { path = "../../showtimes_metadata" }
+showtimes-derive = { path = "../../showtimes_derive" }
 
 # GQL related
 showtimes-gql-common = { path = "../common" }

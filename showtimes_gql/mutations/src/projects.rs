@@ -4,6 +4,7 @@ use ahash::HashMapExt;
 use async_graphql::{CustomValidator, Enum, InputObject, Upload, dataloader::DataLoader};
 use chrono::TimeZone;
 use showtimes_db::{DatabaseShared, ProjectHandler, m::UserKind, mongodb::bson::doc};
+use showtimes_derive::EnumName;
 use showtimes_fs::FsPool;
 use showtimes_metadata::m::AnilistMediaFormat;
 use showtimes_search::SearchClientShared;
@@ -25,6 +26,8 @@ use crate::{
     IntegrationActionGQL, IntegrationInputGQL, IntegrationValidator, execute_search_events,
     is_string_set, is_vec_set,
 };
+
+type IndexMapQueries = async_graphql::indexmap::IndexMap<async_graphql::Name, async_graphql::Value>;
 
 /// The input information of an external metadata source
 #[derive(InputObject)]
@@ -78,6 +81,23 @@ impl CustomValidator<String> for ValidateRole {
     }
 }
 
+impl ProjectCreateMetadataInputGQL {
+    /// Dump the input into query information
+    fn dump_query(&self, f_mut: &mut IndexMapQueries) {
+        f_mut.insert(async_graphql::Name::new("id"), self.id.clone().into());
+        f_mut.insert(async_graphql::Name::new("kind"), self.kind.to_name().into());
+        if let Some(episode) = self.episode {
+            f_mut.insert(async_graphql::Name::new("episode"), episode.into());
+        }
+        if let Some(start_date) = &self.start_date {
+            f_mut.insert(
+                async_graphql::Name::new("start_date"),
+                start_date.to_string().into(),
+            );
+        }
+    }
+}
+
 /// The input for roles information
 #[derive(InputObject)]
 pub struct ProjectRoleInputGQL {
@@ -89,9 +109,18 @@ pub struct ProjectRoleInputGQL {
     name: String,
 }
 
+impl ProjectRoleInputGQL {
+    /// Dump the input into query information
+    fn dump_query(&self, f_mut: &mut IndexMapQueries) {
+        f_mut.insert(async_graphql::Name::new("key"), self.key.clone().into());
+        f_mut.insert(async_graphql::Name::new("name"), self.name.clone().into());
+    }
+}
+
 /// The action for updating a role
-#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, EnumName)]
 #[graphql(rename_items = "SCREAMING_SNAKE_CASE")]
+#[enum_name(rename_items = "SCREAMING_SNAKE_CASE")]
 pub enum ProjectRoleUpdateAction {
     /// Add new role
     Add,
@@ -110,6 +139,22 @@ pub struct ProjectRoleUpdateInputGQL {
     action: ProjectRoleUpdateAction,
 }
 
+impl ProjectRoleUpdateInputGQL {
+    /// Dump the input into query information
+    fn dump_query(&self, f_mut: &mut IndexMapQueries) {
+        let mut role_map = async_graphql::indexmap::IndexMap::new();
+        self.role.dump_query(&mut role_map);
+        f_mut.insert(
+            async_graphql::Name::new("role"),
+            async_graphql::Value::Object(role_map),
+        );
+        f_mut.insert(
+            async_graphql::Name::new("action"),
+            self.action.to_name().into(),
+        );
+    }
+}
+
 /// The input assignees for a project
 #[derive(InputObject)]
 pub struct ProjectAssigneeInputGQL {
@@ -118,6 +163,14 @@ pub struct ProjectAssigneeInputGQL {
     /// The role key
     #[graphql(validator(custom = "ValidateRole"))]
     role: String,
+}
+
+impl ProjectAssigneeInputGQL {
+    /// Dump the input into query information
+    fn dump_query(&self, f_mut: &mut IndexMapQueries) {
+        f_mut.insert(async_graphql::Name::new("id"), self.id.to_string().into());
+        f_mut.insert(async_graphql::Name::new("role"), self.role.clone().into());
+    }
 }
 
 /// The update information for a assignee for a project
@@ -132,6 +185,18 @@ pub struct ProjectAssigneeUpdateInputGQL {
     role: String,
 }
 
+impl ProjectAssigneeUpdateInputGQL {
+    /// Dump the input into query information
+    fn dump_query(&self, f_mut: &mut IndexMapQueries) {
+        if let Some(id) = &self.id {
+            f_mut.insert(async_graphql::Name::new("id"), id.to_string().into());
+        } else {
+            f_mut.insert(async_graphql::Name::new("id"), async_graphql::Value::Null);
+        }
+        f_mut.insert(async_graphql::Name::new("role"), self.role.clone().into());
+    }
+}
+
 /// The update information of a status on each role of a progress
 #[derive(InputObject)]
 pub struct ProjectProgressStatusUpdateInputGQL {
@@ -140,6 +205,14 @@ pub struct ProjectProgressStatusUpdateInputGQL {
     role: String,
     /// The status of the role
     finished: bool,
+}
+
+impl ProjectProgressStatusUpdateInputGQL {
+    /// Dump the input into query information
+    fn dump_query(&self, f_mut: &mut IndexMapQueries) {
+        f_mut.insert(async_graphql::Name::new("role"), self.role.clone().into());
+        f_mut.insert(async_graphql::Name::new("finished"), self.finished.into());
+    }
 }
 
 /// The update information for a progress in the project
@@ -190,6 +263,41 @@ impl ProjectProgressUpdateInputGQL {
             || is_string_set(&self.delay_reason)
             || self.unset_delay.is_some()
     }
+
+    /// Dump the input into query information
+    fn dump_query(&self, f_mut: &mut IndexMapQueries) {
+        f_mut.insert(async_graphql::Name::new("number"), self.number.into());
+        if let Some(finished) = self.finished {
+            f_mut.insert(async_graphql::Name::new("finished"), finished.into());
+        }
+        if let Some(aired) = &self.aired {
+            f_mut.insert(async_graphql::Name::new("aired"), aired.to_string().into());
+        }
+        if let Some(delay_reason) = &self.delay_reason {
+            f_mut.insert(
+                async_graphql::Name::new("delay_reason"),
+                delay_reason.into(),
+            );
+        }
+        if let Some(unset_delay) = self.unset_delay {
+            f_mut.insert(async_graphql::Name::new("unset_delay"), unset_delay.into());
+        }
+        if let Some(statuses) = &self.statuses {
+            f_mut.insert(
+                async_graphql::Name::new("statuses"),
+                statuses
+                    .iter()
+                    .map(|d| {
+                        let mut f_new = async_graphql::indexmap::IndexMap::new();
+                        d.dump_query(&mut f_new);
+                        async_graphql::Value::Object(f_new)
+                    })
+                    .collect::<Vec<async_graphql::Value>>()
+                    .into(),
+            );
+        }
+        f_mut.insert(async_graphql::Name::new("silent"), self.silent.into());
+    }
 }
 
 /// The input object for creating a new project
@@ -214,6 +322,50 @@ pub struct ProjectCreateInputGQL {
     /// If provided, the aliases from metadata will be ignored
     #[graphql(validator(custom = "super::NonEmptyValidator"))]
     aliases: Option<Vec<String>>,
+}
+
+impl ProjectCreateInputGQL {
+    /// Dump the input into query information
+    fn dump_query(&self, f_mut: &mut async_graphql::ErrorExtensionValues) {
+        let mut metadata_map = async_graphql::indexmap::IndexMap::new();
+        self.metadata.dump_query(&mut metadata_map);
+        f_mut.set("metadata", async_graphql::Value::Object(metadata_map));
+
+        if let Some(roles) = &self.roles {
+            f_mut.set(
+                "roles",
+                roles
+                    .iter()
+                    .map(|r| {
+                        let mut role_map = async_graphql::indexmap::IndexMap::new();
+                        r.dump_query(&mut role_map);
+                        async_graphql::Value::Object(role_map)
+                    })
+                    .collect::<Vec<async_graphql::Value>>(),
+            );
+        }
+
+        f_mut.set(
+            "assignees",
+            self.assignees
+                .iter()
+                .map(|a| {
+                    let mut role_map = async_graphql::indexmap::IndexMap::new();
+                    a.dump_query(&mut role_map);
+                    async_graphql::Value::Object(role_map)
+                })
+                .collect::<Vec<async_graphql::Value>>(),
+        );
+
+        f_mut.set("has_poster", self.poster.is_some());
+        if let Some(poster_color) = self.poster_color {
+            f_mut.set("poster_color", poster_color);
+        }
+
+        if let Some(aliases) = &self.aliases {
+            f_mut.set("aliases", aliases.clone());
+        }
+    }
 }
 
 /// The input object for update a project
@@ -285,6 +437,76 @@ impl ProjectUpdateInputGQL {
             || self.poster_color.is_some()
             || is_vec_set(&self.integrations)
     }
+
+    /// Dump the input into query information
+    fn dump_query(&self, f_mut: &mut async_graphql::ErrorExtensionValues) {
+        if let Some(title) = &self.title {
+            f_mut.set("title", title);
+        }
+        if let Some(aliases) = &self.aliases {
+            f_mut.set("aliases", aliases.clone());
+        }
+        if let Some(roles) = &self.roles {
+            f_mut.set(
+                "roles",
+                roles
+                    .iter()
+                    .map(|r| {
+                        let mut role_map = async_graphql::indexmap::IndexMap::new();
+                        r.dump_query(&mut role_map);
+                        async_graphql::Value::Object(role_map)
+                    })
+                    .collect::<Vec<async_graphql::Value>>(),
+            );
+        }
+        if let Some(assignees) = &self.assignees {
+            f_mut.set(
+                "assignees",
+                assignees
+                    .iter()
+                    .map(|a| {
+                        let mut assignee_map = async_graphql::indexmap::IndexMap::new();
+                        a.dump_query(&mut assignee_map);
+                        async_graphql::Value::Object(assignee_map)
+                    })
+                    .collect::<Vec<async_graphql::Value>>(),
+            );
+        }
+        if let Some(integrations) = &self.integrations {
+            f_mut.set(
+                "integrations",
+                integrations
+                    .iter()
+                    .map(|d| {
+                        let mut f_new = async_graphql::indexmap::IndexMap::new();
+                        d.dump_query(&mut f_new);
+                        async_graphql::Value::Object(f_new)
+                    })
+                    .collect::<Vec<async_graphql::Value>>(),
+            );
+        }
+        f_mut.set("has_poster", self.poster.is_some());
+        if let Some(poster_color) = self.poster_color {
+            f_mut.set("poster_color", poster_color);
+        }
+        if let Some(status) = &self.status {
+            f_mut.set("status", status.to_name());
+        }
+        f_mut.set("sync_metadata", self.sync_metadata);
+        if let Some(progress) = &self.progress {
+            f_mut.set(
+                "progress",
+                progress
+                    .iter()
+                    .map(|p| {
+                        let mut progress_map = async_graphql::indexmap::IndexMap::new();
+                        p.dump_query(&mut progress_map);
+                        async_graphql::Value::Object(progress_map)
+                    })
+                    .collect::<Vec<async_graphql::Value>>(),
+            );
+        }
+    }
 }
 
 /// The input object for update a project progress count manually.
@@ -299,6 +521,16 @@ pub struct ProgressCreateInputGQL {
     number: u64,
     /// Airing date of the progress
     aired: Option<DateTimeGQL>,
+}
+
+impl ProgressCreateInputGQL {
+    /// Dump the input into query information
+    fn dump_query(&self, f_mut: &mut IndexMapQueries) {
+        f_mut.insert(async_graphql::Name::new("number"), self.number.into());
+        if let Some(aired) = &self.aired {
+            f_mut.insert(async_graphql::Name::new("aired"), aired.to_string().into());
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -927,7 +1159,7 @@ pub async fn mutate_projects_create(
         ExternalSearchSource::TMDb => fetch_metadata_via_tmdb(ctx, &input.metadata).await?,
     };
 
-    let all_roles = match input.roles {
+    let all_roles = match &input.roles {
         Some(roles) => {
             let mut roles_list: Vec<showtimes_db::m::Role> = vec![];
             for (idx, role) in roles.iter().enumerate() {
@@ -1026,16 +1258,17 @@ pub async fn mutate_projects_create(
             GQLError::new(err.to_string(), GQLErrorCode::ProjectInitError).extend(|e| {
                 e.set("server", srv.id.to_string());
                 e.set("title", &metadata.title);
+                input.dump_query(e);
             })
         })?;
     project.roles = all_roles;
     project.assignees = assignees;
     project.progress = all_progress;
-    if let Some(aliases) = input.aliases {
+    if let Some(aliases) = &input.aliases {
         if aliases.is_empty() {
             project.aliases = metadata.aliases;
         } else {
-            project.aliases = aliases;
+            project.aliases = aliases.clone();
         }
     } else {
         project.aliases = metadata.aliases;
@@ -1242,6 +1475,7 @@ pub async fn mutate_projects_create(
         |e| {
             e.set("id", project.id.to_string());
             e.set("server", id.to_string());
+            input.dump_query(e);
         },
     )?;
 
@@ -2115,7 +2349,7 @@ pub async fn mutate_projects_update(
                 |e| {
                     e.set("id", id.to_string());
                     e.set("server", prj_info.creator.to_string());
-                    // TODO: Dump input
+                    input.dump_query(e);
                 },
             )?;
 
@@ -2182,7 +2416,7 @@ pub async fn mutate_projects_update(
                     |e| {
                         e.set("id", id.to_string());
                         e.set("server", prj_info.creator.to_string());
-                        // TODO: Dump input
+                        input.dump_query(e);
                     },
                 )?;
 
@@ -2333,7 +2567,7 @@ pub async fn mutate_projects_update(
         |e| {
             e.set("id", id.to_string());
             e.set("server", prj_info.creator.to_string());
-            // TODO: Dump input
+            input.dump_query(e);
         },
     )?;
 
@@ -2366,7 +2600,7 @@ pub async fn mutate_projects_update(
                 e.set("id", o_project.id.to_string());
                 e.set("server", o_project.creator.to_string());
                 e.set("root_project", id.to_string());
-                // TODO: Dump input
+                input.dump_query(e);
             },
         )?;
 
@@ -2533,7 +2767,8 @@ pub async fn mutate_projects_episode_add_auto(
         |e| {
             e.set("id", prj_info.id.to_string());
             e.set("server", prj_info.creator.to_string());
-            // TODO: Dump input
+            e.set("auto_add", true);
+            e.set("count", count);
         },
     )?;
 
@@ -2565,7 +2800,8 @@ pub async fn mutate_projects_episode_add_auto(
                 e.set("id", project.id.to_string());
                 e.set("server", project.creator.to_string());
                 e.set("root_project", id.to_string());
-                // TODO: Dump input
+                e.set("auto_add", true);
+                e.set("count", count);
             },
         )?;
 
@@ -2700,7 +2936,16 @@ pub async fn mutate_projects_episode_add_manual(
         |e| {
             e.set("id", id.to_string());
             e.set("server", prj_info.creator.to_string());
-            // TODO: Dump input
+            e.set("auto_add", true);
+            let episodes_dumps = episodes
+                .iter()
+                .map(|e| {
+                    let mut map = IndexMapQueries::new();
+                    e.dump_query(&mut map);
+                    async_graphql::Value::Object(map)
+                })
+                .collect::<Vec<async_graphql::Value>>();
+            e.set("episodes", episodes_dumps);
         },
     )?;
     let mut all_search_contents = vec![showtimes_search::models::Project::from(&prj_info)];
@@ -2717,7 +2962,16 @@ pub async fn mutate_projects_episode_add_manual(
                 e.set("id", project.id.to_string());
                 e.set("server", project.creator.to_string());
                 e.set("root_project", id.to_string());
-                // TODO: Dump input
+                e.set("auto_add", false);
+                let episodes_dumps = episodes
+                    .iter()
+                    .map(|e| {
+                        let mut map = IndexMapQueries::new();
+                        e.dump_query(&mut map);
+                        async_graphql::Value::Object(map)
+                    })
+                    .collect::<Vec<async_graphql::Value>>();
+                e.set("episodes", episodes_dumps);
             },
         )?;
 
@@ -2832,7 +3086,7 @@ pub async fn mutate_projects_episode_remove(
         |e| {
             e.set("id", id.to_string());
             e.set("server", prj_info.creator.to_string());
-            // TODO: Dump input
+            e.set("episodes", episodes);
         },
     )?;
 
@@ -2851,7 +3105,7 @@ pub async fn mutate_projects_episode_remove(
                 e.set("id", project.id.to_string());
                 e.set("server", project.creator.to_string());
                 e.set("root_project", id.to_string());
-                // TODO: Dump input
+                e.set("episodes", episodes);
             },
         )?;
 

@@ -3392,6 +3392,7 @@ dependencies = [
  "async-graphql",
  "chrono",
  "showtimes-db",
+ "showtimes-derive",
  "showtimes-gql-common",
  "showtimes-gql-paginator",
  "showtimes-metadata",

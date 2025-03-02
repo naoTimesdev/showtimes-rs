@@ -1,7 +1,8 @@
 //! A project models list
 
-use async_graphql::{dataloader::DataLoader, Enum, Object, SimpleObject};
+use async_graphql::{Enum, Object, SimpleObject, dataloader::DataLoader};
 use errors::GQLError;
+use showtimes_derive::EnumName;
 use showtimes_gql_common::data_loader::{
     ServerDataLoader, ServerSyncIds, ServerSyncLoader, UserDataLoader,
 };
@@ -42,7 +43,7 @@ pub enum ProjectTypeGQL {
 }
 
 /// Enum to hold project status.
-#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, EnumName)]
 #[graphql(
     remote = "showtimes_db::m::ProjectStatus",
     rename_items = "SCREAMING_SNAKE_CASE"

@@ -1,13 +1,14 @@
 //! A search models list
 
+use showtimes_derive::EnumName;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 use async_graphql::{Enum, Object, SimpleObject};
-use showtimes_gql_common::{errors::GQLError, GQLErrorCode, ProjectKindGQL};
+use showtimes_gql_common::{GQLErrorCode, ProjectKindGQL, errors::GQLError};
 use showtimes_metadata::{
-    m::{AnilistFuzzyDate, AnilistMedia, AnilistMediaFormat, TMDbMovieResult, VndbNovel},
     AnilistProvider, TMDbProvider, VndbProvider,
+    m::{AnilistFuzzyDate, AnilistMedia, AnilistMediaFormat, TMDbMovieResult, VndbNovel},
 };
 
 use super::projects::{ProjectTypeGQL, RoleGQL};
@@ -30,7 +31,7 @@ pub enum ExternalSearchTitlePrefer {
 }
 
 /// The source of the external metadata search
-#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, EnumName)]
 #[graphql(rename_items = "SCREAMING_SNAKE_CASE")]
 pub enum ExternalSearchSource {
     /// Anilist
