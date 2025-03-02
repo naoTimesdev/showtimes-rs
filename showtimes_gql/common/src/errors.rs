@@ -237,6 +237,8 @@ pub enum GQLErrorCode {
     ProjectDeleteSearchError = 3015,
     /// Project fetch disabled
     ProjectFetchDisabled = 3020,
+    /// Project init failed
+    ProjectInitError = 3021,
 
     // --> Server collab sync related
     /// Failed when requesting server collab

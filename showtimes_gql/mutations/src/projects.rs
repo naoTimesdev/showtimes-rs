@@ -1,20 +1,20 @@
 use std::{collections::VecDeque, sync::Arc};
 
 use ahash::HashMapExt;
-use async_graphql::{dataloader::DataLoader, CustomValidator, Enum, InputObject, Upload};
+use async_graphql::{CustomValidator, Enum, InputObject, Upload, dataloader::DataLoader};
 use chrono::TimeZone;
-use showtimes_db::{m::UserKind, mongodb::bson::doc, DatabaseShared, ProjectHandler};
+use showtimes_db::{DatabaseShared, ProjectHandler, m::UserKind, mongodb::bson::doc};
 use showtimes_fs::FsPool;
 use showtimes_metadata::m::AnilistMediaFormat;
 use showtimes_search::SearchClientShared;
 use tokio::{io::AsyncSeekExt, sync::Mutex};
 
 use showtimes_gql_common::{
+    DateTimeGQL, GQLErrorCode, GQLErrorExt, OkResponse, UlidGQL,
     data_loader::{
         ProjectDataLoader, ServerDataLoader, ServerSyncIds, ServerSyncLoader, UserDataLoader,
     },
     errors::GQLError,
-    DateTimeGQL, GQLErrorCode, GQLErrorExt, OkResponse, UlidGQL,
 };
 use showtimes_gql_models::{
     projects::{ProjectGQL, ProjectStatusGQL},
@@ -22,8 +22,8 @@ use showtimes_gql_models::{
 };
 
 use crate::{
-    execute_search_events, is_string_set, is_vec_set, IntegrationActionGQL, IntegrationInputGQL,
-    IntegrationValidator,
+    IntegrationActionGQL, IntegrationInputGQL, IntegrationValidator, execute_search_events,
+    is_string_set, is_vec_set,
 };
 
 /// The input information of an external metadata source
@@ -935,10 +935,11 @@ pub async fn mutate_projects_create(
                     .map_err(|e_root| {
                         GQLError::new(e_root.to_string(), GQLErrorCode::InvalidRequest).extend(
                             |e| {
-                                e.set("server", id.to_string());
+                                e.set("server", srv.id.to_string());
                                 e.set("index", idx);
                                 e.set("key", role.key.clone());
                                 e.set("name", role.name.clone());
+                                e.set("mode", "create_role");
                             },
                         )
                     })?;
@@ -963,21 +964,47 @@ pub async fn mutate_projects_create(
                 let user_info = all_assignees.get(&*assignee.id);
                 match user_info {
                     Some(user_info) => {
-                        // TODO: Propagate error properly
-                        assignees.push(showtimes_db::m::RoleAssignee::new(
-                            role.key(),
-                            Some(user_info.id),
-                        )?);
+                        assignees.push(
+                            showtimes_db::m::RoleAssignee::new(role.key(), Some(user_info.id))
+                                .map_err(|e_root| {
+                                    GQLError::new(e_root.to_string(), GQLErrorCode::InvalidRequest)
+                                        .extend(|e| {
+                                            e.set("server", srv.id.to_string());
+                                            e.set("role", role.key());
+                                            e.set("user_id", assignee.id.to_string());
+                                            e.set("mode", "update_assignee");
+                                        })
+                                })?,
+                        );
                     }
                     None => {
-                        // TODO: Propagate error properly
-                        assignees.push(showtimes_db::m::RoleAssignee::new(role.key(), None)?);
+                        assignees.push(
+                            showtimes_db::m::RoleAssignee::new(role.key(), None).map_err(
+                                |e_root| {
+                                    GQLError::new(e_root.to_string(), GQLErrorCode::InvalidRequest)
+                                        .extend(|e| {
+                                            e.set("server", srv.id.to_string());
+                                            e.set("role", role.key());
+                                            e.set("mode", "update_assignee");
+                                        })
+                                },
+                            )?,
+                        );
                     }
                 }
             }
             None => {
-                // TODO: Propagate error properly
-                assignees.push(showtimes_db::m::RoleAssignee::new(role.key(), None)?);
+                assignees.push(
+                    showtimes_db::m::RoleAssignee::new(role.key(), None).map_err(|e_root| {
+                        GQLError::new(e_root.to_string(), GQLErrorCode::InvalidRequest).extend(
+                            |e| {
+                                e.set("server", id.to_string());
+                                e.set("role", role.key());
+                                e.set("mode", "create_assignee");
+                            },
+                        )
+                    })?,
+                );
             }
         }
     }
@@ -994,8 +1021,13 @@ pub async fn mutate_projects_create(
         all_progress.push(progress);
     }
 
-    // TODO: Propagate error properly
-    let mut project = showtimes_db::m::Project::new(metadata.title, metadata.kind, srv.id)?;
+    let mut project = showtimes_db::m::Project::new(&metadata.title, metadata.kind, srv.id)
+        .map_err(|err| {
+            GQLError::new(err.to_string(), GQLErrorCode::ProjectInitError).extend(|e| {
+                e.set("server", srv.id.to_string());
+                e.set("title", &metadata.title);
+            })
+        })?;
     project.roles = all_roles;
     project.assignees = assignees;
     project.progress = all_progress;
@@ -1205,8 +1237,13 @@ pub async fn mutate_projects_create(
 
     // Save the project
     let prj_handler = ProjectHandler::new(db);
-    // TODO: Propagate error properly
-    prj_handler.save(&mut project, None).await?;
+    prj_handler.save(&mut project, None).await.extend_error(
+        GQLErrorCode::ProjectCreateError,
+        |e| {
+            e.set("id", project.id.to_string());
+            e.set("server", id.to_string());
+        },
+    )?;
 
     // Update index
     let prj_search = showtimes_search::models::Project::from(&project);
@@ -1357,13 +1394,16 @@ pub async fn mutate_projects_delete(
     }
 
     let collab_handler = showtimes_db::CollaborationSyncHandler::new(db);
-    // TODO: Propagate error properly
     let collab_info = collab_handler
         .find_by(doc! {
             "projects.project": prj_info.id.to_string(),
             "projects.server": srv.id.to_string()
         })
-        .await?;
+        .await
+        .extend_error(GQLErrorCode::ServerSyncRequestFails, |e| {
+            e.set("id", id.to_string());
+            e.set("server", srv.id.to_string());
+        })?;
 
     if let Some(collab_info) = collab_info {
         let mut collab_info = collab_info;
@@ -1375,14 +1415,26 @@ pub async fn mutate_projects_delete(
             // If only 1 or zero, delete this link
             if collab_info.length() < 2 {
                 // Delete from DB
-                // TODO: Propagate error properly
-                collab_handler.delete(&collab_info).await?;
+                collab_handler.delete(&collab_info).await.extend_error(
+                    GQLErrorCode::ServerSyncDeleteError,
+                    |e| {
+                        e.set("id", prj_info.id.to_string());
+                        e.set("server", srv.id.to_string());
+                        e.set("collab_id", collab_info.id.to_string());
+                    },
+                )?;
 
                 // Delete from search engine
                 let collab_search =
                     showtimes_search::models::ServerCollabSync::from(collab_info.clone());
-                // TODO: Propagate error properly
-                collab_search.delete_document(meili).await?;
+                collab_search.delete_document(meili).await.extend_error(
+                    GQLErrorCode::ServerSyncDeleteSearchError,
+                    |e| {
+                        e.set("id", prj_info.id.to_string());
+                        e.set("server", srv.id.to_string());
+                        e.set("collab_id", collab_info.id.to_string());
+                    },
+                )?;
 
                 // Delete from search engine
                 let collab_clone = collab_info.clone();
@@ -1412,8 +1464,14 @@ pub async fn mutate_projects_delete(
                 execute_search_events(task_search, task_events).await?;
             } else {
                 // Save the collab
-                // TODO: Propagate error properly
-                collab_handler.save(&mut collab_info, None).await?;
+                collab_handler
+                    .save(&mut collab_info, None)
+                    .await
+                    .extend_error(GQLErrorCode::ServerSyncUpdateError, |e| {
+                        e.set("id", prj_info.id.to_string());
+                        e.set("server", srv.id.to_string());
+                        e.set("collab_id", collab_info.id.to_string());
+                    })?;
 
                 // Update search engine
                 let collab_clone = collab_info.clone();
@@ -1440,14 +1498,12 @@ pub async fn mutate_projects_delete(
                         },
                     );
 
-                // TODO: Propagate error properly
                 execute_search_events(task_search, task_events).await?;
             }
         }
     }
 
     let collab_invite_handler = showtimes_db::CollaborationInviteHandler::new(db);
-    // TODO: Propagate error properly
     let collab_invite_info = collab_invite_handler
         .find_all_by(doc! {
             "$or": [
@@ -1460,7 +1516,11 @@ pub async fn mutate_projects_delete(
                 }
             ]
         })
-        .await?;
+        .await
+        .extend_error(GQLErrorCode::ServerInviteRequestFails, |e| {
+            e.set("id", id.to_string());
+            e.set("server", srv.id.to_string());
+        })?;
 
     let all_ids = collab_invite_info
         .iter()
@@ -1469,14 +1529,18 @@ pub async fn mutate_projects_delete(
 
     if !all_ids.is_empty() {
         // Delete from DB
-        // TODO: Propagate error properly
         collab_invite_handler
             .delete_by(doc! {
                 "id": {
                     "$in": all_ids.clone()
                 }
             })
-            .await?;
+            .await
+            .extend_error(GQLErrorCode::ServerInviteDeleteError, |e| {
+                e.set("id", id.to_string());
+                e.set("server", srv.id.to_string());
+                e.set("invite_ids", all_ids.clone());
+            })?;
 
         // Delete from search engine
         let index_invite = meili.index(showtimes_search::models::ServerCollabInvite::index_name());
@@ -1518,7 +1582,6 @@ pub async fn mutate_projects_delete(
     // Delete poster
     let poster_info = &prj_info.poster.image;
     if poster_info.kind == showtimes_fs::FsFileKind::Images.to_name() {
-        // TODO: Propagate error properly
         storages
             .file_delete(
                 poster_info.key.clone(),
@@ -1526,13 +1589,28 @@ pub async fn mutate_projects_delete(
                 poster_info.parent.as_deref(),
                 Some(showtimes_fs::FsFileKind::Images),
             )
-            .await?;
+            .await
+            .extend_error(GQLErrorCode::ImageDeleteError, |e| {
+                e.set("id", id.to_string());
+                e.set("server", srv.id.to_string());
+                e.set("key", poster_info.key.clone());
+                e.set("filename", &poster_info.filename);
+                if let Some(parent) = &poster_info.parent {
+                    e.set("parent", parent);
+                }
+                e.set("kind", showtimes_fs::FsFileKind::Images.to_name());
+            })?;
     }
 
     // Delete project
     let prj_handler = ProjectHandler::new(db);
-    // TODO: Propagate error properly
-    prj_handler.delete(&prj_info).await?;
+    prj_handler
+        .delete(&prj_info)
+        .await
+        .extend_error(GQLErrorCode::ProjectDeleteError, |e| {
+            e.set("id", id.to_string());
+            e.set("server", srv.id.to_string());
+        })?;
 
     // Delete from search engine
     let prj_clone = prj_info.clone();
@@ -1575,6 +1653,7 @@ async fn update_single_project(
 )> {
     let storages = ctx.data_unchecked::<Arc<FsPool>>();
     let prj_id = project.id;
+    let prj_srv_id = project.creator;
 
     let mut before_project = showtimes_events::m::ProjectUpdatedDataEvent::default();
     let mut after_project = showtimes_events::m::ProjectUpdatedDataEvent::default();
@@ -1658,9 +1737,19 @@ async fn update_single_project(
                     }
                 }
                 ProjectRoleUpdateAction::Add => {
-                    // TODO: Propagate error properly
                     let new_role =
-                        showtimes_db::m::Role::new(role.role.key.clone(), role.role.name.clone())?;
+                        showtimes_db::m::Role::new(role.role.key.clone(), role.role.name.clone())
+                            .map_err(|e_root| {
+                            GQLError::new(e_root.to_string(), GQLErrorCode::InvalidRequest).extend(
+                                |e| {
+                                    e.set("id", prj_id.to_string());
+                                    e.set("server", prj_srv_id.to_string());
+                                    e.set("is_main", is_main);
+                                    e.set("key", role.role.key.clone());
+                                    e.set("name", role.role.name.clone());
+                                },
+                            )
+                        })?;
                     let mut ordered_roles = project.roles.clone();
                     ordered_roles.sort_by_key(|a| a.order());
                     let last_order = ordered_roles.last().map(|r| r.order()).unwrap_or(0);
@@ -1703,6 +1792,8 @@ async fn update_single_project(
                                 |e| {
                                     e.set("id", id.to_string());
                                     e.set("project", prj_id.to_string());
+                                    e.set("server", prj_srv_id.to_string());
+                                    e.set("is_main", is_main);
                                     e.set("role", &assignee.role);
                                     e.set("action", "update");
                                 },
@@ -1880,6 +1971,7 @@ async fn update_single_project(
                 )
                 .extend(|e| {
                     e.set("id", prj_id.to_string());
+                    e.set("server", prj_srv_id.to_string());
                     e.set("where", "project");
                     e.set("original", format!("{err}"));
                     e.set("original_code", format!("{}", err.kind()));
@@ -1897,6 +1989,7 @@ async fn update_single_project(
                     )
                     .extend(|e| {
                         e.set("id", prj_id.to_string());
+                        e.set("server", prj_srv_id.to_string());
                         e.set("where", "project");
                         e.set("original", format!("{err}"));
                         e.set("original_code", format!("{}", err.kind()));
@@ -1913,6 +2006,7 @@ async fn update_single_project(
                     )
                     .extend(|e| {
                         e.set("id", prj_id.to_string());
+                        e.set("server", prj_srv_id.to_string());
                         e.set("where", "project");
                         e.set("original", format!("{err}"));
                         e.set("original_code", format!("{}", err.kind()));
@@ -1937,6 +2031,7 @@ async fn update_single_project(
                     )
                     .extend(|e| {
                         e.set("id", prj_id.to_string());
+                        e.set("server", prj_srv_id.to_string());
                         e.set("where", "project");
                         e.set("original", format!("{err}"));
                     })
@@ -2015,8 +2110,14 @@ pub async fn mutate_projects_update(
             after_update.set_status(prj_info.status);
 
             // Save the project
-            // TODO: Propagate error properly
-            prj_handler.save(&mut prj_info, None).await?;
+            prj_handler.save(&mut prj_info, None).await.extend_error(
+                GQLErrorCode::ProjectUpdateError,
+                |e| {
+                    e.set("id", id.to_string());
+                    e.set("server", prj_info.creator.to_string());
+                    // TODO: Dump input
+                },
+            )?;
 
             // Save search results
             let meili = ctx.data_unchecked::<SearchClientShared>().clone();
@@ -2076,8 +2177,14 @@ pub async fn mutate_projects_update(
                 after_update.set_status(prj_info.status);
 
                 // Save the project
-                // TODO: Propagate error properly
-                prj_handler.save(&mut prj_info, None).await?;
+                prj_handler.save(&mut prj_info, None).await.extend_error(
+                    GQLErrorCode::ProjectUpdateError,
+                    |e| {
+                        e.set("id", id.to_string());
+                        e.set("server", prj_info.creator.to_string());
+                        // TODO: Dump input
+                    },
+                )?;
 
                 // Save search results
                 let meili = ctx.data_unchecked::<SearchClientShared>().clone();
@@ -2199,6 +2306,8 @@ pub async fn mutate_projects_update(
                     .extend(|e| {
                         e.set("id", provider.id());
                         e.set("provider", provider.kind().to_name());
+                        e.set("project", prj_info.id.to_string());
+                        e.set("server", prj_info.creator.to_string());
                     })
                     .into();
                 }
@@ -2208,7 +2317,6 @@ pub async fn mutate_projects_update(
         }
     }
 
-    // TODO: Validate propagate error
     let (project_event, episode_event) = update_single_project(
         ctx,
         &mut prj_info,
@@ -2220,8 +2328,14 @@ pub async fn mutate_projects_update(
     .await?;
 
     // Save the project
-    // TODO: Propagate error properly
-    prj_handler.save(&mut prj_info, None).await?;
+    prj_handler.save(&mut prj_info, None).await.extend_error(
+        GQLErrorCode::ProjectUpdateError,
+        |e| {
+            e.set("id", id.to_string());
+            e.set("server", prj_info.creator.to_string());
+            // TODO: Dump input
+        },
+    )?;
 
     // Search results
     let mut all_project_search: Vec<showtimes_search::models::Project> =
@@ -2232,11 +2346,9 @@ pub async fn mutate_projects_update(
     let mut all_project_episodes_events = vec![];
     all_project_episodes_events.extend(episode_event);
 
-    // TODO: Validate propagate error
     let mut other_projects = fetch_project_collaborators(ctx, &prj_info).await?;
 
     for o_project in other_projects.iter_mut() {
-        // TODO: Validate propagate error
         let (project_event, episode_event) = update_single_project(
             ctx,
             o_project,
@@ -2248,8 +2360,15 @@ pub async fn mutate_projects_update(
         .await?;
 
         // Save the project
-        // TODO: Propagate error properly
-        prj_handler.save(o_project, None).await?;
+        prj_handler.save(o_project, None).await.extend_error(
+            GQLErrorCode::ProjectUpdateError,
+            |e| {
+                e.set("id", o_project.id.to_string());
+                e.set("server", o_project.creator.to_string());
+                e.set("root_project", id.to_string());
+                // TODO: Dump input
+            },
+        )?;
 
         // Create search results
         let project_search = showtimes_search::models::Project::from(&prj_info);
@@ -2307,7 +2426,6 @@ pub async fn mutate_projects_update(
         );
 
     // Wait for all events to finish
-    // TODO: Propagate error properly
     let (t_a, t_b, t_c) = tokio::try_join!(task_search, task_project_events, task_episode_events)?;
     t_a?;
     t_b?;
@@ -2410,15 +2528,20 @@ pub async fn mutate_projects_episode_add_auto(
 
     // Save the project
     let project_event = update_project_inner(&mut prj_info, count);
-    // TODO: Propagate error properly
-    prj_handler.save(&mut prj_info, None).await?;
+    prj_handler.save(&mut prj_info, None).await.extend_error(
+        GQLErrorCode::ProjectUpdateError,
+        |e| {
+            e.set("id", prj_info.id.to_string());
+            e.set("server", prj_info.creator.to_string());
+            // TODO: Dump input
+        },
+    )?;
 
     // Push to search and events
     all_search_contents.push(showtimes_search::models::Project::from(&prj_info));
     all_events_content.push(project_event);
 
     // Fetch collaborators
-    // TODO: Validate propagate error
     let mut other_projects = fetch_project_collaborators(ctx, &prj_info).await?;
     for project in other_projects.iter_mut() {
         if project.progress.is_empty() {
@@ -2428,15 +2551,23 @@ pub async fn mutate_projects_episode_add_auto(
             )
             .extend(|e| {
                 e.set("id", project.id.to_string());
-                e.set("original", id.to_string());
+                e.set("server", project.creator.to_string());
+                e.set("root_project", id.to_string());
             })
             .into();
         }
 
         let project_event = update_project_inner(project, count);
         // Save other project
-        // TODO: Propagate error properly
-        prj_handler.save(project, None).await?;
+        prj_handler.save(project, None).await.extend_error(
+            GQLErrorCode::ProjectUpdateError,
+            |e| {
+                e.set("id", project.id.to_string());
+                e.set("server", project.creator.to_string());
+                e.set("root_project", id.to_string());
+                // TODO: Dump input
+            },
+        )?;
 
         // Push to search and events
         all_search_contents.push(showtimes_search::models::Project::from(project));
@@ -2564,19 +2695,31 @@ pub async fn mutate_projects_episode_add_manual(
     let mut all_events_content = vec![project_event];
 
     // Save the project
-    // TODO: Propagate error properly
-    prj_handler.save(&mut prj_info, None).await?;
+    prj_handler.save(&mut prj_info, None).await.extend_error(
+        GQLErrorCode::ProjectUpdateError,
+        |e| {
+            e.set("id", id.to_string());
+            e.set("server", prj_info.creator.to_string());
+            // TODO: Dump input
+        },
+    )?;
     let mut all_search_contents = vec![showtimes_search::models::Project::from(&prj_info)];
 
     // Sync the collaborations
-    // TODO: Validate propagate error
     let mut other_projects = fetch_project_collaborators(ctx, &prj_info).await?;
 
     for project in other_projects.iter_mut() {
         let project_event = update_project_inner(project, episodes);
         // Save other project
-        // TODO: Propagate error properly
-        prj_handler.save(project, None).await?;
+        prj_handler.save(project, None).await.extend_error(
+            GQLErrorCode::ProjectUpdateError,
+            |e| {
+                e.set("id", project.id.to_string());
+                e.set("server", project.creator.to_string());
+                e.set("root_project", id.to_string());
+                // TODO: Dump input
+            },
+        )?;
 
         // Push to search and events
         all_search_contents.push(showtimes_search::models::Project::from(project));
@@ -2684,21 +2827,33 @@ pub async fn mutate_projects_episode_remove(
 
     // Save the project
     let prj_handler = ProjectHandler::new(db);
-    // TODO: Propagate error properly
-    prj_handler.save(&mut prj_info, None).await?;
+    prj_handler.save(&mut prj_info, None).await.extend_error(
+        GQLErrorCode::ProjectUpdateError,
+        |e| {
+            e.set("id", id.to_string());
+            e.set("server", prj_info.creator.to_string());
+            // TODO: Dump input
+        },
+    )?;
 
     // Create search results
     let mut all_search_contents = vec![showtimes_search::models::Project::from(&prj_info)];
 
     // Sync the collaborations
-    // TODO: Validate propagate error
     let mut other_projects = fetch_project_collaborators(ctx, &prj_info).await?;
 
     for project in other_projects.iter_mut() {
         let project_event = update_project_inner(project, episodes);
         // Save other project
-        // TODO: Propagate error properly
-        prj_handler.save(project, None).await?;
+        prj_handler.save(project, None).await.extend_error(
+            GQLErrorCode::ProjectUpdateError,
+            |e| {
+                e.set("id", project.id.to_string());
+                e.set("server", project.creator.to_string());
+                e.set("root_project", id.to_string());
+                // TODO: Dump input
+            },
+        )?;
 
         // Push to search and events
         all_search_contents.push(showtimes_search::models::Project::from(project));
