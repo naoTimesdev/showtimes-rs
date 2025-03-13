@@ -14,10 +14,11 @@ This library contains four main functions:
 We support the following algorithm:
 - `HS256`, `HS384`, `HS512`
 - `PS256`, `PS384`, `PS512` (We do not support `RS256`, `RS384`, `RS512`)
-- `ES256`, `ES384`
-- `EdDSA`
+- `ES256`, `ES384`, `ES512`
+- `EdDSA`, `ES256K`
 
-You can create the specific algorithm with the `ShowtimesEncodingKey::new_*` function.
+The JWT engine is powered by [`jwt-lc-rs`](https://github.com/noaione/jwt-lc-rs),
+it uses AWS-LC FIPS compliant crypto library to provide the best security and performance.
 
 The following is the example payload:
 ```jsonc
@@ -27,7 +28,7 @@ The following is the example payload:
     // The token expiration date
     "exp": 1620000000,
     // The token issuer
-    "iss": "showtimes-rs-session/0.1.0",
+    "iss": "naoTimes/showtimes-rs",
     // The token "audience": `user`, "api-key", "master-key", or "discord-auth".
     "aud": "user",
     // The user ULID, API key, or the final redirect URL for Discord
@@ -36,7 +37,7 @@ The following is the example payload:
 ```
 
 The verification process will check the following:
-- The token issuer must be `showtimes-rs-session/0.1.0`.
+- The token issuer must be `naoTimes/showtimes-rs`.
 - The token expiration date must be greater than the current time.
 - The token audience must be `user` or `discord-auth`.
 - The token metadata must be a valid ULID or a valid URL (this will be done on another crates).
@@ -51,30 +52,42 @@ openssl genpkey -algorithm RSA-PSS -out private_key.pem -pkeyopt rsa_keygen_bits
 
 This will generate a private key with the following properties:
 - 4096 bits
+- SHA-384
+- MGF1 SHA-384
+- Salt length: 32 bytes
+- PSS padding
+
+You can adjust it to your needs, the above is the recommended settings.
 
 Then generate the public key with the following command:
 ```bash
 openssl rsa -pubout -in ./keys/priv.key -out ./keys/pub.pem
 ```
 
-### ECDSA
+### ECDSA/secp256k1
 For ECDSA, you can do the following:
 ```bash
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out ./keys/priv.key
 ```
 
-This will generate a private key with the following properties:
-- Curve: NIST P-256
+You can change the curve to either:
+- `ES256` (`ec_paramgen_curve:P-256`), SHA-256
+- `ES384` (`ec_paramgen_curve:P-384`), SHA-384
+- `ES512` (`ec_paramgen_curve:P-521`), SHA-512
+- `ES256K` (`ec_paramgen_curve:secp256k1`)
+
+**Note**: You need to set the SHA level to be the same as your NIST curve.<br />
+For `ES256K`, you need to set the `mode` to `es256k1`.
 
 Then generate the public key with the following command:
 ```bash
-openssl ec -pubout -in ./keys/priv.key -out ./keys/pub.pem
+openssl pkey -in ./keys/priv.key -pubout -out ./keys/pub.pem
 ```
 
 ### EdDSA
 For EdDSA, you can do the following:
 ```bash
-openssl genpkey -algorithm ed25519 -out ./keys/priv.key
+openssl genpkey -algorithm ED25519 -out ./keys/priv.key
 ```
 
 This will generate a private key with the following properties:
@@ -82,7 +95,7 @@ This will generate a private key with the following properties:
 
 Then generate the public key with the following command:
 ```bash
-openssl pkey -pubout -in ./keys/priv.key -out ./keys/pub.pem
+openssl pkey -in ./keys/priv.key -pubout -out ./keys/pub.pem
 ```
 
 ## License

@@ -32,7 +32,7 @@ fn find_aws_lc_fips_sys() {
 
         // Check which one has the latest mtime
         if candidates.is_empty() {
-            panic!("Failed to find aws-lc-fips-sys library");
+            panic!("Failed to find aws-lc-fips-sys candidates");
         }
 
         candidates.sort_by(|a, b| {
@@ -48,7 +48,7 @@ fn find_aws_lc_fips_sys() {
         let artifacts = lib_dir.join("out").join("build").join("artifacts");
 
         if !artifacts.exists() {
-            panic!("Failed to find aws-lc-fips-sys library");
+            panic!("Failed to find aws-lc-fips-sys artifacts");
         }
 
         // Get all dll/dylib, exp/lib
