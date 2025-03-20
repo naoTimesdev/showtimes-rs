@@ -11,3 +11,6 @@ description = "Internationalization for Showtimes API"
 
 [dependencies]
 fluent-templates.workspace = true
+
+[dev-dependencies]
+showtimes-i18n = { path = "." }

@@ -1,6 +1,17 @@
 # Title part
 project-create = Proyek baru
-project-progress = {$name} - #{$episode}
+project-progress = {$mode ->
+        [series] {$name} - #{$episode}
+        [movie] {$name}
+        [ova] {$name}
+        [ova-numbered] {$name} - #{$episode}
+        [books] {$name} #{$episode}
+        [manga] {$name} #{$episode}
+        [light-novel] {$name} #{$episode}
+        [games] {$name}
+        [vn] {$name}
+        *[other] {$name}
+    }
 project-release = {$name}
 project-dropped = Dropped...
 project-resumed = Hidup kembali...
@@ -28,7 +39,7 @@ project-resumed-desc =
 project-release-desc-header = Rilis!
 project-release-desc = {$kind ->
         [single] {$name}
-        [episodic] {$name} - ${episodes}
+        [episodic] {$name} - {$episodes}
         *[other] {$name}
     } telah dirilis!
 project-release-revert-desc-header = Batal rilis...
@@ -42,6 +53,6 @@ project-episode-range = #{$episode-start} sampai #{$episode-end}
 project-episode-single = #{$episode}
 
 project-progress-desc = Status
-project-progress-done = ✅ ${role}
-project-progress-revert = ❌ ${role}
-project-progress-ongoing = ⏳ ${role}
+project-progress-done = ✅ {$role}
+project-progress-revert = ❌ {$role}
+project-progress-ongoing = ⏳ {$role}
