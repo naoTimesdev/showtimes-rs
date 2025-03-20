@@ -1,0 +1,13 @@
+[package]
+name = "showtimes-i18n"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+description = "Internationalization for Showtimes API"
+
+[dependencies]
+fluent-templates.workspace = true

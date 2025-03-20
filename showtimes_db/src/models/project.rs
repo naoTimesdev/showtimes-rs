@@ -77,8 +77,8 @@ static DEFAULT_ROLES_GAMES: LazyLock<Vec<Role>> = LazyLock::new(|| {
         Role::new("ED", "Editor")
             .expect("Failed to create role ED")
             .with_order(2),
-        Role::new("CD", "Programming")
-            .expect("Failed to create role CD")
+        Role::new("PRG", "Programming")
+            .expect("Failed to create role PRG")
             .with_order(3),
         Role::new("QC", "Quality Checker")
             .expect("Failed to create role QC")
@@ -166,6 +166,21 @@ impl ProjectType {
             ProjectType::Manga => ProjectKind::Manga,
             ProjectType::Games | ProjectType::VisualNovel => ProjectKind::Games,
             ProjectType::Unknown => ProjectKind::Unknown,
+        }
+    }
+
+    /// Transfer to a locale string used for translation
+    pub fn to_locale(&self) -> &'static str {
+        match self {
+            ProjectType::Movies => "movie",
+            ProjectType::Series => "series",
+            ProjectType::OVAs => "ova",
+            ProjectType::Books => "book",
+            ProjectType::Manga => "manga",
+            ProjectType::LightNovel => "light-novel",
+            ProjectType::Games => "games",
+            ProjectType::VisualNovel => "vn",
+            ProjectType::Unknown => "other",
         }
     }
 }
@@ -435,6 +450,8 @@ pub struct Poster {
 }
 
 impl Poster {
+    pub const DEFAULT_COLOR: u32 = 0x1EB5A6;
+
     /// Create a new show poster with an image.
     pub fn new(image: ImageMetadata) -> Self {
         Poster { image, color: None }

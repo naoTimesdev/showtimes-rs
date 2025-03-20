@@ -20,6 +20,7 @@ members = [
     "showtimes_webhooks",
     "showtimes_session",
     "showtimes_shared",
+    "showtimes_i18n",
     "showtimes_derive",
 
     # Binary
@@ -126,6 +127,9 @@ feed-rs = { version = "2.3.1", features = ["sanitize"] }
 pulldown-cmark = { version = "0.13.0", default-features = false, features = ["html"] }
 pulldown-cmark-escape = "0.11.0"
 htmd = "0.1.6"
+
+# i18n
+fluent-templates = { version = "0.13.0", features = ["macros"] }
 
 # CLI
 clap = { version = "4.5.32", features = ["derive"] }

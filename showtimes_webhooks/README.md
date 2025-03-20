@@ -6,9 +6,10 @@ Currently supported webhooks:
 - Discord
 
 Available webhook type:
-- `new-project`: When a new project is added to the database.
+- `project-create`: When a new project is added to the database.
 - `project-progress`: When a project progress is updated.
-- `project-release`: When one of the "episode" is released.
+- `project-release`: When one or many of the "episode" is released.
+- `project-unrelease`: When one or many of the "episode" is unreleased.
 - `project-dropped`: When a project is dropped.
 - `project-resumed`: When a project is resumed.
 

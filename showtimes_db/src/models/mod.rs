@@ -4,6 +4,7 @@ pub mod project;
 pub mod rss;
 pub mod server;
 pub mod users;
+pub mod webhooks;
 
 pub use common::*;
 pub use migrations::*;
@@ -11,6 +12,7 @@ pub use project::*;
 pub use rss::*;
 pub use server::*;
 pub use users::*;
+pub use webhooks::*;
 
 pub trait ShowModelHandler {
     /// Get the ID
