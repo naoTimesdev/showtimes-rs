@@ -153,8 +153,8 @@ impl SessionManager {
                     Some(session_exp) => {
                         if session_exp != -1 {
                             let current_time = jiff::Timestamp::now()
-                                .saturating_sub(jiff::SignedDuration::new(2 * 60, 0))
-                                .unwrap();
+                                .checked_add(jiff::Span::new().minutes(2))
+                                .unwrap_or(jiff::Timestamp::MAX);
 
                             if session_exp < current_time.as_second() {
                                 // Delete the session

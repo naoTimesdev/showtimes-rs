@@ -64,12 +64,10 @@ impl AnilistFuzzyDate {
     /// Parse the fuzzy date into a [`jiff::Timestamp`]
     pub fn into_timestamp(&self) -> Option<jiff::Timestamp> {
         match (self.year, self.month, self.day) {
-            (Some(year), Some(month), Some(day)) => {
-                let dt = jiff::civil::datetime(year, month, day, 0, 0, 0, 0);
-                dt.to_zoned(JST_TZ.clone())
-                    .ok()
-                    .and_then(|dt| Some(dt.timestamp()))
-            }
+            (Some(year), Some(month), Some(day)) => jiff::civil::Date::new(year, month, day)
+                .and_then(|date| date.to_zoned(JST_TZ.clone()))
+                .and_then(|dt| Ok(dt.timestamp()))
+                .ok(),
             _ => None,
         }
     }

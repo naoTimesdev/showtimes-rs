@@ -408,7 +408,7 @@ impl ServerPremium {
     /// Extend the end date by the given duration.
     ///
     /// Returns `self` for chainability.
-    pub fn extend_by(mut self, duration: jiff::SignedDuration) -> Self {
+    pub fn extend_by(mut self, duration: jiff::Span) -> Self {
         self.ends_at += duration;
         self
     }

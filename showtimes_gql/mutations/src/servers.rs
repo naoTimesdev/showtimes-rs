@@ -1013,13 +1013,9 @@ pub async fn mutate_servers_premium_create(
             // Check if ends_at is less than the current active premium
             // if yes, use extend_by method by the duration between ends_at and current time
             if *ends_at < premium.ends_at {
-                let ends_at_dur = ends_at.as_duration();
-                let cur_ends_at_dur = premium.ends_at.as_duration();
+                let ends_at_dur = *ends_at - current_time;
 
-                if let Some(duration_diff) = ends_at_dur.checked_sub(cur_ends_at_dur) {
-                    // extend by the diff
-                    premium.extend_by(duration_diff)
-                } else {
+                if ends_at_dur.is_negative() {
                     // negative?!
                     return GQLError::new(
                         "Ends at time is in the past",
@@ -1032,6 +1028,9 @@ pub async fn mutate_servers_premium_create(
                     })
                     .into();
                 }
+
+                // extend by the duration
+                premium.extend_by(ends_at_dur)
             } else {
                 // extend until ends_at
                 premium.extend_at(*ends_at)

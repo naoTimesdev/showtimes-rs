@@ -31,7 +31,6 @@ use crate::{
 
 static JST_TZ: LazyLock<jiff::tz::TimeZone> =
     LazyLock::new(|| jiff::tz::TimeZone::get("Asia/Tokyo").unwrap());
-const ONE_WEEK: i64 = 7 * 24 * 60 * 60; // 7 days in seconds
 
 type IndexMapQueries = async_graphql::indexmap::IndexMap<async_graphql::Name, async_graphql::Value>;
 
@@ -566,12 +565,10 @@ fn fuzzy_yyyy_mm_dd_to_timestamp(date: &str) -> Option<jiff::Timestamp> {
 
     // If all None, return None
     match (year, month, day) {
-        (Some(year), Some(month), Some(day)) => {
-            let dt = jiff::civil::datetime(year, month, day, 0, 0, 0, 0);
-            dt.to_zoned(JST_TZ.clone())
-                .ok()
-                .and_then(|dt| Some(dt.timestamp()))
-        }
+        (Some(year), Some(month), Some(day)) => jiff::civil::Date::new(year, month, day)
+            .and_then(|date| date.to_zoned(JST_TZ.clone()))
+            .and_then(|dt| Ok(dt.timestamp()))
+            .ok(),
         _ => None,
     }
 }
@@ -729,7 +726,7 @@ async fn fetch_metadata_via_anilist(
                 aired_at: Some(current_time),
             });
 
-            current_time += jiff::SignedDuration::new(ONE_WEEK, 0);
+            current_time += jiff::Span::new().weeks(1);
         }
     }
 
@@ -778,7 +775,7 @@ async fn fetch_metadata_via_anilist(
                 for i in (last_ep.number + 1)..=est_ep_u32 {
                     let aired_at = match last_ep_start {
                         Some(last) => {
-                            let pushed = last + jiff::SignedDuration::new(ONE_WEEK, 0);
+                            let pushed = last + jiff::Span::new().weeks(1);
                             last_ep_start = Some(pushed);
                             Some(pushed)
                         }
@@ -2718,10 +2715,8 @@ pub async fn mutate_projects_episode_add_auto(
         let new_episodes = ((last_episode.number + 1)..=(last_episode.number + count))
             .enumerate()
             .map(|(idx, n)| {
-                let next_air_date = last_air_date.map(|d| {
-                    let week = ONE_WEEK * (idx as i64 + 1);
-                    d + jiff::SignedDuration::new(week, 0)
-                });
+                let next_air_date =
+                    last_air_date.map(|d| d + jiff::Span::new().weeks((idx as i64) + 1));
 
                 let mut ep =
                     showtimes_db::m::EpisodeProgress::new_with_roles(n, false, &project.roles);

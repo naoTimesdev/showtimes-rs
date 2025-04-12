@@ -102,7 +102,7 @@ impl ShowtimesUserClaims {
             default
         } else {
             let exp_in = jiff::SignedDuration::new(expires_in, 0);
-            iat.saturating_add(exp_in).expect("stupid")
+            iat.checked_add(exp_in).unwrap_or(jiff::Timestamp::MAX)
         };
 
         Self {
@@ -129,7 +129,7 @@ impl ShowtimesUserClaims {
     fn new_state(redirect_url: impl Into<String>) -> Self {
         let iat = jiff::Timestamp::now();
         // Discord OAuth2 request last 5 minutes
-        let exp = iat + jiff::SignedDuration::new(5 * 60, 0);
+        let exp = iat + jiff::Span::new().minutes(5);
 
         Self {
             exp: exp.as_second(),
@@ -170,7 +170,7 @@ impl ShowtimesRefreshClaims {
     fn new(user: showtimes_shared::ulid::Ulid) -> Self {
         let iat = jiff::Timestamp::now();
         // Refresh claims last for 90 days
-        let exp = iat + jiff::SignedDuration::new(7 * 24 * 60 * 60, 0);
+        let exp = iat + jiff::Span::new().days(90);
 
         Self {
             exp: exp.as_second(),
