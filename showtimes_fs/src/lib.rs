@@ -39,7 +39,7 @@ pub struct FsFileObject {
     /// The size of the file.
     pub size: i64,
     /// The last modified time of the file.
-    pub last_modified: Option<chrono::DateTime<chrono::Utc>>,
+    pub last_modified: Option<jiff::Timestamp>,
 }
 
 /// Make a file path from the base key, filename, parent id, and kind.

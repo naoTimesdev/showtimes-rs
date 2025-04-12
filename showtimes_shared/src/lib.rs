@@ -303,126 +303,69 @@ pub mod ulid_list_serializer {
     }
 }
 
-/// A (de)serializer for [`chrono::Utc`] of [`chrono::DateTime`] to be converted to BSON-compatible data.
-pub mod bson_datetime_opt_serializer {
-    use super::*;
+/// A (de)serializer for [`jiff::Timestamp`] with [`bson::DateTime`] serde intermediary.
+pub mod bson_datetime_jiff_timestamp {
     use bson::DateTime;
-    use chrono::Utc;
-    use serde::Serialize;
+    use serde::{Deserialize, Serialize};
 
-    /// De-serialize a BSON-compatible datetime to a [`chrono::Utc`] of [`chrono::DateTime`].
-    ///
-    /// Used for serde deserialization
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<chrono::DateTime<Utc>>, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        match DateTime::deserialize(deserializer) {
-            Ok(dt) => {
-                let dt = dt.to_chrono();
-                Ok(Some(dt))
-            }
-            Err(_) => Ok(None),
-        }
-    }
-
-    /// Serialize a [`chrono::Utc`] of [`chrono::DateTime`] to a BSON-compatible datetime.
+    /// Serialize [`jiff::Timestamp`] to [`bson::DateTime`]
     ///
     /// Used for serde serialization
-    pub fn serialize<S>(
-        date: &Option<chrono::DateTime<Utc>>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(value: &jiff::Timestamp, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        match date {
-            Some(date) => {
-                let dt = DateTime::from_chrono(*date);
-                dt.serialize(serializer)
-            }
-            None => serializer.serialize_none(),
-        }
-    }
-}
-
-/// A (de)serializer for [`chrono::Utc`] of [`chrono::DateTime`] to be converted to UNIX timestamp format.
-pub mod unix_timestamp_serializer {
-    use serde::Deserialize;
-
-    /// Serialize a [`chrono::Utc`] of [`chrono::DateTime`] to a UNIX timestamp ([`i64`]).
-    ///
-    /// Used for serde serialization
-    pub fn serialize<S>(
-        date: &chrono::DateTime<chrono::Utc>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let ts = date.timestamp();
-        serializer.serialize_i64(ts)
+        let dt = DateTime::from_millis(value.as_millisecond());
+        dt.serialize(serializer)
     }
 
-    /// Deserialize a UNIX timestamp ([`i64`]) to a [`chrono::Utc`] of [`chrono::DateTime`].
+    /// Deserialize data to [`bson::DateTime`] then finally to [`jiff::Timestamp`]
     ///
     /// Used for serde deserialization
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<chrono::DateTime<chrono::Utc>, D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<jiff::Timestamp, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        let ts = i64::deserialize(deserializer)?;
-        let dt = chrono::DateTime::<chrono::Utc>::from_timestamp(ts, 0)
-            .ok_or_else(|| serde::de::Error::custom(format!("invalid timestamp: {}", ts)))?;
-        Ok(dt)
+        let dt = DateTime::deserialize(deserializer)?;
+        jiff::Timestamp::try_from(dt.to_system_time()).map_err(serde::de::Error::custom)
     }
-}
 
-/// A (de)serializer for [`chrono::Utc`] of [`chrono::DateTime`]
-/// to be converted to UNIX timestamp with optional support.
-pub mod unix_timestamp_opt_serializer {
-    use serde::Deserialize;
-
-    /// Serialize a plausible [`chrono::Utc`] of [`chrono::DateTime`] to a UNIX timestamp ([`i64`]).
+    /// A (de)serializer for [`jiff::Timestamp`] with [`bson::DateTime`] serde intermediary.
     ///
-    /// Used for serde serialization
-    pub fn serialize<S>(
-        date: &Option<chrono::DateTime<chrono::Utc>>,
-        serializer: S,
-    ) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match date {
-            Some(date) => {
-                let ts = date.timestamp();
-                serializer.serialize_i64(ts)
+    /// The following module is for optional support.
+    pub mod optional {
+        use super::*;
+
+        /// Serialize an optional [`jiff::Timestamp`] to [`bson::DateTime`]
+        ///
+        /// Used for serde serialization
+        pub fn serialize<S>(
+            value: &Option<jiff::Timestamp>,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            match value {
+                Some(v) => super::serialize(v, serializer),
+                None => serializer.serialize_none(),
             }
-            None => serializer.serialize_none(),
         }
-    }
 
-    /// Deserialize a plausible UNIX timestamp ([`i64`]) to a [`chrono::Utc`] of [`chrono::DateTime`].
-    ///
-    /// Used for serde deserialization
-    pub fn deserialize<'de, D>(
-        deserializer: D,
-    ) -> Result<Option<chrono::DateTime<chrono::Utc>>, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        match i64::deserialize(deserializer) {
-            Ok(s) => {
-                // unwrap now!
-                match chrono::DateTime::<chrono::Utc>::from_timestamp(s, 0) {
-                    Some(dt) => Ok(Some(dt)),
-                    None => Err(serde::de::Error::custom(format!(
-                        "invalid timestamp: {}",
-                        s
-                    ))),
-                }
+        /// Deserialize optional data to [`bson::DateTime`] then finally to [`jiff::Timestamp`]
+        ///
+        /// Used for serde deserialization
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<jiff::Timestamp>, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let dt = Option::<DateTime>::deserialize(deserializer)?;
+            match dt {
+                Some(dt) => jiff::Timestamp::try_from(dt.to_system_time())
+                    .map(Some)
+                    .map_err(serde::de::Error::custom),
+                None => Ok(None),
             }
-            Err(_) => Ok(None),
         }
     }
 }

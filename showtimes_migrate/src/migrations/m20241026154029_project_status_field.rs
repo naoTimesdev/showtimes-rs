@@ -1,4 +1,3 @@
-use chrono::TimeZone;
 use mongodb::bson::doc;
 use showtimes_db::{ClientShared, DatabaseShared};
 
@@ -24,10 +23,11 @@ impl Migration for M20241026154029ProjectStatusField {
         "M20241026154029ProjectStatusField"
     }
 
-    fn timestamp(&self) -> chrono::DateTime<chrono::Utc> {
-        chrono::Utc
-            .with_ymd_and_hms(2024, 10, 26, 15, 40, 29)
+    fn timestamp(&self) -> jiff::Timestamp {
+        jiff::civil::datetime(2024, 10, 26, 15, 40, 29, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
             .unwrap()
+            .timestamp()
     }
 
     fn clone_box(&self) -> Box<dyn Migration> {

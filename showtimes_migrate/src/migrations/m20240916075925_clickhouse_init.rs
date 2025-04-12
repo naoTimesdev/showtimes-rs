@@ -1,4 +1,3 @@
-use chrono::TimeZone;
 use showtimes_db::{ClientShared, DatabaseShared};
 
 use crate::common::env_or_exit;
@@ -23,10 +22,11 @@ impl Migration for M20240916075925ClickhouseInit {
         "M20240916075925ClickhouseInit"
     }
 
-    fn timestamp(&self) -> chrono::DateTime<chrono::Utc> {
-        chrono::Utc
-            .with_ymd_and_hms(2024, 9, 16, 7, 59, 25)
+    fn timestamp(&self) -> jiff::Timestamp {
+        jiff::civil::datetime(2024, 9, 16, 7, 59, 25, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
             .unwrap()
+            .timestamp()
     }
 
     fn clone_box(&self) -> Box<dyn Migration> {

@@ -1,12 +1,11 @@
 use std::path::Path;
 
-use chrono::{Datelike, Timelike};
 use clap::{
-    builder::{
-        styling::{AnsiColor, Effects},
-        Styles,
-    },
     Parser,
+    builder::{
+        Styles,
+        styling::{AnsiColor, Effects},
+    },
 };
 
 fn cli_styles() -> Styles {
@@ -37,8 +36,7 @@ pub(crate) struct MigrationCli {
     pub(crate) name: Option<String>,
 }
 
-const MIGRATION_TEMPLATE: &str = r#"use chrono::TimeZone;
-use showtimes_db::{ClientShared, DatabaseShared};
+const MIGRATION_TEMPLATE: &str = r#"use showtimes_db::{ClientShared, DatabaseShared};
 
 use super::Migration;
 
@@ -60,10 +58,11 @@ impl Migration for {{name}} {
         "{{name}}"
     }
 
-    fn timestamp(&self) -> chrono::DateTime<chrono::Utc> {
-        chrono::Utc
-            .with_ymd_and_hms({{timestamp_split}})
+    fn timestamp(&self) -> jiff::Timestamp {
+        jiff::civil::datetime({{timestamp_split}}, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
             .unwrap()
+            .timestamp()
     }
 
     fn clone_box(&self) -> Box<dyn Migration> {
@@ -130,9 +129,9 @@ async fn main() {
         + &original_name[1..];
     let name = snake_case_to_pascal_case(&name);
 
-    let current_time = chrono::Utc::now();
+    let current_time = jiff::Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC);
     // format YYYYMMDDHHMMSS
-    let timestamp = current_time.format("%Y%m%d%H%M%S").to_string();
+    let timestamp = current_time.strftime("%Y%m%d%H%M%S").to_string();
 
     let migration_file = migrations_dir.join(format!("m{}_{}.rs", timestamp, original_name));
 

@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 use async_graphql::{Object, SimpleObject};
 use showtimes_db::m::RSSFeedDisplay;
 use showtimes_gql_common::{
-    data_loader::RSSFeedLoader, errors::GQLError, DataLoader, DateTimeGQL, GQLErrorCode,
-    GQLErrorExt, IntegrationIdGQL, UlidGQL,
+    DataLoader, DateTimeGQL, GQLErrorCode, GQLErrorExt, IntegrationIdGQL, UlidGQL,
+    data_loader::RSSFeedLoader, errors::GQLError,
 };
 use showtimes_rss::FeedEntryCloned;
 
@@ -151,40 +151,26 @@ impl RSSEventRenderedGQL {
 
 impl From<showtimes_events::m::RSSEvent> for RSSEventGQL {
     fn from(value: showtimes_events::m::RSSEvent) -> Self {
-        let chrono_ts =
-            chrono::DateTime::<chrono::Utc>::from_timestamp(value.timestamp().unix_timestamp(), 0)
-                .unwrap_or_else(|| {
-                    // current time
-                    chrono::Utc::now()
-                });
-
         Self {
             id: value.id().into(),
             feed_id: value.feed_id().into(),
             server_id: value.server_id().into(),
             hash: value.hash_key().to_string(),
             entry: value.entry().clone(),
-            timestamp: chrono_ts.into(),
+            timestamp: value.timestamp().into(),
         }
     }
 }
 
 impl From<&showtimes_events::m::RSSEvent> for RSSEventGQL {
     fn from(value: &showtimes_events::m::RSSEvent) -> Self {
-        let chrono_ts =
-            chrono::DateTime::<chrono::Utc>::from_timestamp(value.timestamp().unix_timestamp(), 0)
-                .unwrap_or_else(|| {
-                    // current time
-                    chrono::Utc::now()
-                });
-
         Self {
             id: value.id().into(),
             feed_id: value.feed_id().into(),
             server_id: value.server_id().into(),
             hash: value.hash_key().to_string(),
             entry: value.entry().clone(),
-            timestamp: chrono_ts.into(),
+            timestamp: value.timestamp().into(),
         }
     }
 }

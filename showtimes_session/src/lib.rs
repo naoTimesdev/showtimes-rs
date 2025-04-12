@@ -5,11 +5,9 @@ use std::sync::LazyLock;
 #[allow(clippy::disallowed_types)]
 use std::{collections::HashSet, sync::Arc};
 
-use chrono::TimeZone;
 use jwt_lc_rs::errors::ValidationError;
 use jwt_lc_rs::validator::Validator;
 use serde::{Deserialize, Serialize};
-use showtimes_shared::unix_timestamp_serializer;
 
 pub mod manager;
 pub mod oauth2;
@@ -67,8 +65,8 @@ pub struct ShowtimesUserClaims {
     /// When the token expires
     exp: i64,
     /// When the token was issued
-    #[serde(with = "unix_timestamp_serializer")]
-    iat: chrono::DateTime<chrono::Utc>,
+    #[serde(with = "jiff::fmt::serde::timestamp::second::required")]
+    iat: jiff::Timestamp,
     /// Who issued the token, usually `showtimes-rs-session/{version}`
     iss: String,
     /// Who the token is for
@@ -84,8 +82,8 @@ pub struct ShowtimesRefreshClaims {
     /// When the token expires
     exp: i64,
     /// When the token was issued
-    #[serde(with = "unix_timestamp_serializer")]
-    iat: chrono::DateTime<chrono::Utc>,
+    #[serde(with = "jiff::fmt::serde::timestamp::second::required")]
+    iat: jiff::Timestamp,
     /// Who issued the token, usually `showtimes-rs-session/{version}`
     iss: String,
     /// Current user ID
@@ -97,16 +95,18 @@ pub struct ShowtimesRefreshClaims {
 
 impl ShowtimesUserClaims {
     fn new(id: showtimes_shared::ulid::Ulid, expires_in: i64) -> Self {
-        let iat = chrono::Utc::now();
+        let iat = jiff::Timestamp::now();
+        let default = jiff::Timestamp::new(2_147_483_647, 0).unwrap();
         let exp = if expires_in == 0 {
             // Do a 32-bit max value
-            chrono::Utc.timestamp_opt(2_147_483_647, 0).unwrap()
+            default
         } else {
-            iat + chrono::Duration::seconds(expires_in)
+            let exp_in = jiff::SignedDuration::new(expires_in, 0);
+            iat.saturating_add(exp_in).expect("stupid")
         };
 
         Self {
-            exp: exp.timestamp(),
+            exp: exp.as_second(),
             iat,
             iss: ISSUER.to_string(),
             aud: ShowtimesAudience::User,
@@ -116,7 +116,7 @@ impl ShowtimesUserClaims {
 
     /// Create a new API key claims
     pub fn new_api(api_key: String, aud: ShowtimesAudience) -> Self {
-        let iat = chrono::Utc::now();
+        let iat = jiff::Timestamp::now();
         Self {
             exp: -1i64,
             iat,
@@ -127,12 +127,12 @@ impl ShowtimesUserClaims {
     }
 
     fn new_state(redirect_url: impl Into<String>) -> Self {
-        let iat = chrono::Utc::now();
+        let iat = jiff::Timestamp::now();
         // Discord OAuth2 request last 5 minutes
-        let exp = iat + chrono::Duration::seconds(300);
+        let exp = iat + jiff::SignedDuration::new(5 * 60, 0);
 
         Self {
-            exp: exp.timestamp(),
+            exp: exp.as_second(),
             iat,
             iss: ISSUER.to_string(),
             aud: ShowtimesAudience::DiscordAuth,
@@ -151,7 +151,7 @@ impl ShowtimesUserClaims {
     }
 
     /// Get when the claims is issued
-    pub fn get_issued_at(&self) -> chrono::DateTime<chrono::Utc> {
+    pub fn get_issued_at(&self) -> jiff::Timestamp {
         self.iat
     }
 
@@ -168,12 +168,12 @@ impl ShowtimesUserClaims {
 
 impl ShowtimesRefreshClaims {
     fn new(user: showtimes_shared::ulid::Ulid) -> Self {
-        let iat = chrono::Utc::now();
+        let iat = jiff::Timestamp::now();
         // Refresh claims last for 90 days
-        let exp = iat + chrono::Duration::days(90);
+        let exp = iat + jiff::SignedDuration::new(7 * 24 * 60 * 60, 0);
 
         Self {
-            exp: exp.timestamp(),
+            exp: exp.as_second(),
             iat,
             user,
             iss: ISSUER.to_string(),
@@ -187,7 +187,7 @@ impl ShowtimesRefreshClaims {
     }
 
     /// Get when the claims is issued
-    pub fn get_issued_at(&self) -> chrono::DateTime<chrono::Utc> {
+    pub fn get_issued_at(&self) -> jiff::Timestamp {
         self.iat
     }
 }

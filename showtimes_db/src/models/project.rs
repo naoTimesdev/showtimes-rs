@@ -1,8 +1,7 @@
 use std::sync::LazyLock;
 
-use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
-use showtimes_shared::{bson_datetime_opt_serializer, ulid_opt_serializer, ulid_serializer};
+use showtimes_shared::{ulid_opt_serializer, ulid_serializer};
 
 use crate::errors::{SHDbResult, StringValidationError, StringValidationErrorKind};
 
@@ -474,8 +473,8 @@ pub struct EpisodeProgress {
     /// Is the episode/chapter finished/released.
     pub finished: bool,
     /// The airing/release date of the episode/chapter.
-    #[serde(with = "bson_datetime_opt_serializer")]
-    pub aired: Option<chrono::DateTime<chrono::Utc>>,
+    #[serde(with = "showtimes_shared::bson_datetime_jiff_timestamp::optional")]
+    pub aired: Option<jiff::Timestamp>,
     /// The list of roles in the episode/chapter.
     pub statuses: Vec<RoleStatus>,
     /// The delay reason of the episode/chapter.
@@ -521,13 +520,13 @@ impl EpisodeProgress {
         self.delay_reason = None;
     }
 
-    pub fn set_aired(&mut self, aired: Option<chrono::DateTime<chrono::Utc>>) {
+    pub fn set_aired(&mut self, aired: Option<jiff::Timestamp>) {
         self.aired = aired;
     }
 
     pub fn set_aired_from_unix(&mut self, aired: i64) -> SHDbResult<()> {
-        let timestamp = chrono::DateTime::<chrono::Utc>::from_timestamp(aired, 0)
-            .ok_or(crate::errors::Error::TimeConversionError(aired))?;
+        let timestamp = jiff::Timestamp::from_second(aired)
+            .map_err(|_| crate::errors::Error::TimeConversionError(aired))?;
 
         self.aired = Some(timestamp);
         Ok(())
@@ -657,15 +656,15 @@ pub struct Project {
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
+        default = "jiff::Timestamp::now"
     )]
-    pub created: chrono::DateTime<chrono::Utc>,
+    pub created: jiff::Timestamp,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
+        default = "jiff::Timestamp::now"
     )]
-    pub updated: chrono::DateTime<chrono::Utc>,
+    pub updated: jiff::Timestamp,
 }
 
 impl Project {
@@ -678,7 +677,7 @@ impl Project {
         let title: String = title.into();
         validate_name(&title)?;
 
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         Ok(Project {
             id: ulid_serializer::default(),
@@ -701,7 +700,7 @@ impl Project {
         let title: String = title.into();
         validate_name(&title)?;
 
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         Ok(Project {
             id: ulid_serializer::default(),
@@ -728,7 +727,7 @@ impl Project {
 
         // generate assignee from roles
         let assignees: Vec<RoleAssignee> = roles.iter().map(RoleAssignee::from).collect();
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         Ok(Project {
             id: ulid_serializer::default(),
@@ -756,7 +755,7 @@ impl Project {
         let title: String = title.into();
         validate_name(&title)?;
 
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         Ok(Project {
             id: ulid_serializer::default(),
@@ -786,11 +785,7 @@ impl Project {
     }
 
     /// Create a new episode/chapter progress with specific episode/chapter number and airing date.
-    pub fn add_episode_with_number_and_airing(
-        &mut self,
-        number: u64,
-        aired_at: chrono::DateTime<chrono::Utc>,
-    ) {
+    pub fn add_episode_with_number_and_airing(&mut self, number: u64, aired_at: jiff::Timestamp) {
         let mut episode = EpisodeProgress::new_with_roles(number, false, &self.roles);
         episode.set_aired(Some(aired_at));
         self.progress.push(episode);
@@ -875,7 +870,7 @@ impl Project {
     /// Create a new Clone or Duplicate of this project with different ID and creator.
     pub fn duplicate(&self, creator: showtimes_shared::ulid::Ulid) -> Self {
         let mut new_project = self.clone();
-        let cur_time = chrono::Utc::now();
+        let cur_time = jiff::Timestamp::now();
         new_project.id = ulid_serializer::default();
         new_project.creator = creator;
         new_project.created = cur_time;

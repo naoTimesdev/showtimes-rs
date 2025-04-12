@@ -10,14 +10,12 @@ rust-version.workspace = true
 description = "Common library for GraphQL definitions of Showtimes API"
 
 [dependencies]
-chrono.workspace = true
+jiff.workspace = true
 ahash.workspace = true
 fastnomicon.workspace = true
 
 tokio.workspace = true
 futures-util.workspace = true
-
-tracing.workspace = true
 
 async-graphql.workspace = true
 image.workspace = true

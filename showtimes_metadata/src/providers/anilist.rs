@@ -117,7 +117,7 @@ impl AnilistProvider {
 
         if self.wait_limit && self.rate_limit.exhausted() {
             // Reset is UNIX timestamp
-            let wait_time = self.rate_limit.reset - chrono::Utc::now().timestamp();
+            let wait_time = self.rate_limit.reset - jiff::Timestamp::now().as_second();
             if wait_time > 0 {
                 tokio::time::sleep(tokio::time::Duration::from_secs(wait_time as u64)).await;
             }
@@ -292,11 +292,7 @@ impl AnilistProvider {
         let act_page = match page {
             Some(p) => {
                 // If page is less than 1, set it to 1
-                if p < 1 {
-                    1
-                } else {
-                    p
-                }
+                if p < 1 { 1 } else { p }
             }
             None => 1,
         };

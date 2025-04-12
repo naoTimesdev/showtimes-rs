@@ -49,11 +49,11 @@ pub enum ExternalSearchSource {
 #[derive(SimpleObject)]
 pub struct ExternalSearchFuzzyDate {
     /// The year of the date
-    year: Option<i32>,
+    year: Option<i16>,
     /// The month of the date
-    month: Option<i32>,
+    month: Option<i8>,
     /// The day of the date
-    day: Option<i32>,
+    day: Option<i8>,
 }
 
 /// The resulting title from a external metadata search

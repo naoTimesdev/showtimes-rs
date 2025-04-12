@@ -1,7 +1,7 @@
 //! A collection of common model types, also contains the main [`SHEvent`] model.
 
 use clickhouse::Row;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use showtimes_derive::EnumName;
 use std::fmt::Debug;
@@ -76,8 +76,8 @@ pub struct SHEvent<T: Send + Sync + Clone> {
     /// If the event is initiated by the system/Owner, this will be `None`/null
     actor: Option<String>,
     /// The timestamp of the event
-    #[serde(with = "clickhouse::serde::time::datetime")]
-    timestamp: ::time::OffsetDateTime,
+    #[serde(with = "super::timestamp")]
+    timestamp: jiff::Timestamp,
 }
 
 impl<T> SHEvent<T>
@@ -91,7 +91,7 @@ where
             kind,
             data,
             actor: None,
-            timestamp: ::time::OffsetDateTime::now_utc(),
+            timestamp: jiff::Timestamp::now(),
         }
     }
 
@@ -121,7 +121,7 @@ where
     }
 
     /// Get the timestamp of the event
-    pub fn timestamp(&self) -> ::time::OffsetDateTime {
+    pub fn timestamp(&self) -> jiff::Timestamp {
         self.timestamp
     }
 }

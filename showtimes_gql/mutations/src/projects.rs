@@ -1,8 +1,10 @@
-use std::{collections::VecDeque, sync::Arc};
+use std::{
+    collections::VecDeque,
+    sync::{Arc, LazyLock},
+};
 
 use ahash::HashMapExt;
 use async_graphql::{CustomValidator, Enum, InputObject, Upload, dataloader::DataLoader};
-use chrono::TimeZone;
 use showtimes_db::{DatabaseShared, ProjectHandler, m::UserKind, mongodb::bson::doc};
 use showtimes_derive::EnumName;
 use showtimes_fs::FsPool;
@@ -26,6 +28,10 @@ use crate::{
     IntegrationActionGQL, IntegrationInputGQL, IntegrationValidator, execute_search_events,
     is_string_set, is_vec_set,
 };
+
+static JST_TZ: LazyLock<jiff::tz::TimeZone> =
+    LazyLock::new(|| jiff::tz::TimeZone::get("Asia/Tokyo").unwrap());
+const ONE_WEEK: i64 = 7 * 24 * 60 * 60; // 7 days in seconds
 
 type IndexMapQueries = async_graphql::indexmap::IndexMap<async_graphql::Name, async_graphql::Value>;
 
@@ -536,7 +542,7 @@ impl ProgressCreateInputGQL {
 #[derive(Clone, Debug)]
 struct ExternalMediaFetchProgressResult {
     number: u32,
-    aired_at: Option<chrono::DateTime<chrono::Utc>>,
+    aired_at: Option<jiff::Timestamp>,
 }
 
 struct ExternalMediaFetchResult {
@@ -548,21 +554,24 @@ struct ExternalMediaFetchResult {
     poster_url: Option<String>,
 }
 
-fn unix_to_chrono(unix: i64) -> chrono::DateTime<chrono::Utc> {
-    chrono::DateTime::<chrono::Utc>::from_timestamp(unix, 0).unwrap()
+fn unix_to_timestamp(unix: i64) -> jiff::Timestamp {
+    jiff::Timestamp::from_second(unix).unwrap()
 }
 
-fn fuzzy_yyyy_mm_dd_to_chrono(date: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+fn fuzzy_yyyy_mm_dd_to_timestamp(date: &str) -> Option<jiff::Timestamp> {
     let parts: Vec<&str> = date.split('-').collect();
-    let year: Option<i32> = parts.first().and_then(|y| y.parse().ok());
-    let month: Option<u32> = parts.get(1).and_then(|m| m.parse().ok());
-    let day: Option<u32> = parts.get(2).and_then(|d| d.parse().ok());
+    let year: Option<i16> = parts.first().and_then(|y| y.parse().ok());
+    let month: Option<i8> = parts.get(1).and_then(|m| m.parse().ok());
+    let day: Option<i8> = parts.get(2).and_then(|d| d.parse().ok());
 
     // If all None, return None
     match (year, month, day) {
-        (Some(year), Some(month), Some(day)) => chrono::Utc
-            .with_ymd_and_hms(year, month, day, 0, 0, 0)
-            .single(),
+        (Some(year), Some(month), Some(day)) => {
+            let dt = jiff::civil::datetime(year, month, day, 0, 0, 0, 0);
+            dt.to_zoned(JST_TZ.clone())
+                .ok()
+                .and_then(|dt| Some(dt.timestamp()))
+        }
         _ => None,
     }
 }
@@ -647,7 +656,7 @@ async fn fetch_metadata_via_anilist(
             .iter()
             .map(|sched| ExternalMediaFetchProgressResult {
                 number: sched.episode as u32,
-                aired_at: Some(unix_to_chrono(sched.airing_at)),
+                aired_at: Some(unix_to_timestamp(sched.airing_at)),
             })
             .collect();
 
@@ -687,7 +696,7 @@ async fn fetch_metadata_via_anilist(
 
     let start_time = match (anilist_info.start_date, input.start_date) {
         (_, Some(start_date)) => *start_date,
-        (Some(fuzzy_start), _) => fuzzy_start.into_chrono().ok_or_else(|| {
+        (Some(fuzzy_start), _) => fuzzy_start.into_timestamp().ok_or_else(|| {
             GQLError::new(
                 "Invalid fuzzy date from Anilist, please provide override".to_string(),
                 GQLErrorCode::MetadataUnableToParseDate,
@@ -720,7 +729,7 @@ async fn fetch_metadata_via_anilist(
                 aired_at: Some(current_time),
             });
 
-            current_time += chrono::Duration::weeks(1);
+            current_time += jiff::SignedDuration::new(ONE_WEEK, 0);
         }
     }
 
@@ -769,7 +778,7 @@ async fn fetch_metadata_via_anilist(
                 for i in (last_ep.number + 1)..=est_ep_u32 {
                     let aired_at = match last_ep_start {
                         Some(last) => {
-                            let pushed = last + chrono::Duration::weeks(1);
+                            let pushed = last + jiff::SignedDuration::new(ONE_WEEK, 0);
                             last_ep_start = Some(pushed);
                             Some(pushed)
                         }
@@ -899,7 +908,7 @@ async fn fetch_metadata_via_vndb(
 
     let aired_at = vndb_info
         .released
-        .and_then(|d| fuzzy_yyyy_mm_dd_to_chrono(&d));
+        .and_then(|d| fuzzy_yyyy_mm_dd_to_timestamp(&d));
 
     let poster_url = vndb_info.image.url;
 
@@ -969,7 +978,7 @@ async fn fetch_metadata_via_tmdb(
 
     let aired_at = tmdb_info
         .release_date
-        .and_then(|d| fuzzy_yyyy_mm_dd_to_chrono(&d));
+        .and_then(|d| fuzzy_yyyy_mm_dd_to_timestamp(&d));
 
     Ok(ExternalMediaFetchResult {
         title: first_title,
@@ -2062,7 +2071,7 @@ async fn update_single_project(
                             episode.number as u64,
                         );
                     if let Some(aired_at) = db_ep.aired {
-                        aired_before.set_aired(aired_at.timestamp());
+                        aired_before.set_aired(aired_at.as_second());
                     }
                     before_project.add_progress(aired_before);
                     db_ep.set_aired(episode.aired_at);
@@ -2071,7 +2080,7 @@ async fn update_single_project(
                             episode.number as u64,
                         );
                     if let Some(aired_at) = episode.aired_at {
-                        aired_after.set_aired(aired_at.timestamp());
+                        aired_after.set_aired(aired_at.as_second());
                     }
                     after_project.add_progress(aired_after);
                 }
@@ -2082,7 +2091,7 @@ async fn update_single_project(
                             showtimes_events::m::ProjectUpdatedEpisodeDataEvent::added(
                                 episode.number as u64,
                             );
-                        ep_events.set_aired(aired_at.timestamp());
+                        ep_events.set_aired(aired_at.as_second());
                         after_project.add_progress(ep_events);
                     }
                     None => {
@@ -2146,11 +2155,11 @@ async fn update_single_project(
 
                 let aired_at = episode.aired.map(|a| *a);
                 if let Some(original) = db_ep.aired {
-                    before_episode.set_aired(original.timestamp());
+                    before_episode.set_aired(original.as_second());
                 }
                 db_ep.set_aired(aired_at);
                 if let Some(after) = db_ep.aired {
-                    after_episode.set_aired(after.timestamp());
+                    after_episode.set_aired(after.as_second());
                 }
 
                 if let Some(true) = episode.unset_delay {
@@ -2709,8 +2718,10 @@ pub async fn mutate_projects_episode_add_auto(
         let new_episodes = ((last_episode.number + 1)..=(last_episode.number + count))
             .enumerate()
             .map(|(idx, n)| {
-                let next_air_date =
-                    last_air_date.map(|d| d + chrono::Duration::weeks((idx + 1) as i64));
+                let next_air_date = last_air_date.map(|d| {
+                    let week = ONE_WEEK * (idx as i64 + 1);
+                    d + jiff::SignedDuration::new(week, 0)
+                });
 
                 let mut ep =
                     showtimes_db::m::EpisodeProgress::new_with_roles(n, false, &project.roles);
@@ -2725,7 +2736,7 @@ pub async fn mutate_projects_episode_add_auto(
                 let mut event =
                     showtimes_events::m::ProjectUpdatedEpisodeDataEvent::added(episode.number);
                 if let Some(aired) = episode.aired {
-                    event.set_aired(aired.timestamp());
+                    event.set_aired(aired.as_second());
                 }
 
                 event
@@ -2888,13 +2899,13 @@ pub async fn mutate_projects_episode_add_manual(
                     showtimes_events::m::ProjectUpdatedEpisodeDataEvent::updated(repl_mut.number);
                 let mut aired_after = aired_before.clone();
                 if let Some(aired_at) = repl_mut.aired {
-                    aired_before.set_aired(aired_at.timestamp());
+                    aired_before.set_aired(aired_at.as_second());
                 }
                 if let Some(aired) = &episode.aired {
                     repl_mut.set_aired(Some(**aired));
                 }
                 if let Some(aired_at) = repl_mut.aired {
-                    aired_after.set_aired(aired_at.timestamp());
+                    aired_after.set_aired(aired_at.as_second());
                 }
                 before_project.add_progress(aired_before);
                 after_project.add_progress(aired_after);
@@ -2906,7 +2917,7 @@ pub async fn mutate_projects_episode_add_manual(
                             showtimes_events::m::ProjectUpdatedEpisodeDataEvent::added(
                                 episode.number,
                             );
-                        ep_events.set_aired(aired.timestamp());
+                        ep_events.set_aired(aired.as_second());
                         after_project.add_progress(ep_events);
                     }
                     None => {

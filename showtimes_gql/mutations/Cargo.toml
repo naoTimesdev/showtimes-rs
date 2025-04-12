@@ -10,7 +10,7 @@ rust-version.workspace = true
 description = "Mutations library for GraphQL definitions of Showtimes API"
 
 [dependencies]
-chrono.workspace = true
+jiff.workspace = true
 url.workspace = true
 ahash.workspace = true
 
@@ -20,7 +20,6 @@ tracing.workspace = true
 
 async-graphql.workspace = true
 reqwest.workspace = true
-image.workspace = true
 
 # Showtimes related
 showtimes-shared = { path = "../../showtimes_shared" }

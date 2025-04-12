@@ -13,7 +13,7 @@ pub trait Migration {
     where
         Self: Sized;
     fn name(&self) -> &'static str;
-    fn timestamp(&self) -> chrono::DateTime<chrono::Utc>;
+    fn timestamp(&self) -> jiff::Timestamp;
     async fn up(&self) -> anyhow::Result<()>;
     async fn down(&self) -> anyhow::Result<()>;
     fn clone_box(&self) -> Box<dyn Migration>;

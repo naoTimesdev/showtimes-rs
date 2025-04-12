@@ -1,14 +1,13 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use ahash::{HashMap, HashMapExt};
-use chrono::TimeZone;
 use futures_util::TryStreamExt;
 use mongodb::bson::doc;
 use showtimes_db::{
+    ClientShared, DatabaseShared, UserHandler,
     m::{
         DiscordUser, EpisodeProgress, ImageMetadata, IntegrationId, RoleAssignee, RoleStatus, User,
     },
-    ClientShared, DatabaseShared, UserHandler,
 };
 use showtimes_fs::{
     local::LocalFs,
@@ -74,10 +73,11 @@ impl Migration for M20240725045840Init {
         "M20240725045840Init"
     }
 
-    fn timestamp(&self) -> chrono::DateTime<chrono::Utc> {
-        chrono::Utc
-            .with_ymd_and_hms(2024, 7, 25, 4, 58, 40)
+    fn timestamp(&self) -> jiff::Timestamp {
+        jiff::civil::datetime(2024, 7, 25, 4, 58, 40, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
             .unwrap()
+            .timestamp()
     }
 
     #[inline(never)]
@@ -898,11 +898,12 @@ impl M20240725045840Init {
         }
 
         new_project.integrations = integrations;
-        let last_update = chrono::DateTime::<chrono::Utc>::try_from(project.last_update)
-            .unwrap_or_else(|_| chrono::Utc::now());
+        let last_update = jiff::Timestamp::try_from(project.last_update)
+            .unwrap_or_else(|_| jiff::Timestamp::now());
         new_project.updated = last_update;
         // Created just do last_update minus 1 day
-        new_project.created = last_update - chrono::Duration::days(1);
+        let one_day = jiff::SignedDuration::new(24 * 60 * 60, 0);
+        new_project.created = last_update - one_day;
 
         Ok(new_project)
     }

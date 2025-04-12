@@ -1,4 +1,3 @@
-use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
 use showtimes_shared::ulid_serializer;
 
@@ -79,15 +78,15 @@ pub struct Webhook {
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
+        default = "jiff::Timestamp::now"
     )]
-    pub created: chrono::DateTime<chrono::Utc>,
+    pub created: jiff::Timestamp,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
+        default = "jiff::Timestamp::now"
     )]
-    pub updated: chrono::DateTime<chrono::Utc>,
+    pub updated: jiff::Timestamp,
 }
 
 impl Webhook {
@@ -97,7 +96,7 @@ impl Webhook {
         kind: WebhookTarget,
         creator: showtimes_shared::ulid::Ulid,
     ) -> Self {
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
         Self {
             id: showtimes_shared::ulid::Ulid::new(),
             url: url.into(),

@@ -253,7 +253,7 @@ impl From<&showtimes_db::m::EpisodeProgress> for ProjectUpdatedEpisodeDataEvent 
     fn from(value: &showtimes_db::m::EpisodeProgress) -> Self {
         Self {
             number: value.number,
-            aired: value.aired.map(|v| v.timestamp()),
+            aired: value.aired.map(|v| v.as_second()),
             delay_reason: value.delay_reason.clone(),
             status: ProjectUpdatedEpisodeStatus::Updated,
         }

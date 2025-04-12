@@ -525,7 +525,6 @@ dependencies = [
  "ahash",
  "base64 0.22.1",
  "bitvec",
- "chrono",
  "getrandom 0.2.15",
  "getrandom 0.3.2",
  "hex",
@@ -805,6 +804,15 @@ name = "convert_case"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "convert_case"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baaaa0ecca5b51987b9423ccdc971514dd8b0bb7b4060b983d3664dad3f1f89f"
 dependencies = [
  "unicode-segmentation",
 ]
@@ -1937,6 +1945,47 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
+name = "jiff"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f33145a5cbea837164362c7bd596106eb7c5198f97d1ba6f6ebb3223952e488"
+dependencies = [
+ "jiff-static",
+ "jiff-tzdb-platform",
+ "log",
+ "portable-atomic",
+ "portable-atomic-util",
+ "serde",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "jiff-static"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43ce13c40ec6956157a3635d97a1ee2df323b263f09ea14165131289cb0f5c19"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "jiff-tzdb"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1283705eb0a21404d2bfd6eef2a7593d240bc42a0bdb39db0ad6fa2ec026524"
+
+[[package]]
+name = "jiff-tzdb-platform"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "875a5a69ac2bab1a891711cf5eccbec1ce0341ea805560dcd90b7a2e925132e8"
+dependencies = [
+ "jiff-tzdb",
+]
+
+[[package]]
 name = "js-sys"
 version = "0.3.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2662,6 +2711,21 @@ dependencies = [
  "fdeflate",
  "flate2",
  "miniz_oxide",
+]
+
+[[package]]
+name = "portable-atomic"
+version = "1.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "350e9b48cbc6b0e028b0473b114454c6316e57336ee184ceab6e53f72c178b3e"
+
+[[package]]
+name = "portable-atomic-util"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8a2f0d8d040d7848a709caf78912debcc3f33ee4b3cac47d73d1e1069e83507"
+dependencies = [
+ "portable-atomic",
 ]
 
 [[package]]
@@ -3438,7 +3502,6 @@ dependencies = [
  "async-graphql-axum",
  "axum",
  "axum-extra",
- "chrono",
  "futures-util",
  "redis",
  "reqwest",
@@ -3472,9 +3535,8 @@ dependencies = [
 name = "showtimes-db"
 version = "0.1.0"
 dependencies = [
- "bson",
- "chrono",
  "futures-util",
+ "jiff",
  "mongodb",
  "serde",
  "showtimes-derive",
@@ -3488,7 +3550,7 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "bson",
- "convert_case 0.6.0",
+ "convert_case 0.8.0",
  "proc-macro2",
  "quote",
  "serde",
@@ -3503,6 +3565,7 @@ dependencies = [
  "clickhouse",
  "futures-channel",
  "futures-util",
+ "jiff",
  "rustc-hash 2.1.1",
  "serde",
  "serde_json",
@@ -3512,7 +3575,6 @@ dependencies = [
  "showtimes-rss",
  "showtimes-shared",
  "slab",
- "time",
  "tokio",
  "tracing",
  "uuid",
@@ -3522,7 +3584,7 @@ dependencies = [
 name = "showtimes-fansubdb"
 version = "0.1.0"
 dependencies = [
- "chrono",
+ "jiff",
  "reqwest",
  "serde",
 ]
@@ -3531,8 +3593,8 @@ dependencies = [
 name = "showtimes-fs"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "futures-util",
+ "jiff",
  "mime_guess",
  "quick-xml",
  "reqwest",
@@ -3548,16 +3610,15 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "async-graphql",
- "chrono",
  "fastnomicon",
  "futures-util",
  "image",
+ "jiff",
  "showtimes-db",
  "showtimes-derive",
  "showtimes-session",
  "showtimes-shared",
  "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -3565,16 +3626,11 @@ name = "showtimes-gql-events"
 version = "0.1.0"
 dependencies = [
  "async-graphql",
- "chrono",
  "serde",
  "showtimes-db",
  "showtimes-events",
  "showtimes-gql-common",
  "showtimes-gql-events-models",
- "showtimes-gql-models",
- "showtimes-rss",
- "showtimes-shared",
- "time",
 ]
 
 [[package]]
@@ -3582,7 +3638,7 @@ name = "showtimes-gql-events-models"
 version = "0.1.0"
 dependencies = [
  "async-graphql",
- "chrono",
+ "jiff",
  "serde",
  "showtimes-db",
  "showtimes-events",
@@ -3590,7 +3646,6 @@ dependencies = [
  "showtimes-gql-models",
  "showtimes-rss",
  "showtimes-shared",
- "time",
 ]
 
 [[package]]
@@ -3598,7 +3653,7 @@ name = "showtimes-gql-models"
 version = "0.1.0"
 dependencies = [
  "async-graphql",
- "chrono",
+ "jiff",
  "showtimes-db",
  "showtimes-derive",
  "showtimes-gql-common",
@@ -3615,8 +3670,7 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "async-graphql",
- "chrono",
- "image",
+ "jiff",
  "reqwest",
  "showtimes-db",
  "showtimes-derive",
@@ -3691,8 +3745,8 @@ dependencies = [
 name = "showtimes-metadata"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "image",
+ "jiff",
  "kmeans_colors",
  "nom 8.0.0",
  "palette",
@@ -3711,11 +3765,10 @@ dependencies = [
  "ahash",
  "anyhow",
  "async-trait",
- "bson",
- "chrono",
  "clap",
  "dotenvy",
  "futures-util",
+ "jiff",
  "mongodb",
  "reqwest",
  "serde",
@@ -3734,9 +3787,9 @@ name = "showtimes-rss"
 version = "0.1.0"
 dependencies = [
  "ahash",
- "chrono",
  "feed-rs",
  "htmd",
+ "jiff",
  "nom 8.0.0",
  "pulldown-cmark",
  "pulldown-cmark-escape",
@@ -3751,7 +3804,7 @@ dependencies = [
 name = "showtimes-search"
 version = "0.1.0"
 dependencies = [
- "chrono",
+ "jiff",
  "meilisearch-sdk",
  "serde",
  "showtimes-db",
@@ -3764,7 +3817,7 @@ dependencies = [
 name = "showtimes-session"
 version = "0.1.0"
 dependencies = [
- "chrono",
+ "jiff",
  "jwt-lc-rs",
  "redis",
  "reqwest",
@@ -3780,7 +3833,7 @@ name = "showtimes-shared"
 version = "0.1.0"
 dependencies = [
  "bson",
- "chrono",
+ "jiff",
  "serde",
  "serde_repr",
  "tokio",

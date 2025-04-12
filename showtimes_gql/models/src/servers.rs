@@ -1,6 +1,6 @@
 //! A server models list
 
-use async_graphql::{dataloader::DataLoader, Enum, Object};
+use async_graphql::{Enum, Object, dataloader::DataLoader};
 use errors::GQLError;
 use showtimes_db::{
     m::{APIKeyCapability, ServerUser},
@@ -118,8 +118,8 @@ pub struct ServerGQL {
     owners: Vec<ServerUser>,
     integrations: Vec<showtimes_db::m::IntegrationId>,
     avatar: Option<showtimes_db::m::ImageMetadata>,
-    created: chrono::DateTime<chrono::Utc>,
-    updated: chrono::DateTime<chrono::Utc>,
+    created: jiff::Timestamp,
+    updated: jiff::Timestamp,
     current_user: Option<showtimes_shared::ulid::Ulid>,
     disable_projects: bool,
 }
@@ -234,7 +234,7 @@ impl ServerGQL {
 
         let loader = ctx.data_unchecked::<DataLoader<ServerPremiumLoader>>();
 
-        let current_time = chrono::Utc::now();
+        let current_time = jiff::Timestamp::now();
         let results = loader
             .load_one(ServerPremiumServer::from(self.id))
             .await?
@@ -262,9 +262,9 @@ impl ServerGQL {
 pub struct ServerPremiumGQL {
     id: showtimes_shared::ulid::Ulid,
     target: showtimes_shared::ulid::Ulid,
-    ends_at: chrono::DateTime<chrono::Utc>,
-    created: chrono::DateTime<chrono::Utc>,
-    updated: chrono::DateTime<chrono::Utc>,
+    ends_at: jiff::Timestamp,
+    created: jiff::Timestamp,
+    updated: jiff::Timestamp,
     disable_server: bool,
     current_user: Option<showtimes_shared::ulid::Ulid>,
 }

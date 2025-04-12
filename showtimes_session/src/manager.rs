@@ -152,9 +152,11 @@ impl SessionManager {
                     None => Err(SessionError::SessionNotFound),
                     Some(session_exp) => {
                         if session_exp != -1 {
-                            let current_time = chrono::Utc::now() - chrono::Duration::minutes(2);
+                            let current_time = jiff::Timestamp::now()
+                                .saturating_sub(jiff::SignedDuration::new(2 * 60, 0))
+                                .unwrap();
 
-                            if session_exp < current_time.timestamp() {
+                            if session_exp < current_time.as_second() {
                                 // Delete the session
                                 self.remove_session(&token).await.map_err(|e| {
                                     tracing::error!("Failed to remove session: {:?}", e);

@@ -1,11 +1,10 @@
 use ahash::{HashMap, HashMapExt};
-use chrono::TimeZone;
 use mongodb::bson::doc;
 use showtimes_db::{ClientShared, DatabaseShared};
 use showtimes_fs::{
+    FsFileKind,
     local::LocalFs,
     s3::{S3Fs, S3FsCredentials, S3PathStyle},
-    FsFileKind,
 };
 
 use crate::common::env_or_exit;
@@ -30,10 +29,11 @@ impl Migration for M20240726055250UpdateCovers {
         "M20240726055250UpdateCovers"
     }
 
-    fn timestamp(&self) -> chrono::DateTime<chrono::Utc> {
-        chrono::Utc
-            .with_ymd_and_hms(2024, 7, 26, 5, 52, 50)
+    fn timestamp(&self) -> jiff::Timestamp {
+        jiff::civil::datetime(2024, 7, 26, 5, 52, 50, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
             .unwrap()
+            .timestamp()
     }
 
     async fn up(&self) -> anyhow::Result<()> {
