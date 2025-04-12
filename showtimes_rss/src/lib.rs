@@ -6,11 +6,11 @@ pub mod markdown;
 pub mod template;
 
 use ahash::{HashMap, HashMapExt};
-use chrono::{DateTime, Utc};
 use feed_rs::model::{MediaContent, MediaThumbnail};
+use jiff::{Timestamp, fmt::rfc2822, tz::TimeZone};
 use markdown::expand_url;
 use serde::{Deserialize, Serialize};
-pub use template::{format_text, VecString};
+pub use template::{VecString, format_text};
 
 fn create_client() -> Result<reqwest::Client, reqwest::Error> {
     let ua = format!(
@@ -61,7 +61,7 @@ pub enum FeedValue {
     /// Value ia a collection of String
     Collection(VecString),
     /// Value is a timestamp
-    Timestamp(DateTime<Utc>),
+    Timestamp(Timestamp),
 }
 
 impl From<String> for FeedValue {
@@ -82,9 +82,15 @@ impl From<Vec<String>> for FeedValue {
     }
 }
 
-impl From<DateTime<Utc>> for FeedValue {
-    fn from(value: DateTime<Utc>) -> Self {
+impl From<Timestamp> for FeedValue {
+    fn from(value: Timestamp) -> Self {
         Self::Timestamp(value)
+    }
+}
+
+impl From<jiff::Zoned> for FeedValue {
+    fn from(value: jiff::Zoned) -> Self {
+        Self::Timestamp(value.timestamp())
     }
 }
 
@@ -119,8 +125,11 @@ impl<'de> Deserialize<'de> for FeedValue {
             where
                 E: serde::de::Error,
             {
-                // Try RFC3339 first
-                if let Ok(dt) = value.parse::<DateTime<Utc>>() {
+                if let Ok(dt) = value.parse::<Timestamp>() {
+                    // Try RFC3339 first
+                    Ok(FeedValue::from(dt))
+                } else if let Ok(dt) = rfc2822::parse(value) {
+                    // Try RFC2822 second
                     Ok(FeedValue::from(dt))
                 } else {
                     // Fallback to string
@@ -151,7 +160,13 @@ impl std::fmt::Display for FeedValue {
             FeedValue::Collection(s) => write!(f, "{}", s),
             FeedValue::Timestamp(s) => {
                 // Use similar format to RFC3339
-                write!(f, "{}", s.format("%a, %d %b %Y %H:%M:%S %Z"))
+                let zone = s.to_zoned(TimeZone::UTC);
+                let rfc_data = rfc2822::to_string(&zone);
+                write!(
+                    f,
+                    "{}",
+                    rfc_data.unwrap_or("[Invalid ZonedTimestamp]".to_string())
+                )
             }
         }
     }
@@ -245,11 +260,14 @@ pub async fn parse_feed<'a>(
             }
 
             if let Some(updated) = entry.updated {
-                hash_entries.insert("updated", updated.into());
+                let coerced = Timestamp::from_second(updated.timestamp()).unwrap_or(Timestamp::MAX);
+                hash_entries.insert("updated", coerced.into());
             }
 
             if let Some(published) = entry.published {
-                hash_entries.insert("published", published.into());
+                let coerced =
+                    Timestamp::from_second(published.timestamp()).unwrap_or(Timestamp::MAX);
+                hash_entries.insert("published", coerced.into());
             }
 
             let parsed_links: Vec<String> = entry

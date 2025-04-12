@@ -11,7 +11,7 @@ description = "MongoDB models mapping for Showtimes Database"
 
 [dependencies]
 serde.workspace = true
-chrono.workspace = true
+jiff.workspace = true
 url.workspace = true
 
 futures-util.workspace = true

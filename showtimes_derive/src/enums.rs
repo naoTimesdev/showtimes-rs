@@ -4,18 +4,18 @@ use proc_macro::TokenStream;
 use syn::{Attribute, Expr, Lit, LitStr, Meta, Token, punctuated::Punctuated, spanned::Spanned};
 
 #[derive(Debug, Clone)]
-struct EnumNameAttr {
+struct EnumNameAttr<'a> {
     /// Rename field to
     rename: Option<String>,
     /// Globally convert field to
-    rename_all: convert_case::Case,
+    rename_all: convert_case::Case<'a>,
     /// Strict mode, default true
     ///
     /// Will check if all variants have unique values
     strict: bool,
 }
 
-impl Default for EnumNameAttr {
+impl<'a> Default for EnumNameAttr<'a> {
     fn default() -> Self {
         EnumNameAttr {
             rename: None,
@@ -25,14 +25,14 @@ impl Default for EnumNameAttr {
     }
 }
 
-fn map_convert_case(case: &str, expr: &LitStr) -> Result<convert_case::Case, syn::Error> {
+fn map_convert_case<'a>(case: &str, expr: &LitStr) -> Result<convert_case::Case<'a>, syn::Error> {
     match case {
         "UPPERCASE" => Ok(convert_case::Case::Upper),
         "lowercase" => Ok(convert_case::Case::Lower),
         "camelCase" => Ok(convert_case::Case::Camel),
         "PascalCase" => Ok(convert_case::Case::Pascal),
         "snake_case" => Ok(convert_case::Case::Snake),
-        "SCREAMING_SNAKE_CASE" => Ok(convert_case::Case::ScreamingSnake),
+        "SCREAMING_SNAKE_CASE" => Ok(convert_case::Case::Constant),
         "kebab-case" => Ok(convert_case::Case::Kebab),
         "flatcase" => Ok(convert_case::Case::Flat),
         "UPPERFLATCASE" => Ok(convert_case::Case::UpperFlat),
@@ -198,17 +198,17 @@ pub(crate) fn expand_enumname(input: &syn::DeriveInput) -> TokenStream {
 }
 
 #[derive(Debug, Clone)]
-struct SerdeAutomataAttr {
+struct SerdeAutomataAttr<'a> {
     /// Rename field to
     rename: Vec<String>,
     ser_rename: Vec<String>,
     deser_rename: Vec<String>,
     /// Globally convert field to
-    rename_all: convert_case::Case,
+    rename_all: convert_case::Case<'a>,
     /// Deserialize field rename
-    deserialize_rename_all: Option<convert_case::Case>,
+    deserialize_rename_all: Option<convert_case::Case<'a>>,
     /// For serializing
-    serialize_rename_all: Option<convert_case::Case>,
+    serialize_rename_all: Option<convert_case::Case<'a>>,
     /// Strict mode, default true
     ///
     /// Will check if all variants have unique values
@@ -217,7 +217,7 @@ struct SerdeAutomataAttr {
     case_sensitive: bool,
 }
 
-impl Default for SerdeAutomataAttr {
+impl<'a> Default for SerdeAutomataAttr<'a> {
     fn default() -> Self {
         SerdeAutomataAttr {
             rename: vec![],

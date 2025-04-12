@@ -137,7 +137,7 @@ pub(crate) fn expand_showmodel(ast: &syn::DeriveInput) -> TokenStream {
             }
 
             fn updated(&mut self) {
-                self.updated = chrono::Utc::now();
+                self.updated = jiff::Timestamp::now();
             }
         }
     };

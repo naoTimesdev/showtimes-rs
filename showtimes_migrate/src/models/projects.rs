@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,19 +98,18 @@ pub enum LastUpdate {
     Comma(f64),
 }
 
-impl TryFrom<LastUpdate> for DateTime<Utc> {
+impl TryFrom<LastUpdate> for jiff::Timestamp {
     type Error = String;
 
     fn try_from(value: LastUpdate) -> Result<Self, Self::Error> {
         match value {
             LastUpdate::Flat(v) => {
-                DateTime::from_timestamp(v, 0).ok_or(format!("Invalid timestamp: {}", v))
+                jiff::Timestamp::from_second(v).map_err(|_| format!("Invalid timestamp: {}", v))
             }
             LastUpdate::Comma(v) => {
                 // Round the float to the nearest second
                 let secs = v as i64;
-                let nanos = ((v - secs as f64) * 1_000_000_000.0) as u32;
-                DateTime::from_timestamp(secs, nanos).ok_or(format!("Invalid timestamp: {}", v))
+                jiff::Timestamp::from_second(secs).map_err(|_| format!("Invalid timestamp: {}", v))
             }
         }
     }

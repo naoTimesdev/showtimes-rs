@@ -1,4 +1,3 @@
-use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
 use showtimes_derive::EnumName;
 use showtimes_shared::ulid_serializer;
@@ -266,21 +265,21 @@ pub struct User {
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub created: chrono::DateTime<chrono::Utc>,
+    pub created: jiff::Timestamp,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub updated: chrono::DateTime<chrono::Utc>,
+    pub updated: jiff::Timestamp,
 }
 
 impl User {
     /// Create a new user
     pub fn new(username: String, discord_meta: DiscordUser) -> Self {
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         Self {
             id: ulid_serializer::default(),
@@ -298,7 +297,7 @@ impl User {
 
     /// Create a new admin user
     pub fn new_admin(username: String, discord_meta: DiscordUser) -> Self {
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         Self {
             id: ulid_serializer::default(),
@@ -316,7 +315,7 @@ impl User {
 
     /// Stub a owner user
     pub fn stub_owner(master_key: impl Into<String>) -> Self {
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         let mut discord = DiscordUser::stub();
         discord.id = master_key.into();
@@ -341,7 +340,7 @@ impl User {
 
     /// Stub a user
     pub fn stub() -> Self {
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         Self {
             id: ulid_serializer::default(),

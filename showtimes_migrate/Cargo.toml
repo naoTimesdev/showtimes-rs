@@ -11,7 +11,7 @@ description = "A tools to migrate Showtimes database models and more"
 
 [dependencies]
 anyhow.workspace = true
-chrono.workspace = true
+jiff.workspace = true
 serde.workspace = true
 ahash.workspace = true
 

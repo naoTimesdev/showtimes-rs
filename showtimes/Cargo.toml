@@ -16,7 +16,7 @@ serde.workspace = true
 serde_json.workspace = true
 urlencoding.workspace = true
 uuid.workspace = true
-chrono.workspace = true
+jiff.workspace = true
 ahash.workspace = true
 
 # Async/Tokio

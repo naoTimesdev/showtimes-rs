@@ -1,5 +1,4 @@
 use crate::ShowModelHandler;
-use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
 
 /// A model to hold migrations information
@@ -9,27 +8,27 @@ pub struct Migration {
     /// The migration's ID described
     pub name: String,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub ts: chrono::DateTime<chrono::Utc>,
+    pub ts: jiff::Timestamp,
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub updated: chrono::DateTime<chrono::Utc>,
+    pub updated: jiff::Timestamp,
     pub is_current: bool,
 }
 
 impl Migration {
-    pub fn new(name: &str, ts: chrono::DateTime<chrono::Utc>) -> Self {
+    pub fn new(name: &str, ts: jiff::Timestamp) -> Self {
         Self {
             name: name.to_string(),
             ts,
             _id: None,
-            updated: chrono::Utc::now(),
+            updated: jiff::Timestamp::now(),
             is_current: true,
         }
     }

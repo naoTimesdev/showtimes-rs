@@ -2,10 +2,14 @@
 //!
 //! This is incomplete and only made to support what Showtimes needed.
 
-use chrono::TimeZone;
+use std::sync::LazyLock;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{errors::DetailedSerdeError, image::hex_to_u32};
+
+static JST_TZ: LazyLock<jiff::tz::TimeZone> =
+    LazyLock::new(|| jiff::tz::TimeZone::get("Asia/Tokyo").unwrap());
 
 /// Media type
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
@@ -49,20 +53,23 @@ pub enum AnilistMediaFormat {
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
 pub struct AnilistFuzzyDate {
     /// The year
-    pub year: Option<i32>,
+    pub year: Option<i16>,
     /// The month
-    pub month: Option<i32>,
+    pub month: Option<i8>,
     /// The day
-    pub day: Option<i32>,
+    pub day: Option<i8>,
 }
 
 impl AnilistFuzzyDate {
-    /// Parse the fuzzy date into a [`chrono::DateTime`]
-    pub fn into_chrono(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+    /// Parse the fuzzy date into a [`jiff::Timestamp`]
+    pub fn into_timestamp(&self) -> Option<jiff::Timestamp> {
         match (self.year, self.month, self.day) {
-            (Some(year), Some(month), Some(day)) => chrono::Utc
-                .with_ymd_and_hms(year, month as u32, day as u32, 0, 0, 0)
-                .single(),
+            (Some(year), Some(month), Some(day)) => {
+                let dt = jiff::civil::datetime(year, month, day, 0, 0, 0, 0);
+                dt.to_zoned(JST_TZ.clone())
+                    .ok()
+                    .and_then(|dt| Some(dt.timestamp()))
+            }
             _ => None,
         }
     }

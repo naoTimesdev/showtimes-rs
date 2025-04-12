@@ -1,9 +1,7 @@
-use bson::serde_helpers::chrono_datetime_as_bson_datetime;
-use chrono::TimeZone;
 use futures_util::TryStreamExt;
 use mongodb::bson::doc;
 use serde::{Deserialize, Serialize};
-use showtimes_db::{m::ShowModelHandler, ClientShared, DatabaseShared};
+use showtimes_db::{ClientShared, DatabaseShared, m::ShowModelHandler};
 use showtimes_shared::ulid_serializer;
 
 use crate::common::env_or_exit;
@@ -28,10 +26,11 @@ impl Migration for M20250125075556UpdateUsersApiKey {
         "M20250125075556UpdateUsersApiKey"
     }
 
-    fn timestamp(&self) -> chrono::DateTime<chrono::Utc> {
-        chrono::Utc
-            .with_ymd_and_hms(2025, 1, 25, 7, 55, 56)
+    fn timestamp(&self) -> jiff::Timestamp {
+        jiff::civil::datetime(2025, 1, 25, 7, 55, 56, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
             .unwrap()
+            .timestamp()
     }
 
     fn clone_box(&self) -> Box<dyn Migration> {
@@ -123,15 +122,15 @@ struct UserV1 {
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    created: chrono::DateTime<chrono::Utc>,
+    created: jiff::Timestamp,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    updated: chrono::DateTime<chrono::Utc>,
+    updated: jiff::Timestamp,
 }
 
 impl From<UserV1> for showtimes_db::m::User {

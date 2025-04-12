@@ -14,7 +14,7 @@ struct TestMetadata {
 pub fn test_encode(signer: &jwt_lc_rs::Signer) -> Result<String, jwt_lc_rs::errors::Error> {
     let metadata = TestMetadata {
         sub: "test-encode-subject".to_string(),
-        time: chrono::Utc::now().timestamp(),
+        time: jiff::Timestamp::now().as_second(),
     };
 
     jwt_lc_rs::encode(&metadata, signer)

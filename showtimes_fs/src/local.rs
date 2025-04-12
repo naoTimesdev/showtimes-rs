@@ -2,12 +2,12 @@
 
 use std::path::PathBuf;
 
-use chrono::{DateTime, Utc};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::{
+    FsFileKind, FsFileObject,
     errors::{FsErrorExt, FsErrorSource, FsResult},
-    fs_bail, fs_error, make_file_path, FsFileKind, FsFileObject,
+    fs_bail, fs_error, make_file_path,
 };
 
 /// A local disk client for accessing filesystem.
@@ -60,10 +60,7 @@ impl LocalFs {
             .map_err(|e| e.to_fserror(FsErrorSource::Local))?;
         let content_type = mime_guess::from_path(path).first_or_octet_stream();
         let last_modified = match item.modified() {
-            Ok(time) => {
-                let dt: DateTime<Utc> = time.into();
-                Some(dt)
-            }
+            Ok(time) => jiff::Timestamp::try_from(time).ok(),
             Err(_) => None,
         };
 

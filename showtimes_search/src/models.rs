@@ -40,16 +40,16 @@ pub struct Project {
     pub kind: showtimes_db::m::ProjectType,
     /// The date and time the project was created
     #[serde(
-        with = "showtimes_shared::unix_timestamp_serializer",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub created: chrono::DateTime<chrono::Utc>,
+    pub created: jiff::Timestamp,
     /// The date and time the project was last updated
     #[serde(
-        with = "showtimes_shared::unix_timestamp_serializer",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub updated: chrono::DateTime<chrono::Utc>,
+    pub updated: jiff::Timestamp,
 }
 
 impl From<showtimes_db::m::Project> for Project {
@@ -133,16 +133,16 @@ pub struct Server {
     pub owners: Vec<showtimes_shared::ulid::Ulid>,
     /// The date and time the server was created
     #[serde(
-        with = "showtimes_shared::unix_timestamp_serializer",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub created: chrono::DateTime<chrono::Utc>,
+    pub created: jiff::Timestamp,
     /// The date and time the server was last updated
     #[serde(
-        with = "showtimes_shared::unix_timestamp_serializer",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub updated: chrono::DateTime<chrono::Utc>,
+    pub updated: jiff::Timestamp,
 }
 
 impl From<showtimes_db::m::Server> for Server {
@@ -194,16 +194,16 @@ pub struct User {
     pub registered: bool,
     /// The date and time the user was created
     #[serde(
-        with = "showtimes_shared::unix_timestamp_serializer",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub created: chrono::DateTime<chrono::Utc>,
+    pub created: jiff::Timestamp,
     /// The date and time the user was last updated
     #[serde(
-        with = "showtimes_shared::unix_timestamp_serializer",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub updated: chrono::DateTime<chrono::Utc>,
+    pub updated: jiff::Timestamp,
 }
 
 impl From<showtimes_db::m::User> for User {
@@ -276,16 +276,16 @@ pub struct ServerCollabSync {
     pub projects: Vec<ServerCollabTarget>,
     /// The date and time the server collab was created
     #[serde(
-        with = "showtimes_shared::unix_timestamp_serializer",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub created: chrono::DateTime<chrono::Utc>,
+    pub created: jiff::Timestamp,
     /// The date and time the server collab was last updated
     #[serde(
-        with = "showtimes_shared::unix_timestamp_serializer",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub updated: chrono::DateTime<chrono::Utc>,
+    pub updated: jiff::Timestamp,
 }
 
 impl From<showtimes_db::m::ServerCollaborationSync> for ServerCollabSync {
@@ -348,18 +348,18 @@ pub struct ServerCollabInvite {
     pub source: ServerCollabInviteSource,
     /// The target server
     pub target: ServerCollabInviteTarget,
-    /// The date and time the server collab invite was created
+    /// The date and time the server invite was created
     #[serde(
-        with = "showtimes_shared::unix_timestamp_serializer",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub created: chrono::DateTime<chrono::Utc>,
-    /// The date and time the server collab invite was last updated
+    pub created: jiff::Timestamp,
+    /// The date and time the server invite was last updated
     #[serde(
-        with = "showtimes_shared::unix_timestamp_serializer",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub updated: chrono::DateTime<chrono::Utc>,
+    pub updated: jiff::Timestamp,
 }
 
 impl From<showtimes_db::m::ServerCollaborationInvite> for ServerCollabInvite {

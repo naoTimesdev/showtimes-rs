@@ -1,4 +1,3 @@
-use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
 use showtimes_derive::EnumName;
 use showtimes_shared::{ulid_opt_serializer, ulid_serializer};
@@ -102,19 +101,20 @@ pub struct Server {
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub created: chrono::DateTime<chrono::Utc>,
+    pub created: jiff::Timestamp,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub updated: chrono::DateTime<chrono::Utc>,
+    pub updated: jiff::Timestamp,
 }
 
 impl Server {
     pub fn new(name: impl Into<String>, owners: Vec<ServerUser>) -> Self {
+        let cur_time = jiff::Timestamp::now();
         Server {
             id: ulid_serializer::default(),
             name: name.into(),
@@ -122,8 +122,8 @@ impl Server {
             owners,
             avatar: None,
             _id: None,
-            created: chrono::Utc::now(),
-            updated: chrono::Utc::now(),
+            created: cur_time,
+            updated: cur_time,
         }
     }
 
@@ -208,25 +208,26 @@ pub struct ServerCollaborationSync {
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub created: chrono::DateTime<chrono::Utc>,
+    pub created: jiff::Timestamp,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub updated: chrono::DateTime<chrono::Utc>,
+    pub updated: jiff::Timestamp,
 }
 
 impl ServerCollaborationSync {
     pub fn new(projects: Vec<ServerCollaborationSyncTarget>) -> Self {
+        let cur_time = jiff::Timestamp::now();
         ServerCollaborationSync {
             id: ulid_serializer::default(),
             projects,
             _id: None,
-            created: chrono::Utc::now(),
-            updated: chrono::Utc::now(),
+            created: cur_time,
+            updated: cur_time,
         }
     }
 
@@ -329,15 +330,15 @@ pub struct ServerCollaborationInvite {
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub created: chrono::DateTime<chrono::Utc>,
+    pub created: jiff::Timestamp,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub updated: chrono::DateTime<chrono::Utc>,
+    pub updated: jiff::Timestamp,
 }
 
 impl ServerCollaborationInvite {
@@ -345,13 +346,14 @@ impl ServerCollaborationInvite {
         source: ServerCollaborationInviteSource,
         target: ServerCollaborationInviteTarget,
     ) -> Self {
+        let cur_time = jiff::Timestamp::now();
         ServerCollaborationInvite {
             id: ulid_serializer::default(),
             source,
             target,
             _id: None,
-            created: chrono::Utc::now(),
-            updated: chrono::Utc::now(),
+            created: cur_time,
+            updated: cur_time,
         }
     }
 }
@@ -367,40 +369,38 @@ pub struct ServerPremium {
     #[serde(with = "ulid_serializer")]
     pub target: showtimes_shared::ulid::Ulid,
     /// The premium end date
-    #[serde(with = "chrono_datetime_as_bson_datetime")]
-    pub ends_at: chrono::DateTime<chrono::Utc>,
+    #[serde(with = "jiff::fmt::serde::timestamp::second::required")]
+    pub ends_at: jiff::Timestamp,
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub created: chrono::DateTime<chrono::Utc>,
+    pub created: jiff::Timestamp,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub updated: chrono::DateTime<chrono::Utc>,
+    pub updated: jiff::Timestamp,
 }
 
 impl ServerPremium {
     /// Create a new instance of [`ServerPremium`].
-    pub fn new(
-        target: showtimes_shared::ulid::Ulid,
-        ends_at: chrono::DateTime<chrono::Utc>,
-    ) -> Self {
+    pub fn new(target: showtimes_shared::ulid::Ulid, ends_at: jiff::Timestamp) -> Self {
+        let cur_time = jiff::Timestamp::now();
         ServerPremium {
             id: ulid_serializer::default(),
             target,
             ends_at,
             _id: None,
-            created: chrono::Utc::now(),
-            updated: chrono::Utc::now(),
+            created: cur_time,
+            updated: cur_time,
         }
     }
 
     /// Extend the end date to the given date.
-    pub fn extend_at(mut self, ends_at: chrono::DateTime<chrono::Utc>) -> Self {
+    pub fn extend_at(mut self, ends_at: jiff::Timestamp) -> Self {
         self.ends_at = ends_at;
         self
     }
@@ -408,7 +408,7 @@ impl ServerPremium {
     /// Extend the end date by the given duration.
     ///
     /// Returns `self` for chainability.
-    pub fn extend_by(mut self, duration: chrono::Duration) -> Self {
+    pub fn extend_by(mut self, duration: jiff::SignedDuration) -> Self {
         self.ends_at += duration;
         self
     }

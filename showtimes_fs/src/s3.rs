@@ -3,16 +3,17 @@
 use std::{sync::Arc, time::Duration};
 
 use crate::{
+    FsFileKind, FsFileObject,
     errors::{FsErrorExt, FsErrorSource, FsResult},
-    fs_bail, fs_error, make_file_path, FsFileKind, FsFileObject,
+    fs_bail, fs_error, make_file_path,
 };
 use futures_util::TryStreamExt;
 use rusty_s3::{
+    S3Action,
     actions::{
         CompleteMultipartUpload, CreateBucket, CreateMultipartUpload, DeleteObjects, HeadBucket,
         HeadObject, ListObjectsV2, ObjectIdentifier, UploadPart,
     },
-    S3Action,
 };
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 
@@ -162,9 +163,10 @@ impl S3Fs {
             .and_then(|v| v.to_str().ok())
             .and_then(|v| {
                 // Parse with chrono
-                chrono::DateTime::parse_from_rfc2822(v).ok()
+                jiff::fmt::rfc2822::parse(v).ok()
             })
-            .map(|v| v.with_timezone(&chrono::Utc));
+            .map(|v| v.with_time_zone(jiff::tz::TimeZone::UTC))
+            .map(|v| v.timestamp());
 
         // Content type
         let content_type = response

@@ -1,5 +1,4 @@
 use super::{IntegrationId, ShowModelHandler};
-use bson::serde_helpers::chrono_datetime_as_bson_datetime;
 use serde::{Deserialize, Serialize};
 use showtimes_shared::ulid_serializer;
 
@@ -131,20 +130,21 @@ pub struct RSSFeed {
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub created: chrono::DateTime<chrono::Utc>,
+    pub created: jiff::Timestamp,
     #[serde(
-        with = "chrono_datetime_as_bson_datetime",
-        default = "chrono::Utc::now"
+        with = "jiff::fmt::serde::timestamp::second::required",
+        default = "jiff::Timestamp::now"
     )]
-    pub updated: chrono::DateTime<chrono::Utc>,
+    pub updated: jiff::Timestamp,
 }
 
 impl RSSFeed {
     /// Create a new simple RSS feed
     pub fn new(url: url::Url, creator: showtimes_shared::ulid::Ulid) -> Self {
+        let cur_time = jiff::Timestamp::now();
         Self {
             id: showtimes_shared::ulid::Ulid::new(),
             url,
@@ -155,8 +155,8 @@ impl RSSFeed {
             etag: None,
             creator,
             _id: None,
-            created: chrono::Utc::now(),
-            updated: chrono::Utc::now(),
+            created: cur_time,
+            updated: cur_time,
         }
     }
 

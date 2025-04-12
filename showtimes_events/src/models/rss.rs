@@ -5,7 +5,7 @@
 use super::{deserialize_ulid, serialize_ulid};
 use clickhouse::Row;
 use serde::{Deserialize, Serialize};
-use showtimes_rss::{transform_to_cloned_feed, FeedEntry, FeedEntryCloned, FeedValue};
+use showtimes_rss::{FeedEntry, FeedEntryCloned, FeedValue, transform_to_cloned_feed};
 use std::fmt::Debug;
 
 /// The event structure that is broadcasted and stored
@@ -36,8 +36,8 @@ pub struct RSSEvent {
     /// The event data itself, on Clickhouse this will be stored as a string
     entries: FeedEntryCloned,
     /// The timestamp of the event
-    #[serde(with = "clickhouse::serde::time::datetime")]
-    timestamp: ::time::OffsetDateTime,
+    #[serde(with = "super::timestamp")]
+    timestamp: jiff::Timestamp,
 }
 
 impl RSSEvent {
@@ -51,12 +51,11 @@ impl RSSEvent {
         server: showtimes_shared::ulid::Ulid,
         entry: &FeedEntry,
     ) -> Self {
-        let default_time = ::time::OffsetDateTime::now_utc();
+        let default_time = jiff::Timestamp::now();
         let published_at = if let Some(FeedValue::Timestamp(published_at)) =
             entry.get("published").or_else(|| entry.get("updated"))
         {
-            ::time::OffsetDateTime::from_unix_timestamp(published_at.timestamp())
-                .unwrap_or(default_time)
+            *published_at
         } else {
             default_time
         };
@@ -100,7 +99,7 @@ impl RSSEvent {
     }
 
     /// Get the timestamp of the event
-    pub fn timestamp(&self) -> ::time::OffsetDateTime {
+    pub fn timestamp(&self) -> jiff::Timestamp {
         self.timestamp
     }
 }
