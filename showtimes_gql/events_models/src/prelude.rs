@@ -1,8 +1,8 @@
 //! A collection of prelude/common types and traits
 
 use async_graphql::{Enum, OutputType, SimpleObject};
-use serde::{de::DeserializeOwned, Serialize};
-use showtimes_gql_common::{queries::ServerQueryUser, DateTimeGQL, UlidGQL};
+use serde::{Serialize, de::DeserializeOwned};
+use showtimes_gql_common::{DateTimeGQL, UlidGQL, queries::ServerQueryUser};
 
 use super::{
     collaborations::{
@@ -119,22 +119,14 @@ where
         data: T,
         kind: EventKindGQL,
         actor: Option<String>,
-        timestamp: ::time::OffsetDateTime,
+        timestamp: jiff::Timestamp,
     ) -> Self {
-        // Convert the timestamp to a chrono date time
-        let ts_unix = timestamp.unix_timestamp();
-        let chrono_ts =
-            chrono::DateTime::<chrono::Utc>::from_timestamp(ts_unix, 0).unwrap_or_else(|| {
-                // current time
-                chrono::Utc::now()
-            });
-
         Self {
             id: UlidGQL::from(id),
             data,
             kind,
             actor,
-            timestamp: DateTimeGQL::from(chrono_ts),
+            timestamp: DateTimeGQL::from(timestamp),
         }
     }
 }

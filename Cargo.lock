@@ -3503,7 +3503,6 @@ dependencies = [
  "axum",
  "axum-extra",
  "futures-util",
- "jiff",
  "redis",
  "reqwest",
  "serde",
@@ -3536,7 +3535,6 @@ dependencies = [
 name = "showtimes-db"
 version = "0.1.0"
 dependencies = [
- "bson",
  "futures-util",
  "jiff",
  "mongodb",
@@ -3621,7 +3619,6 @@ dependencies = [
  "showtimes-session",
  "showtimes-shared",
  "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -3629,15 +3626,11 @@ name = "showtimes-gql-events"
 version = "0.1.0"
 dependencies = [
  "async-graphql",
- "jiff",
  "serde",
  "showtimes-db",
  "showtimes-events",
  "showtimes-gql-common",
  "showtimes-gql-events-models",
- "showtimes-gql-models",
- "showtimes-rss",
- "showtimes-shared",
 ]
 
 [[package]]
@@ -3645,6 +3638,7 @@ name = "showtimes-gql-events-models"
 version = "0.1.0"
 dependencies = [
  "async-graphql",
+ "jiff",
  "serde",
  "showtimes-db",
  "showtimes-events",
@@ -3676,8 +3670,7 @@ version = "0.1.0"
 dependencies = [
  "ahash",
  "async-graphql",
- "chrono",
- "image",
+ "jiff",
  "reqwest",
  "showtimes-db",
  "showtimes-derive",
@@ -3772,7 +3765,6 @@ dependencies = [
  "ahash",
  "anyhow",
  "async-trait",
- "bson",
  "clap",
  "dotenvy",
  "futures-util",
@@ -3841,6 +3833,7 @@ name = "showtimes-shared"
 version = "0.1.0"
 dependencies = [
  "bson",
+ "jiff",
  "serde",
  "serde_repr",
  "tokio",

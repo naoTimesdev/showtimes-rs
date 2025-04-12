@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
-use async_graphql::{dataloader::DataLoader, InputObject};
-use showtimes_db::{mongodb::bson::doc, DatabaseShared};
+use async_graphql::{InputObject, dataloader::DataLoader};
+use showtimes_db::{DatabaseShared, mongodb::bson::doc};
 
 use showtimes_gql_common::{
+    GQLErrorCode, GQLErrorExt, OkResponse, UlidGQL,
     data_loader::{RSSFeedLoader, ServerDataLoader},
     errors::GQLError,
-    GQLErrorCode, GQLErrorExt, OkResponse, UlidGQL,
 };
-use showtimes_gql_events_models::rss::{render_feed_display_with_entry, RSSFeedRenderedGQL};
+use showtimes_gql_events_models::rss::{RSSFeedRenderedGQL, render_feed_display_with_entry};
 use showtimes_gql_models::rss::RSSFeedGQL;
 
 use crate::{
-    is_string_set, is_vec_set, IntegrationActionGQL, IntegrationInputGQL, IntegrationValidator,
+    IntegrationActionGQL, IntegrationInputGQL, IntegrationValidator, is_string_set, is_vec_set,
 };
 
 /// The RSS feed input object for creating a new RSS feed
@@ -283,7 +283,7 @@ fn has_valid_premium(premium_status: &[showtimes_db::m::ServerPremium]) -> bool 
         return true;
     }
 
-    let current_time = chrono::Utc::now();
+    let current_time = jiff::Timestamp::now();
 
     premium_status.iter().any(|p| p.ends_at > current_time)
 }

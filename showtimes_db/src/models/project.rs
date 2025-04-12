@@ -473,7 +473,7 @@ pub struct EpisodeProgress {
     /// Is the episode/chapter finished/released.
     pub finished: bool,
     /// The airing/release date of the episode/chapter.
-    #[serde(with = "jiff::fmt::serde::timestamp::second::optional")]
+    #[serde(with = "showtimes_shared::bson_datetime_jiff_timestamp::optional")]
     pub aired: Option<jiff::Timestamp>,
     /// The list of roles in the episode/chapter.
     pub statuses: Vec<RoleStatus>,
@@ -656,12 +656,12 @@ pub struct Project {
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "jiff::fmt::serde::timestamp::second::required",
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
         default = "jiff::Timestamp::now"
     )]
     pub created: jiff::Timestamp,
     #[serde(
-        with = "jiff::fmt::serde::timestamp::second::required",
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
         default = "jiff::Timestamp::now"
     )]
     pub updated: jiff::Timestamp,

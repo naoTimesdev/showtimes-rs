@@ -13,11 +13,11 @@ pub mod guard;
 pub mod image;
 pub mod queries;
 
-/// Re-exports of the async_graphql crate
-pub use async_graphql::http::{graphiql_plugin_explorer, GraphiQLSource, ALL_WEBSOCKET_PROTOCOLS};
 pub use async_graphql::Response as GQLResponse;
 pub use async_graphql::ServerError as GQLServerError;
-pub use async_graphql::{dataloader::DataLoader, extensions::Tracing, Data, Error, Schema};
+/// Re-exports of the async_graphql crate
+pub use async_graphql::http::{ALL_WEBSOCKET_PROTOCOLS, GraphiQLSource, graphiql_plugin_explorer};
+pub use async_graphql::{Data, Error, Schema, dataloader::DataLoader, extensions::Tracing};
 /// Re-exports of the errors enums
 pub use errors::{GQLDataLoaderWhere, GQLErrorCode, GQLErrorExt};
 pub use image::MAX_IMAGE_SIZE;
@@ -181,7 +181,7 @@ impl From<&[fastnomicon::timestring::TimeTuple]> for TimeStringGQL {
 #[derive(Clone, Copy)]
 pub struct DateTimeGQL(
     /// A datetime timestamp format in UTC timezone, follows RFC3339 format
-    chrono::DateTime<chrono::Utc>,
+    jiff::Timestamp,
 );
 
 impl Description for DateTimeGQL {
@@ -191,7 +191,7 @@ impl Description for DateTimeGQL {
 }
 
 impl Deref for DateTimeGQL {
-    type Target = chrono::DateTime<chrono::Utc>;
+    type Target = jiff::Timestamp;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -203,32 +203,42 @@ impl ScalarType for DateTimeGQL {
     fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
         match value {
             async_graphql::Value::String(s) => {
-                let rfc3399 = chrono::DateTime::parse_from_rfc3339(&s).map_err(|e| {
+                let rfc3399 = s.parse::<jiff::Timestamp>().map_err(|e| {
                     async_graphql::InputValueError::custom(e.to_string())
                         .with_extension("value", &s)
                 })?;
-                let utc = rfc3399.with_timezone(&chrono::Utc);
 
-                Ok(DateTimeGQL(utc))
+                Ok(DateTimeGQL(rfc3399))
             }
             _ => Err(async_graphql::InputValueError::expected_type(value)),
         }
     }
 
     fn to_value(&self) -> async_graphql::Value {
-        async_graphql::Value::String(self.0.to_rfc3339())
+        async_graphql::Value::String(self.0.to_string())
     }
 }
 
-impl From<chrono::DateTime<chrono::Utc>> for DateTimeGQL {
-    fn from(dt: chrono::DateTime<chrono::Utc>) -> Self {
+impl From<jiff::Timestamp> for DateTimeGQL {
+    fn from(dt: jiff::Timestamp) -> Self {
         DateTimeGQL(dt)
     }
 }
-
-impl From<&chrono::DateTime<chrono::Utc>> for DateTimeGQL {
-    fn from(dt: &chrono::DateTime<chrono::Utc>) -> Self {
+impl From<&jiff::Timestamp> for DateTimeGQL {
+    fn from(dt: &jiff::Timestamp) -> Self {
         DateTimeGQL(*dt)
+    }
+}
+
+impl From<jiff::Zoned> for DateTimeGQL {
+    fn from(dt: jiff::Zoned) -> Self {
+        DateTimeGQL(dt.timestamp())
+    }
+}
+
+impl From<&jiff::Zoned> for DateTimeGQL {
+    fn from(dt: &jiff::Zoned) -> Self {
+        DateTimeGQL(dt.timestamp())
     }
 }
 

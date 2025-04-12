@@ -10,7 +10,7 @@ rust-version.workspace = true
 description = "Models library for GraphQL definitions of Showtimes API"
 
 [dependencies]
-chrono.workspace = true
+jiff.workspace = true
 url.workspace = true
 
 tokio.workspace = true

@@ -1,6 +1,6 @@
 //! A collaboration sync or invite models list
 
-use async_graphql::{dataloader::DataLoader, Object};
+use async_graphql::{Object, dataloader::DataLoader};
 use errors::GQLError;
 use showtimes_db::m::APIKeyCapability;
 use showtimes_shared::ulid::Ulid;
@@ -36,9 +36,9 @@ pub struct CollaborationSyncGQL {
     /// The project ID
     project_ids: Vec<showtimes_shared::ulid::Ulid>,
     /// Collaboration link creation
-    created: chrono::DateTime<chrono::Utc>,
+    created: jiff::Timestamp,
     /// Collaboration link updated
-    updated: chrono::DateTime<chrono::Utc>,
+    updated: jiff::Timestamp,
     /// What server requested the sync
     requester: Option<CollaborationSyncRequester>,
 }
@@ -257,9 +257,9 @@ pub struct CollaborationInviteGQL {
     /// The target
     target: CollaborationInviteTargetGQL,
     /// Creation time
-    created: chrono::DateTime<chrono::Utc>,
+    created: jiff::Timestamp,
     /// Updated time
-    updated: chrono::DateTime<chrono::Utc>,
+    updated: jiff::Timestamp,
 }
 
 #[Object]

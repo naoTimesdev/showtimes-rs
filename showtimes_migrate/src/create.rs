@@ -58,7 +58,7 @@ impl Migration for {{name}} {
         "{{name}}"
     }
 
-    fn timestamp(&self) -> chrono::DateTime<chrono::Utc> {
+    fn timestamp(&self) -> jiff::Timestamp {
         jiff::civil::datetime({{timestamp_split}}, 0)
             .to_zoned(jiff::tz::TimeZone::UTC)
             .unwrap()

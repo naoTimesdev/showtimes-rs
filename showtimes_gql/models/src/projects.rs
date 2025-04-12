@@ -197,8 +197,8 @@ pub struct ProjectGQL {
     creator: showtimes_shared::ulid::Ulid,
     kind: showtimes_db::m::ProjectType,
     status: showtimes_db::m::ProjectStatus,
-    created: chrono::DateTime<chrono::Utc>,
-    updated: chrono::DateTime<chrono::Utc>,
+    created: jiff::Timestamp,
+    updated: jiff::Timestamp,
     disable_server_fetch: bool,
     disable_collaboration_fetch: bool,
 }

@@ -10,8 +10,7 @@ rust-version.workspace = true
 description = "Events models library for GraphQL definitions of Showtimes API"
 
 [dependencies]
-chrono.workspace = true
-time.workspace = true
+jiff.workspace = true
 serde.workspace = true
 
 async-graphql.workspace = true

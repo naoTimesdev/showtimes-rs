@@ -303,6 +303,73 @@ pub mod ulid_list_serializer {
     }
 }
 
+/// A (de)serializer for [`jiff::Timestamp`] with [`bson::DateTime`] serde intermediary.
+pub mod bson_datetime_jiff_timestamp {
+    use bson::DateTime;
+    use serde::{Deserialize, Serialize};
+
+    /// Serialize [`jiff::Timestamp`] to [`bson::DateTime`]
+    ///
+    /// Used for serde serialization
+    pub fn serialize<S>(value: &jiff::Timestamp, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let dt = DateTime::from_millis(value.as_millisecond());
+        dt.serialize(serializer)
+    }
+
+    /// Deserialize data to [`bson::DateTime`] then finally to [`jiff::Timestamp`]
+    ///
+    /// Used for serde deserialization
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<jiff::Timestamp, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let dt = DateTime::deserialize(deserializer)?;
+        jiff::Timestamp::try_from(dt.to_system_time()).map_err(serde::de::Error::custom)
+    }
+
+    /// A (de)serializer for [`jiff::Timestamp`] with [`bson::DateTime`] serde intermediary.
+    ///
+    /// The following module is for optional support.
+    pub mod optional {
+        use super::*;
+
+        /// Serialize an optional [`jiff::Timestamp`] to [`bson::DateTime`]
+        ///
+        /// Used for serde serialization
+        pub fn serialize<S>(
+            value: &Option<jiff::Timestamp>,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            match value {
+                Some(v) => super::serialize(v, serializer),
+                None => serializer.serialize_none(),
+            }
+        }
+
+        /// Deserialize optional data to [`bson::DateTime`] then finally to [`jiff::Timestamp`]
+        ///
+        /// Used for serde deserialization
+        pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<jiff::Timestamp>, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let dt = Option::<DateTime>::deserialize(deserializer)?;
+            match dt {
+                Some(dt) => jiff::Timestamp::try_from(dt.to_system_time())
+                    .map(Some)
+                    .map_err(serde::de::Error::custom),
+                None => Ok(None),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

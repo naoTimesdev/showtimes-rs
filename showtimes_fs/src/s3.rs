@@ -162,7 +162,7 @@ impl S3Fs {
             .get(reqwest::header::LAST_MODIFIED)
             .and_then(|v| v.to_str().ok())
             .and_then(|v| {
-                // Parse with chrono
+                // Parse with jiff
                 jiff::fmt::rfc2822::parse(v).ok()
             })
             .map(|v| v.with_time_zone(jiff::tz::TimeZone::UTC))

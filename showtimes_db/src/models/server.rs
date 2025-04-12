@@ -101,12 +101,12 @@ pub struct Server {
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "jiff::fmt::serde::timestamp::second::required",
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
         default = "jiff::Timestamp::now"
     )]
     pub created: jiff::Timestamp,
     #[serde(
-        with = "jiff::fmt::serde::timestamp::second::required",
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
         default = "jiff::Timestamp::now"
     )]
     pub updated: jiff::Timestamp,
@@ -208,12 +208,12 @@ pub struct ServerCollaborationSync {
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "jiff::fmt::serde::timestamp::second::required",
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
         default = "jiff::Timestamp::now"
     )]
     pub created: jiff::Timestamp,
     #[serde(
-        with = "jiff::fmt::serde::timestamp::second::required",
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
         default = "jiff::Timestamp::now"
     )]
     pub updated: jiff::Timestamp,
@@ -330,12 +330,12 @@ pub struct ServerCollaborationInvite {
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "jiff::fmt::serde::timestamp::second::required",
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
         default = "jiff::Timestamp::now"
     )]
     pub created: jiff::Timestamp,
     #[serde(
-        with = "jiff::fmt::serde::timestamp::second::required",
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
         default = "jiff::Timestamp::now"
     )]
     pub updated: jiff::Timestamp,
@@ -369,17 +369,17 @@ pub struct ServerPremium {
     #[serde(with = "ulid_serializer")]
     pub target: showtimes_shared::ulid::Ulid,
     /// The premium end date
-    #[serde(with = "jiff::fmt::serde::timestamp::second::required")]
+    #[serde(with = "showtimes_shared::bson_datetime_jiff_timestamp")]
     pub ends_at: jiff::Timestamp,
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "jiff::fmt::serde::timestamp::second::required",
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
         default = "jiff::Timestamp::now"
     )]
     pub created: jiff::Timestamp,
     #[serde(
-        with = "jiff::fmt::serde::timestamp::second::required",
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
         default = "jiff::Timestamp::now"
     )]
     pub updated: jiff::Timestamp,

@@ -19,8 +19,8 @@ pub struct UserGQL {
     api_key: Vec<showtimes_db::m::APIKey>,
     registered: bool,
     avatar: Option<showtimes_db::m::ImageMetadata>,
-    created: chrono::DateTime<chrono::Utc>,
-    updated: chrono::DateTime<chrono::Utc>,
+    created: jiff::Timestamp,
+    updated: jiff::Timestamp,
     disallow_server_fetch: bool,
     requester: Option<ServerQueryUser>,
 }

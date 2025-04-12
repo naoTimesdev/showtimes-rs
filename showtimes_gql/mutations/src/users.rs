@@ -510,6 +510,11 @@ pub async fn mutate_users_authenticate(
     tracing::info!("Checking if user exists for ID: {}", &user_info.id);
     let user = loader.load_one(DiscordIdLoad(user_info.id.clone())).await?;
 
+    let expire_dur = jiff::SignedDuration::new(exchanged.expires_in as i64, 0);
+    let auth_expire_at = jiff::Timestamp::now()
+        .checked_add(expire_dur)
+        .unwrap_or(jiff::Timestamp::MAX);
+
     match user {
         Some(mut user) => {
             tracing::info!("User found, updating token for ID: {}", &user_info.id);
@@ -523,8 +528,7 @@ pub async fn mutate_users_authenticate(
             } else {
                 user.discord_meta.refresh_token = String::new();
             }
-            user.discord_meta.expires_at =
-                chrono::Utc::now().timestamp() + exchanged.expires_in as i64;
+            user.discord_meta.expires_at = auth_expire_at.as_second();
 
             if !user.registered {
                 user.discord_meta.username = user_info.username.clone();
@@ -622,15 +626,13 @@ pub async fn mutate_users_authenticate(
                 &user_info.id
             );
             // Create new user
-            let current_time = chrono::Utc::now();
-            let expires_at = current_time.timestamp() + exchanged.expires_in as i64;
             let discord_user = showtimes_db::m::DiscordUser {
                 id: user_info.id,
                 username: user_info.username.clone(),
                 avatar: user_info.avatar,
                 access_token: exchanged.access_token,
                 refresh_token: exchanged.refresh_token.unwrap_or_default(),
-                expires_at,
+                expires_at: auth_expire_at.as_second(),
             };
 
             let mut user = showtimes_db::m::User::new(user_info.username, discord_user);

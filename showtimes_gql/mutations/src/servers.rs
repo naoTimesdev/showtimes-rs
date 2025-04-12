@@ -978,11 +978,12 @@ pub async fn mutate_servers_premium_create(
     let loader = ctx.data_unchecked::<DataLoader<ServerPremiumLoader>>();
     let handler = loader.loader().get_inner();
 
-    let current_time_bson = showtimes_db::mongodb::bson::DateTime::now();
-    let chrono_utc = current_time_bson.to_chrono();
+    let current_time = jiff::Timestamp::now();
+    let current_time_bson =
+        showtimes_db::mongodb::bson::DateTime::from_millis(current_time.as_millisecond());
 
     // Check if ends_at is in the past
-    if chrono_utc > *ends_at {
+    if current_time > *ends_at {
         return GQLError::new(
             "Ends at time is in the past",
             GQLErrorCode::ServerPremiumInvalidEndTime,
@@ -990,7 +991,7 @@ pub async fn mutate_servers_premium_create(
         .extend(|e| {
             e.set("id", server.id.to_string());
             e.set("ends_at", ends_at.to_string());
-            e.set("current_time", chrono_utc.to_string());
+            e.set("current_time", current_time.to_string());
         })
         .into();
     }
@@ -1012,9 +1013,13 @@ pub async fn mutate_servers_premium_create(
             // Check if ends_at is less than the current active premium
             // if yes, use extend_by method by the duration between ends_at and current time
             if *ends_at < premium.ends_at {
-                let duration_diff = *ends_at - premium.ends_at;
+                let ends_at_dur = ends_at.as_duration();
+                let cur_ends_at_dur = premium.ends_at.as_duration();
 
-                if duration_diff.num_seconds() < 0 {
+                if let Some(duration_diff) = ends_at_dur.checked_sub(cur_ends_at_dur) {
+                    // extend by the diff
+                    premium.extend_by(duration_diff)
+                } else {
                     // negative?!
                     return GQLError::new(
                         "Ends at time is in the past",
@@ -1027,9 +1032,6 @@ pub async fn mutate_servers_premium_create(
                     })
                     .into();
                 }
-
-                // extend by the diff
-                premium.extend_by(duration_diff)
             } else {
                 // extend until ends_at
                 premium.extend_at(*ends_at)

@@ -122,12 +122,12 @@ struct UserV1 {
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
-        with = "jiff::fmt::serde::timestamp::second::required",
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
         default = "jiff::Timestamp::now"
     )]
     created: jiff::Timestamp,
     #[serde(
-        with = "jiff::fmt::serde::timestamp::second::required",
+        with = "showtimes_shared::bson_datetime_jiff_timestamp",
         default = "jiff::Timestamp::now"
     )]
     updated: jiff::Timestamp,
