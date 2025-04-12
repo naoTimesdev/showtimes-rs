@@ -26,6 +26,8 @@ pub enum WebhookAction {
     ProjectProgress,
     /// A project is released
     ProjectRelease,
+    /// A project is reversed/unreleased
+    ProjectUnreleased,
     /// A project is dropped
     ProjectDropped,
     /// A project is resumed
@@ -34,9 +36,10 @@ pub enum WebhookAction {
 
 impl WebhookAction {
     /// The default actions for the webhook
-    pub const DEFAULT_ACTIONS: [WebhookAction; 4] = [
+    pub const DEFAULT_ACTIONS: [WebhookAction; 5] = [
         WebhookAction::ProjectProgress,
         WebhookAction::ProjectRelease,
+        WebhookAction::ProjectUnreleased,
         WebhookAction::ProjectDropped,
         WebhookAction::ProjectResumed,
     ];
