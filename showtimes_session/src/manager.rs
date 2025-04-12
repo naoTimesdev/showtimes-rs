@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use jiff::ToSpan;
 use jwt_lc_rs::errors::ValidationError;
 use redis::AsyncCommands;
 use redis::RedisResult;
@@ -153,7 +154,7 @@ impl SessionManager {
                     Some(session_exp) => {
                         if session_exp != -1 {
                             let current_time = jiff::Timestamp::now()
-                                .checked_add(jiff::Span::new().minutes(2))
+                                .checked_add(2.minutes())
                                 .unwrap_or(jiff::Timestamp::MAX);
 
                             if session_exp < current_time.as_second() {

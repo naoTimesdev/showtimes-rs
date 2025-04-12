@@ -5,6 +5,7 @@ use std::{
 
 use ahash::HashMapExt;
 use async_graphql::{CustomValidator, Enum, InputObject, Upload, dataloader::DataLoader};
+use jiff::ToSpan;
 use showtimes_db::{DatabaseShared, ProjectHandler, m::UserKind, mongodb::bson::doc};
 use showtimes_derive::EnumName;
 use showtimes_fs::FsPool;
@@ -726,7 +727,9 @@ async fn fetch_metadata_via_anilist(
                 aired_at: Some(current_time),
             });
 
-            current_time += jiff::Span::new().weeks(1);
+            current_time = current_time
+                .checked_add(1.weeks())
+                .unwrap_or(jiff::Timestamp::MAX);
         }
     }
 
@@ -775,7 +778,8 @@ async fn fetch_metadata_via_anilist(
                 for i in (last_ep.number + 1)..=est_ep_u32 {
                     let aired_at = match last_ep_start {
                         Some(last) => {
-                            let pushed = last + jiff::Span::new().weeks(1);
+                            let pushed =
+                                last.checked_add(1.weeks()).unwrap_or(jiff::Timestamp::MAX);
                             last_ep_start = Some(pushed);
                             Some(pushed)
                         }
@@ -2715,8 +2719,10 @@ pub async fn mutate_projects_episode_add_auto(
         let new_episodes = ((last_episode.number + 1)..=(last_episode.number + count))
             .enumerate()
             .map(|(idx, n)| {
-                let next_air_date =
-                    last_air_date.map(|d| d + jiff::Span::new().weeks((idx as i64) + 1));
+                let next_air_date = last_air_date.map(|d| {
+                    let week = (idx as i64) + 1;
+                    d.checked_add(week.weeks()).unwrap_or(jiff::Timestamp::MAX)
+                });
 
                 let mut ep =
                     showtimes_db::m::EpisodeProgress::new_with_roles(n, false, &project.roles);

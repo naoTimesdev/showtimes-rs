@@ -5,6 +5,7 @@ use std::sync::LazyLock;
 #[allow(clippy::disallowed_types)]
 use std::{collections::HashSet, sync::Arc};
 
+use jiff::ToSpan;
 use jwt_lc_rs::errors::ValidationError;
 use jwt_lc_rs::validator::Validator;
 use serde::{Deserialize, Serialize};
@@ -129,7 +130,7 @@ impl ShowtimesUserClaims {
     fn new_state(redirect_url: impl Into<String>) -> Self {
         let iat = jiff::Timestamp::now();
         // Discord OAuth2 request last 5 minutes
-        let exp = iat + jiff::Span::new().minutes(5);
+        let exp = iat.checked_add(5.minutes()).unwrap_or(jiff::Timestamp::MAX);
 
         Self {
             exp: exp.as_second(),
@@ -170,7 +171,7 @@ impl ShowtimesRefreshClaims {
     fn new(user: showtimes_shared::ulid::Ulid) -> Self {
         let iat = jiff::Timestamp::now();
         // Refresh claims last for 90 days
-        let exp = iat + jiff::Span::new().days(90);
+        let exp = iat.checked_add(90.days()).unwrap_or(jiff::Timestamp::MAX);
 
         Self {
             exp: exp.as_second(),
