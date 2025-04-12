@@ -408,8 +408,11 @@ impl ServerPremium {
     /// Extend the end date by the given duration.
     ///
     /// Returns `self` for chainability.
-    pub fn extend_by(mut self, duration: jiff::SignedDuration) -> Self {
-        self.ends_at += duration;
+    pub fn extend_by(mut self, duration: jiff::Span) -> Self {
+        self.ends_at = self
+            .ends_at
+            .checked_add(duration)
+            .unwrap_or(jiff::Timestamp::MAX);
         self
     }
 }

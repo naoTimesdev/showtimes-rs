@@ -59,10 +59,7 @@ impl Migration for {{name}} {
     }
 
     fn timestamp(&self) -> jiff::Timestamp {
-        jiff::civil::datetime({{timestamp_split}}, 0)
-            .to_zoned(jiff::tz::TimeZone::UTC)
-            .unwrap()
-            .timestamp()
+        jiff::Timestamp::from_second({{timestamp}}).unwrap()
     }
 
     fn clone_box(&self) -> Box<dyn Migration> {
@@ -129,26 +126,16 @@ async fn main() {
         + &original_name[1..];
     let name = snake_case_to_pascal_case(&name);
 
-    let current_time = jiff::Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC);
+    let current_time = jiff::Timestamp::now();
     // format YYYYMMDDHHMMSS
     let timestamp = current_time.strftime("%Y%m%d%H%M%S").to_string();
 
     let migration_file = migrations_dir.join(format!("m{}_{}.rs", timestamp, original_name));
 
-    let timestamp_split = format!(
-        "{}, {}, {}, {}, {}, {}",
-        current_time.year(),
-        current_time.month(),
-        current_time.day(),
-        current_time.hour(),
-        current_time.minute(),
-        current_time.second()
-    );
-
     let struct_name = format!("M{}{}", timestamp, name);
     let template = MIGRATION_TEMPLATE
         .replace("{{name}}", &struct_name)
-        .replace("{{timestamp_split}}", &timestamp_split);
+        .replace("{{timestamp}}", &current_time.as_second().to_string());
 
     std::fs::write(&migration_file, template).unwrap();
 

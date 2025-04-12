@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use ahash::{HashMap, HashMapExt};
 use futures_util::TryStreamExt;
+use jiff::ToSpan;
 use mongodb::bson::doc;
 use showtimes_db::{
     ClientShared, DatabaseShared, UserHandler,
@@ -902,8 +903,7 @@ impl M20240725045840Init {
             .unwrap_or_else(|_| jiff::Timestamp::now());
         new_project.updated = last_update;
         // Created just do last_update minus 1 day
-        let one_day = jiff::SignedDuration::new(24 * 60 * 60, 0);
-        new_project.created = last_update - one_day;
+        new_project.created = last_update.checked_sub(1.days()).unwrap_or(last_update);
 
         Ok(new_project)
     }
