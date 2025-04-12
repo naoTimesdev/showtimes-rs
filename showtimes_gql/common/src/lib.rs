@@ -408,7 +408,7 @@ pub enum APIKeyCapabilityGQL {
 #[derive(SimpleObject)]
 pub struct IntegrationIdGQL {
     /// The ID of the integration
-    iod: String,
+    id: String,
     /// The kind of the integration
     kind: IntegrationTypeGQL,
 }
@@ -416,7 +416,7 @@ pub struct IntegrationIdGQL {
 impl From<showtimes_db::m::IntegrationId> for IntegrationIdGQL {
     fn from(integration: showtimes_db::m::IntegrationId) -> Self {
         IntegrationIdGQL {
-            iod: integration.id().to_string(),
+            id: integration.id().to_string(),
             kind: (*integration.kind()).into(),
         }
     }
@@ -425,7 +425,7 @@ impl From<showtimes_db::m::IntegrationId> for IntegrationIdGQL {
 impl From<&showtimes_db::m::IntegrationId> for IntegrationIdGQL {
     fn from(integration: &showtimes_db::m::IntegrationId) -> Self {
         IntegrationIdGQL {
-            iod: integration.id().to_string(),
+            id: integration.id().to_string(),
             kind: (*integration.kind()).into(),
         }
     }
