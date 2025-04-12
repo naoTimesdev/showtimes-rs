@@ -1,8 +1,8 @@
 #![warn(missing_docs, clippy::empty_docs, rustdoc::broken_intra_doc_links)]
 #![doc = include_str!("../README.md")]
 
-use serde::{ser::SerializeSeq, Deserialize};
-use uuid::{Timestamp, Uuid};
+use serde::{Deserialize, ser::SerializeSeq};
+use uuid::{ContextV7, Timestamp, Uuid, timestamp::context::ThreadLocalContext};
 
 pub mod config;
 pub use config::Config;
@@ -11,6 +11,15 @@ pub use config::Config;
 pub use ulid;
 
 const API_KEY_PREFIX: &str = "nsh_";
+
+thread_local! {
+    static UUID_CONTEXT: ContextV7 = ContextV7::new();
+}
+
+fn get_uuid_timestamp() -> Timestamp {
+    let thread_ctx = ThreadLocalContext::new(&UUID_CONTEXT);
+    Timestamp::now(&thread_ctx)
+}
 
 /// Generate v7 UUID for the current timestamp
 ///
@@ -22,7 +31,7 @@ const API_KEY_PREFIX: &str = "nsh_";
 /// println!("{}", uuid);
 /// ```
 pub fn generate_uuid() -> Uuid {
-    let ts = Timestamp::now(uuid::timestamp::context::NoContext);
+    let ts = get_uuid_timestamp();
     Uuid::new_v7(ts)
 }
 
@@ -422,6 +431,11 @@ pub mod unix_timestamp_opt_serializer {
 mod tests {
     use super::*;
 
+    fn get_uuid_unix(seconds: u64) -> Timestamp {
+        let thread_ctx = ThreadLocalContext::new(&UUID_CONTEXT);
+        Timestamp::from_unix(&thread_ctx, seconds, 0)
+    }
+
     #[test]
     fn test_generate_uuid() {
         let uuid = generate_uuid();
@@ -430,7 +444,7 @@ mod tests {
 
     #[test]
     fn test_ulid_string() {
-        let ts = Timestamp::from_unix(uuid::timestamp::context::NoContext, 1718276973, 0);
+        let ts = get_uuid_unix(1718276973);
         let uuid_act = Uuid::new_v7(ts);
 
         let ulid = uuid_to_ulid(uuid_act);
