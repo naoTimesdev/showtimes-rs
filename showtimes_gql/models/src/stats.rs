@@ -1,6 +1,6 @@
 //! A stats models list
 
-use async_graphql::{dataloader::DataLoader, Object};
+use async_graphql::{Object, dataloader::DataLoader};
 
 use showtimes_gql_common::data_loader::{ProjectDataLoader, ServerOwnerId};
 

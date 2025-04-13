@@ -2,12 +2,12 @@
 
 use futures_util::TryStreamExt;
 use showtimes_db::{
-    mongodb::bson::{doc, Document},
     DatabaseShared,
+    mongodb::bson::{Document, doc},
 };
 use showtimes_gql_common::{
-    queries::ServerQueryUser, GQLDataLoaderWhere, GQLErrorCode, GQLErrorExt, PageInfoGQL,
-    SortOrderGQL,
+    GQLDataLoaderWhere, GQLErrorCode, GQLErrorExt, PageInfoGQL, SortOrderGQL,
+    queries::ServerQueryUser,
 };
 use showtimes_shared::ulid::Ulid;
 

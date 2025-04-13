@@ -13,7 +13,7 @@ pub use ulid;
 const API_KEY_PREFIX: &str = "nsh_";
 
 thread_local! {
-    static UUID_CONTEXT: ContextV7 = ContextV7::new();
+    static UUID_CONTEXT: ContextV7 = const { ContextV7::new() };
 }
 
 fn get_uuid_timestamp() -> Timestamp {

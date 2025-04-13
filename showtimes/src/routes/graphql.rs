@@ -8,8 +8,8 @@ use axum::{
 };
 use showtimes_db::DatabaseShared;
 use showtimes_gql_common::{
-    data_loader, graphiql_plugin_explorer, Data as GQLData, Error as GQLError, GQLDataLoaderWhere,
-    GQLErrorCode, GQLResponse, GQLServerError, GraphiQLSource, ALL_WEBSOCKET_PROTOCOLS,
+    ALL_WEBSOCKET_PROTOCOLS, Data as GQLData, Error as GQLError, GQLDataLoaderWhere, GQLErrorCode,
+    GQLResponse, GQLServerError, GraphiQLSource, data_loader, graphiql_plugin_explorer,
 };
 use showtimes_gql_mutations::MutationRoot;
 use showtimes_gql_queries::QueryRoot;
@@ -277,60 +277,68 @@ async fn on_ws_init(
 
     let mut data = GQLData::default();
 
-    match serde_json::from_value::<Payload>(value) { Ok(payload) => {
-        // If master key, format is MasterKey
-        let session_kind = if payload.token == state.config.master_key {
-            SessionKind::MasterKey
-        } else if payload.token.starts_with("nsh_") {
-            // Try parse API key, if fails then assume bearer
-            showtimes_shared::APIKey::from_string(&payload.token)
-                .map(|_| SessionKind::APIKey)
-                .ok()
-                .unwrap_or(SessionKind::Bearer)
-        } else {
-            SessionKind::Bearer
-        };
+    match serde_json::from_value::<Payload>(value) {
+        Ok(payload) => {
+            // If master key, format is MasterKey
+            let session_kind = if payload.token == state.config.master_key {
+                SessionKind::MasterKey
+            } else if payload.token.starts_with("nsh_") {
+                // Try parse API key, if fails then assume bearer
+                showtimes_shared::APIKey::from_string(&payload.token)
+                    .map(|_| SessionKind::APIKey)
+                    .ok()
+                    .unwrap_or(SessionKind::Bearer)
+            } else {
+                SessionKind::Bearer
+            };
 
-        match state
-            .session
-            .lock()
-            .await
-            .get_session(payload.token, session_kind)
-            .await
-        {
-            Ok(session) => {
-                tracing::debug!("[WS] Got session (from payload): {:?}", session);
-                data.insert(session.get_claims().clone());
-                data.insert(session);
-            }
-            Err(err) => {
-                tracing::error!("[WS] Error getting session (from payload): {:?}", err);
-                return Err(GQLError::new(format!(
-                    "Error validating token session: {}",
-                    err
-                )));
-            }
-        }
-    } _ => { match get_token_or_bearer(&headers, &state.config) { Some((kind, token)) => {
-        match state.session.lock().await.get_session(token, kind).await {
-            Ok(session) => {
-                tracing::debug!("[WS] Got session (from header): {:?}", session);
-                data.insert(session.get_claims().clone());
-                data.insert(session);
-            }
-            Err(err) => {
-                tracing::error!("[WS] Error getting session (from header): {:?}", err);
-                return Err(GQLError::new(format!(
-                    "Error validating token session: {}",
-                    err
-                )));
+            match state
+                .session
+                .lock()
+                .await
+                .get_session(payload.token, session_kind)
+                .await
+            {
+                Ok(session) => {
+                    tracing::debug!("[WS] Got session (from payload): {:?}", session);
+                    data.insert(session.get_claims().clone());
+                    data.insert(session);
+                }
+                Err(err) => {
+                    tracing::error!("[WS] Error getting session (from payload): {:?}", err);
+                    return Err(GQLError::new(format!(
+                        "Error validating token session: {}",
+                        err
+                    )));
+                }
             }
         }
-    } _ => {
-        tracing::error!("[WS] No token found in payload or header");
-        // Close/deny the connection
-        return Err(GQLError::new("No token found in payload or header"));
-    }}}}
+        _ => {
+            match get_token_or_bearer(&headers, &state.config) {
+                Some((kind, token)) => {
+                    match state.session.lock().await.get_session(token, kind).await {
+                        Ok(session) => {
+                            tracing::debug!("[WS] Got session (from header): {:?}", session);
+                            data.insert(session.get_claims().clone());
+                            data.insert(session);
+                        }
+                        Err(err) => {
+                            tracing::error!("[WS] Error getting session (from header): {:?}", err);
+                            return Err(GQLError::new(format!(
+                                "Error validating token session: {}",
+                                err
+                            )));
+                        }
+                    }
+                }
+                _ => {
+                    tracing::error!("[WS] No token found in payload or header");
+                    // Close/deny the connection
+                    return Err(GQLError::new("No token found in payload or header"));
+                }
+            }
+        }
+    }
 
     data.insert(state.db.clone());
     data.insert(state.config.clone());

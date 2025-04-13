@@ -1,6 +1,6 @@
 //! A project events interactor
 
-use async_graphql::{dataloader::DataLoader, Enum, Object, SimpleObject};
+use async_graphql::{Enum, Object, SimpleObject, dataloader::DataLoader};
 
 use errors::GQLError;
 use showtimes_gql_common::{

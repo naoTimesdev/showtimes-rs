@@ -141,7 +141,7 @@ impl Migration for M20240726055250UpdateCovers {
 
             let cover_format = cover_url
                 .split('.')
-                .last()
+                .next_back()
                 .ok_or_else(|| anyhow::anyhow!("No cover format found"))?;
 
             let cover_key = format!("cover.{}", cover_format);

@@ -5,15 +5,15 @@
 use std::collections::BTreeMap;
 
 use nom::{
+    IResult, Parser,
     branch::alt,
     bytes::complete::tag,
     character::complete::{alphanumeric1, digit1},
     combinator::{map, map_res, value},
     multi::many0,
     sequence::delimited,
-    IResult, Parser,
 };
-use serde::{ser::SerializeSeq, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, ser::SerializeSeq};
 
 /// A simple tempate error
 #[derive(Debug)]

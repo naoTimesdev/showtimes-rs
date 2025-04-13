@@ -1,5 +1,4 @@
 use super::{WebhookEngine, WebhookEnginePayload};
-use serde::Deserialize;
 
 pub struct DiscordEngine {
     pub(crate) url: String,

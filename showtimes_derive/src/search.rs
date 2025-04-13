@@ -3,7 +3,7 @@
 //! Since the provided one by Meilisearch is a bit more limited for my use case.
 
 use proc_macro::TokenStream;
-use syn::{punctuated::Punctuated, spanned::Spanned, Attribute, Expr, Lit, Meta, Token};
+use syn::{Attribute, Expr, Lit, Meta, Token, punctuated::Punctuated, spanned::Spanned};
 
 struct SearchModelAttr {
     // name = "Project"

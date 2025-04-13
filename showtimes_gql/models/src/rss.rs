@@ -3,8 +3,8 @@
 use async_graphql::Object;
 use showtimes_db::m::RSSFeedEmbedDisplay;
 use showtimes_gql_common::{
-    data_loader::ServerDataLoader, errors::GQLError, DataLoader, DateTimeGQL, GQLErrorCode,
-    IntegrationIdGQL, UlidGQL,
+    DataLoader, DateTimeGQL, GQLErrorCode, IntegrationIdGQL, UlidGQL,
+    data_loader::ServerDataLoader, errors::GQLError,
 };
 
 use crate::servers::ServerGQL;

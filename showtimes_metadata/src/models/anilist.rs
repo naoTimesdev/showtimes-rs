@@ -66,7 +66,7 @@ impl AnilistFuzzyDate {
         match (self.year, self.month, self.day) {
             (Some(year), Some(month), Some(day)) => jiff::civil::Date::new(year, month, day)
                 .and_then(|date| date.to_zoned(JST_TZ.clone()))
-                .and_then(|dt| Ok(dt.timestamp()))
+                .map(|dt| dt.timestamp())
                 .ok(),
             _ => None,
         }

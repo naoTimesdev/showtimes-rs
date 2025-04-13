@@ -1,15 +1,15 @@
-use async_graphql::{dataloader::DataLoader, InputObject};
+use async_graphql::{InputObject, dataloader::DataLoader};
 use showtimes_db::{
+    CollaborationInviteHandler, DatabaseShared,
     m::{ServerCollaborationSyncTarget, UserKind},
     mongodb::bson::doc,
-    CollaborationInviteHandler, DatabaseShared,
 };
 use showtimes_search::SearchClientShared;
 
 use showtimes_gql_common::{
+    GQLErrorCode, OkResponse, UlidGQL,
     data_loader::{ProjectDataLoader, ServerDataLoader, ServerInviteLoader, ServerSyncLoader},
     errors::GQLError,
-    GQLErrorCode, OkResponse, UlidGQL,
 };
 use showtimes_gql_models::collaborations::{CollaborationInviteGQL, CollaborationSyncGQL};
 
@@ -135,7 +135,7 @@ pub async fn mutate_collaborations_initiate(
                         e.set("id", target.to_string());
                         e.set("server", input.target_server.to_string());
                     })
-                    .into()
+                    .into();
             }
         },
         None => None,

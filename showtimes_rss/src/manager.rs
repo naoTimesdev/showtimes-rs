@@ -3,9 +3,9 @@
 use std::sync::Arc;
 
 use ahash::HashMap;
-use redis::cmd;
 use redis::AsyncCommands;
 use redis::RedisResult;
+use redis::cmd;
 
 use crate::FeedEntry;
 use crate::FeedEntryCloned;

@@ -386,21 +386,21 @@ mod tests {
     #[test]
     fn test_valid_session() {
         let user_id = ulid_serializer::default();
-        let (_, token) = create_session(user_id, 3600, &*SECRET_INFO).unwrap();
+        let (_, token) = create_session(user_id, 3600, &SECRET_INFO).unwrap();
 
-        let claims = verify_session(&token, &*SECRET_INFO, ShowtimesAudience::User).unwrap();
+        let claims = verify_session(&token, &SECRET_INFO, ShowtimesAudience::User).unwrap();
 
         assert_eq!(claims.get_metadata(), &user_id.to_string());
-        assert_eq!(claims.get_issuer(), &*ISSUER);
+        assert_eq!(claims.get_issuer(), ISSUER);
         assert_eq!(claims.get_audience(), ShowtimesAudience::User);
     }
 
     #[test]
     fn test_valid_session_with_invalid_aud() {
         let user_id = ulid_serializer::default();
-        let (_, token) = create_session(user_id, 3600, &*SECRET_INFO).unwrap();
+        let (_, token) = create_session(user_id, 3600, &SECRET_INFO).unwrap();
 
-        let result = verify_session(&token, &*SECRET_INFO, ShowtimesAudience::DiscordAuth);
+        let result = verify_session(&token, &SECRET_INFO, ShowtimesAudience::DiscordAuth);
 
         match result {
             Err(e) => match e {
@@ -417,20 +417,20 @@ mod tests {
 
     #[test]
     fn test_valid_discord_session_state() {
-        let token = create_discord_session_state(REDIRECT_URL, &*SECRET_INFO).unwrap();
+        let token = create_discord_session_state(REDIRECT_URL, &SECRET_INFO).unwrap();
 
-        let claims = verify_session(&token, &*SECRET_INFO, ShowtimesAudience::DiscordAuth).unwrap();
+        let claims = verify_session(&token, &SECRET_INFO, ShowtimesAudience::DiscordAuth).unwrap();
 
         assert_eq!(claims.get_metadata(), REDIRECT_URL);
-        assert_eq!(claims.get_issuer(), &*ISSUER);
+        assert_eq!(claims.get_issuer(), ISSUER);
         assert_eq!(claims.get_audience(), ShowtimesAudience::DiscordAuth);
     }
 
     #[test]
     fn test_valid_discord_session_state_with_invalid_aud() {
-        let token = create_discord_session_state(REDIRECT_URL, &*SECRET_INFO).unwrap();
+        let token = create_discord_session_state(REDIRECT_URL, &SECRET_INFO).unwrap();
 
-        let result = verify_session(&token, &*SECRET_INFO, ShowtimesAudience::User);
+        let result = verify_session(&token, &SECRET_INFO, ShowtimesAudience::User);
 
         match result {
             Err(e) => match e {
@@ -448,7 +448,7 @@ mod tests {
     #[test]
     fn test_with_valid_header() {
         let user_id = ulid_serializer::default();
-        let (_, token) = create_session(user_id, 3600, &*SECRET_INFO).unwrap();
+        let (_, token) = create_session(user_id, 3600, &SECRET_INFO).unwrap();
 
         let header = jwt_lc_rs::decode_header(&token).unwrap();
 

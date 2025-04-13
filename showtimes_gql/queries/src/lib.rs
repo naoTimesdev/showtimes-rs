@@ -1,14 +1,14 @@
 #![warn(missing_docs, clippy::empty_docs, rustdoc::broken_intra_doc_links)]
 #![doc = include_str!("../../README.md")]
 
-use async_graphql::{dataloader::DataLoader, Context, Object};
+use async_graphql::{Context, Object, dataloader::DataLoader};
 
 use showtimes_db::m::APIKeyCapability;
 use showtimes_gql_common::{
+    GQLErrorCode, UserKindGQL,
     data_loader::{ServerAndOwnerId, ServerDataLoader, ServerOwnerId},
     errors::GQLError,
-    guard::{visible_minimum_admin, APIKeyVerify, AuthUserAndAPIKeyGuard, AuthUserMinimumGuard},
-    GQLErrorCode, UserKindGQL,
+    guard::{APIKeyVerify, AuthUserAndAPIKeyGuard, AuthUserMinimumGuard, visible_minimum_admin},
 };
 use showtimes_gql_events::QueryEventsRoot;
 use showtimes_gql_models::{

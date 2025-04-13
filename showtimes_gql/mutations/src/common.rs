@@ -1,6 +1,6 @@
 use async_graphql::{CustomValidator, Enum, InputObject};
 use showtimes_derive::EnumName;
-use showtimes_gql_common::{errors::GQLError, GQLErrorExt, IntegrationTypeGQL};
+use showtimes_gql_common::{GQLErrorExt, IntegrationTypeGQL, errors::GQLError};
 
 /// The list of possible integrations actions.
 #[derive(Enum, Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, EnumName)]

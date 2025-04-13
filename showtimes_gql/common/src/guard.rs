@@ -3,7 +3,7 @@
 use async_graphql::Guard;
 use showtimes_session::ShowtimesUserSession;
 
-use crate::{errors::GQLError, GQLErrorCode, GQLErrorExt, UserKindGQL};
+use crate::{GQLErrorCode, GQLErrorExt, UserKindGQL, errors::GQLError};
 
 /// A guard to check if the user is at least a certain level
 pub struct AuthUserMinimumGuard {

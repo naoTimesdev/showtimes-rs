@@ -1,6 +1,6 @@
 use mongodb::bson::doc;
-use mongodb::{options::IndexOptions, IndexModel};
-use showtimes_db::{m::ShowModelHandler, MigrationHandler};
+use mongodb::{IndexModel, options::IndexOptions};
+use showtimes_db::{MigrationHandler, m::ShowModelHandler};
 
 use crate::{common::env_or_exit, migrations::Migration};
 

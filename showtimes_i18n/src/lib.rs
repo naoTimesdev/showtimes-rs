@@ -1,11 +1,14 @@
+#![allow(clippy::disallowed_types)]
 use std::{borrow::Cow, collections::HashMap, sync::LazyLock};
 
 use fluent_templates::{
     LanguageIdentifier, Loader, fluent_bundle::FluentValue, langid, static_loader,
 };
 
+type LangToIds = HashMap<Language, LanguageIdentifier>;
+
 static LANG_IDS: LazyLock<HashMap<Language, LanguageIdentifier>> = LazyLock::new(|| {
-    let mut map = HashMap::new();
+    let mut map = LangToIds::new();
     map.insert(Language::Id, langid!("id-ID"));
     map.insert(Language::En, langid!("en-US"));
     map.insert(Language::Ja, langid!("ja-JP"));

@@ -1,6 +1,6 @@
 //! A user events interactor
 
-use async_graphql::{dataloader::DataLoader, Object, SimpleObject};
+use async_graphql::{Object, SimpleObject, dataloader::DataLoader};
 
 use errors::GQLError;
 use showtimes_gql_common::{data_loader::UserDataLoader, queries::ServerQueryUser, *};

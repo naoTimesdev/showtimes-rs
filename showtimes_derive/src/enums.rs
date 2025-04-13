@@ -15,7 +15,7 @@ struct EnumNameAttr<'a> {
     strict: bool,
 }
 
-impl<'a> Default for EnumNameAttr<'a> {
+impl Default for EnumNameAttr<'_> {
     fn default() -> Self {
         EnumNameAttr {
             rename: None,
@@ -217,7 +217,7 @@ struct SerdeAutomataAttr<'a> {
     case_sensitive: bool,
 }
 
-impl<'a> Default for SerdeAutomataAttr<'a> {
+impl Default for SerdeAutomataAttr<'_> {
     fn default() -> Self {
         SerdeAutomataAttr {
             rename: vec![],

@@ -3,12 +3,12 @@
 
 use std::sync::LazyLock;
 
-use executor::{stream_rss_events, EventWatcher, EventWatcherWithUser};
+use executor::{EventWatcher, EventWatcherWithUser, stream_rss_events};
 use futures_util::Stream;
 
 use async_graphql::{Context, Subscription};
 
-use showtimes_gql_common::{guard, queries::ServerQueryUser, UserKindGQL};
+use showtimes_gql_common::{UserKindGQL, guard, queries::ServerQueryUser};
 use showtimes_gql_events_models::collaborations::{
     CollabAcceptedEventDataGQL, CollabCreatedEventDataGQL, CollabDeletedEventDataGQL,
     CollabRejectedEventDataGQL, CollabRetractedEventDataGQL,

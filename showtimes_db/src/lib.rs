@@ -32,8 +32,7 @@ pub struct Connection {
 /// Create a connection to the MongoDB server
 ///
 /// # Arguments
-/// - `url` - The URL of the MongoDB server.
-///           This is formatted as `mongodb://<host>:<port>`
+/// - `url` - The URL of the MongoDB server, this is formatted as `mongodb://<host>:<port>`
 pub async fn create_connection(url: &str) -> Result<Connection, mongodb::error::Error> {
     // Parse the connection string
     let mut options = ClientOptions::parse(url).await?;

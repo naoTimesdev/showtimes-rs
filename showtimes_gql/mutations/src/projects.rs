@@ -568,7 +568,7 @@ fn fuzzy_yyyy_mm_dd_to_timestamp(date: &str) -> Option<jiff::Timestamp> {
     match (year, month, day) {
         (Some(year), Some(month), Some(day)) => jiff::civil::Date::new(year, month, day)
             .and_then(|date| date.to_zoned(JST_TZ.clone()))
-            .and_then(|dt| Ok(dt.timestamp()))
+            .map(|dt| dt.timestamp())
             .ok(),
         _ => None,
     }
@@ -772,9 +772,7 @@ async fn fetch_metadata_via_anilist(
             let est_ep_u32: u32 = est_episode.try_into().unwrap();
             if last_ep.number < est_ep_u32 {
                 // Extrapolate forward, use the last episode start as the basis
-                let mut last_ep_start = last_ep
-                    .aired_at
-                    .and_then(|last| Some(last.to_zoned(JST_TZ.clone())));
+                let mut last_ep_start = last_ep.aired_at.map(|last| last.to_zoned(JST_TZ.clone()));
                 for i in (last_ep.number + 1)..=est_ep_u32 {
                     let aired_at = match last_ep_start {
                         Some(last) => {
@@ -786,7 +784,7 @@ async fn fetch_metadata_via_anilist(
                     };
                     merged_episodes.push(ExternalMediaFetchProgressResult {
                         number: i,
-                        aired_at: aired_at.and_then(|d| Some(d.timestamp())),
+                        aired_at: aired_at.map(|d| d.timestamp()),
                     });
                 }
             }
@@ -1407,7 +1405,7 @@ pub async fn mutate_projects_create(
                 poster_color_collect = Some(*first_col);
             }
 
-            let cover_format = poster.split('.').last().unwrap_or("jpg");
+            let cover_format = poster.split('.').next_back().unwrap_or("jpg");
 
             let cover_key = format!("cover.{}", cover_format);
 

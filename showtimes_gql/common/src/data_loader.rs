@@ -3,11 +3,11 @@
 use std::ops::Deref;
 
 use ahash::{HashMap, HashMapExt};
-use async_graphql::{dataloader::Loader, FieldError};
+use async_graphql::{FieldError, dataloader::Loader};
 use futures_util::TryStreamExt;
 use showtimes_db::{
-    mongodb::bson::{doc, Document},
     DatabaseShared,
+    mongodb::bson::{Document, doc},
 };
 use showtimes_shared::ulid::Ulid;
 
