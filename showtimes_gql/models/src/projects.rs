@@ -197,6 +197,7 @@ pub struct ProjectGQL {
     creator: showtimes_shared::ulid::Ulid,
     kind: showtimes_db::m::ProjectType,
     status: showtimes_db::m::ProjectStatus,
+    aliases: Vec<String>,
     created: jiff::Timestamp,
     updated: jiff::Timestamp,
     disable_server_fetch: bool,
@@ -308,6 +309,13 @@ impl ProjectGQL {
     /// Can be used to link to other services like Discord or FansubDB.
     async fn integrations(&self) -> Vec<IntegrationIdGQL> {
         self.integrations.iter().map(|i| i.into()).collect()
+    }
+
+    /// The project title aliases.
+    ///
+    /// This can be used for searching or displaying other names for the project.
+    async fn aliases(&self) -> &[String] {
+        &self.aliases
     }
 
     /// The project creator or the server that created the project.
@@ -481,6 +489,7 @@ impl From<showtimes_db::m::Project> for ProjectGQL {
             progress: project.progress,
             assignees: project.assignees,
             integrations: project.integrations,
+            aliases: project.aliases,
             creator: project.creator,
             kind: project.kind,
             status: project.status,
@@ -502,6 +511,7 @@ impl From<&showtimes_db::m::Project> for ProjectGQL {
             progress: project.progress.clone(),
             assignees: project.assignees.clone(),
             integrations: project.integrations.clone(),
+            aliases: project.aliases.clone(),
             creator: project.creator,
             kind: project.kind,
             status: project.status,
