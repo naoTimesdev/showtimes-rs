@@ -283,7 +283,7 @@ fn has_valid_premium(premium_status: &[showtimes_db::m::ServerPremium]) -> bool 
         return true;
     }
 
-    let current_time = jiff::Timestamp::now();
+    let current_time = jiff::Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC);
 
     premium_status.iter().any(|p| p.ends_at > current_time)
 }

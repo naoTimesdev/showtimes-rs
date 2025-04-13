@@ -327,7 +327,7 @@ pub mod bson_datetime_jiff_timestamp {
         D: serde::Deserializer<'de>,
     {
         let dt = DateTime::deserialize(deserializer)?;
-        jiff::Timestamp::try_from(dt.to_system_time()).map_err(serde::de::Error::custom)
+        jiff::Timestamp::from_millisecond(dt.timestamp_millis()).map_err(serde::de::Error::custom)
     }
 
     /// A (de)serializer for [`jiff::Timestamp`] with [`bson::DateTime`] serde intermediary.
@@ -361,12 +361,46 @@ pub mod bson_datetime_jiff_timestamp {
         {
             let dt = Option::<DateTime>::deserialize(deserializer)?;
             match dt {
-                Some(dt) => jiff::Timestamp::try_from(dt.to_system_time())
+                Some(dt) => jiff::Timestamp::from_millisecond(dt.timestamp_millis())
                     .map(Some)
                     .map_err(serde::de::Error::custom),
                 None => Ok(None),
             }
         }
+    }
+}
+
+/// A (de)serializer for [`jiff::Zoned`] with [`bson::DateTime`] serde intermediary.
+///
+/// # Note
+/// You will lose the original timezone information when using this serializer since
+/// this will convert the timezone to UTC format.
+pub mod bson_datetime_jiff_utc {
+    use bson::DateTime;
+    use serde::{Deserialize, Serialize};
+
+    /// Serialize [`jiff::Zoned`] to [`bson::DateTime`]
+    ///
+    /// Used for serde serialization
+    pub fn serialize<S>(value: &jiff::Zoned, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let dt = DateTime::from_millis(value.timestamp().as_millisecond());
+        dt.serialize(serializer)
+    }
+
+    /// Deserialize data to [`bson::DateTime`] then finally to [`jiff::Zoned`]
+    ///
+    /// Used for serde deserialization
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<jiff::Zoned, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let dt = DateTime::deserialize(deserializer)?;
+        let ts = jiff::Timestamp::from_millisecond(dt.timestamp_millis())
+            .map_err(serde::de::Error::custom)?;
+        Ok(ts.to_zoned(jiff::tz::TimeZone::UTC))
     }
 }
 

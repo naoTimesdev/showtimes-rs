@@ -16,7 +16,7 @@ pub(crate) use common::*;
 
 use showtimes_db::m::APIKeyCapability;
 use showtimes_gql_common::{
-    DateTimeGQL, GQLErrorCode, GQLErrorExt, OkResponse, Orchestrator, UserKindGQL,
+    DateTimeTZGQL, GQLErrorCode, GQLErrorExt, OkResponse, Orchestrator, UserKindGQL,
     data_loader::UserDataLoader,
     errors::GQLError,
     guard::{APIKeyVerify, AuthUserAndAPIKeyGuard, AuthUserMinimumGuard},
@@ -619,7 +619,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         #[graphql(desc = "The server ID to create/update premium status for")]
         id: showtimes_gql_common::UlidGQL,
-        #[graphql(desc = "The end date of the premium status")] ends_at: DateTimeGQL,
+        #[graphql(desc = "The end date of the premium status")] ends_at: DateTimeTZGQL,
     ) -> async_graphql::Result<ServerPremiumGQL> {
         servers::mutate_servers_premium_create(ctx, id, ends_at).await
     }

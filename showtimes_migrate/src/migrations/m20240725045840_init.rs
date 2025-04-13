@@ -900,10 +900,11 @@ impl M20240725045840Init {
 
         new_project.integrations = integrations;
         let last_update = jiff::Timestamp::try_from(project.last_update)
-            .unwrap_or_else(|_| jiff::Timestamp::now());
-        new_project.updated = last_update;
+            .unwrap_or_else(|_| jiff::Timestamp::now())
+            .to_zoned(jiff::tz::TimeZone::UTC);
+        new_project.updated = last_update.timestamp();
         // Created just do last_update minus 1 day
-        new_project.created = last_update.checked_sub(1.days()).unwrap_or(last_update);
+        new_project.created = last_update.saturating_sub(1.days()).timestamp();
 
         Ok(new_project)
     }

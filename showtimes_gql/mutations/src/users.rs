@@ -512,8 +512,8 @@ pub async fn mutate_users_authenticate(
 
     let expire_dur = jiff::SignedDuration::new(exchanged.expires_in as i64, 0);
     let auth_expire_at = jiff::Timestamp::now()
-        .checked_add(expire_dur)
-        .unwrap_or(jiff::Timestamp::MAX);
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .saturating_add(expire_dur);
 
     match user {
         Some(mut user) => {
@@ -528,7 +528,7 @@ pub async fn mutate_users_authenticate(
             } else {
                 user.discord_meta.refresh_token = String::new();
             }
-            user.discord_meta.expires_at = auth_expire_at.as_second();
+            user.discord_meta.expires_at = auth_expire_at.timestamp().as_second();
 
             if !user.registered {
                 user.discord_meta.username = user_info.username.clone();
@@ -632,7 +632,7 @@ pub async fn mutate_users_authenticate(
                 avatar: user_info.avatar,
                 access_token: exchanged.access_token,
                 refresh_token: exchanged.refresh_token.unwrap_or_default(),
-                expires_at: auth_expire_at.as_second(),
+                expires_at: auth_expire_at.timestamp().as_second(),
             };
 
             let mut user = showtimes_db::m::User::new(user_info.username, discord_user);

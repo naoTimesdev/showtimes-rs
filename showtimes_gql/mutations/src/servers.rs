@@ -11,7 +11,7 @@ use showtimes_search::SearchClientShared;
 use tokio::io::AsyncSeekExt;
 
 use showtimes_gql_common::{
-    DateTimeGQL, GQLErrorCode, GQLErrorExt, OkResponse, UlidGQL, UserKindGQL,
+    DateTimeTZGQL, GQLErrorCode, GQLErrorExt, OkResponse, UlidGQL, UserKindGQL,
     data_loader::{ServerDataLoader, ServerPremiumLoader},
     errors::GQLError,
 };
@@ -951,7 +951,7 @@ pub async fn mutate_servers_delete(
 pub async fn mutate_servers_premium_create(
     ctx: &async_graphql::Context<'_>,
     id: UlidGQL,
-    ends_at: DateTimeGQL,
+    ends_at: DateTimeTZGQL,
 ) -> async_graphql::Result<ServerPremiumGQL> {
     let user = ctx.data_unchecked::<showtimes_db::m::User>();
 
@@ -982,15 +982,18 @@ pub async fn mutate_servers_premium_create(
     let current_time_bson =
         showtimes_db::mongodb::bson::DateTime::from_millis(current_time.as_millisecond());
 
+    let ends_at_str = ends_at.to_string();
+    let ends_at_ts = ends_at.timestamp();
+
     // Check if ends_at is in the past
-    if current_time > *ends_at {
+    if current_time > ends_at_ts {
         return GQLError::new(
             "Ends at time is in the past",
             GQLErrorCode::ServerPremiumInvalidEndTime,
         )
         .extend(|e| {
             e.set("id", server.id.to_string());
-            e.set("ends_at", ends_at.to_string());
+            e.set("ends_at", ends_at_str);
             e.set("current_time", current_time.to_string());
         })
         .into();
@@ -1012,8 +1015,8 @@ pub async fn mutate_servers_premium_create(
         Some(premium) => {
             // Check if ends_at is less than the current active premium
             // if yes, use extend_by method by the duration between ends_at and current time
-            if *ends_at < premium.ends_at {
-                let ends_at_dur = *ends_at - current_time;
+            if ends_at_ts < premium.ends_at.timestamp() {
+                let ends_at_dur = ends_at_ts - current_time;
 
                 if ends_at_dur.is_negative() {
                     // negative?!
@@ -1023,7 +1026,7 @@ pub async fn mutate_servers_premium_create(
                     )
                     .extend(|e| {
                         e.set("id", server.id.to_string());
-                        e.set("ends_at", ends_at.to_string());
+                        e.set("ends_at", ends_at_str);
                         e.set("current_time", premium.ends_at.to_string());
                     })
                     .into();
@@ -1033,12 +1036,12 @@ pub async fn mutate_servers_premium_create(
                 premium.extend_by(ends_at_dur)
             } else {
                 // extend until ends_at
-                premium.extend_at(*ends_at)
+                premium.extend_at(ends_at.into_inner())
             }
         }
         None => {
             // Create a new premium
-            showtimes_db::m::ServerPremium::new(server.id, *ends_at)
+            showtimes_db::m::ServerPremium::new(server.id, ends_at.into_inner())
         }
     };
 
@@ -1048,7 +1051,7 @@ pub async fn mutate_servers_premium_create(
     handler.save_direct(&mut premium, None).await.map_err(|e| {
         GQLError::new(e.to_string(), GQLErrorCode::ServerPremiumCreateError).extend(|f| {
             f.set("id", server.id.to_string());
-            f.set("ends_at", ends_at.to_string());
+            f.set("ends_at", ends_at_str);
         })
     })?;
 

@@ -720,16 +720,14 @@ async fn fetch_metadata_via_anilist(
 
     if merged_episodes.is_empty() && est_episode > 0 {
         // Extrapolate the episodes, we separate the episode start date by 1 week
-        let mut current_time = start_time;
+        let mut current_time = start_time.to_zoned(JST_TZ.clone());
         for i in 1..=est_episode {
             merged_episodes.push(ExternalMediaFetchProgressResult {
                 number: i as u32,
-                aired_at: Some(current_time),
+                aired_at: Some(current_time.timestamp()),
             });
 
-            current_time = current_time
-                .checked_add(1.weeks())
-                .unwrap_or(jiff::Timestamp::MAX);
+            current_time = current_time.saturating_add(1.weeks());
         }
     }
 
@@ -774,20 +772,21 @@ async fn fetch_metadata_via_anilist(
             let est_ep_u32: u32 = est_episode.try_into().unwrap();
             if last_ep.number < est_ep_u32 {
                 // Extrapolate forward, use the last episode start as the basis
-                let mut last_ep_start = last_ep.aired_at;
+                let mut last_ep_start = last_ep
+                    .aired_at
+                    .and_then(|last| Some(last.to_zoned(JST_TZ.clone())));
                 for i in (last_ep.number + 1)..=est_ep_u32 {
                     let aired_at = match last_ep_start {
                         Some(last) => {
-                            let pushed =
-                                last.checked_add(1.weeks()).unwrap_or(jiff::Timestamp::MAX);
-                            last_ep_start = Some(pushed);
+                            let pushed = last.saturating_add(1.weeks());
+                            last_ep_start = Some(pushed.clone());
                             Some(pushed)
                         }
                         None => None,
                     };
                     merged_episodes.push(ExternalMediaFetchProgressResult {
                         number: i,
-                        aired_at,
+                        aired_at: aired_at.and_then(|d| Some(d.timestamp())),
                     });
                 }
             }
@@ -2719,9 +2718,9 @@ pub async fn mutate_projects_episode_add_auto(
         let new_episodes = ((last_episode.number + 1)..=(last_episode.number + count))
             .enumerate()
             .map(|(idx, n)| {
-                let next_air_date = last_air_date.map(|d| {
+                let next_air_date = last_air_date.map(|d| d.to_zoned(JST_TZ.clone())).map(|d| {
                     let week = (idx as i64) + 1;
-                    d.checked_add(week.weeks()).unwrap_or(jiff::Timestamp::MAX)
+                    d.saturating_add(week.weeks()).timestamp()
                 });
 
                 let mut ep =

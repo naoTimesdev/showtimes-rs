@@ -177,7 +177,7 @@ impl From<&[fastnomicon::timestring::TimeTuple]> for TimeStringGQL {
     }
 }
 
-/// A wrapper around `DateTime<Utc>` to allow it to be used in GraphQL
+/// A wrapper around [`jiff::Timestamp`] to allow it to be used in GraphQL
 #[derive(Clone, Copy)]
 pub struct DateTimeGQL(
     /// A datetime timestamp format in UTC timezone, follows RFC3339 format
@@ -239,6 +239,67 @@ impl From<jiff::Zoned> for DateTimeGQL {
 impl From<&jiff::Zoned> for DateTimeGQL {
     fn from(dt: &jiff::Zoned) -> Self {
         DateTimeGQL(dt.timestamp())
+    }
+}
+
+/// A wrapper around [`jiff::Zoned`] to allow it to be used in GraphQL
+#[derive(Clone)]
+pub struct DateTimeTZGQL(
+    /// A datetime timestamp format in specific timezone, follows Temporal/RFC9557 format
+    jiff::Zoned,
+);
+
+impl Description for DateTimeTZGQL {
+    fn description() -> &'static str {
+        "A datetime timestamp format in UTC timezone, follows Temporal/RFC9557 spec format"
+    }
+}
+
+impl Deref for DateTimeTZGQL {
+    type Target = jiff::Zoned;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DateTimeTZGQL {
+    /// Get the internal data
+    pub fn into_inner(self) -> jiff::Zoned {
+        self.0
+    }
+}
+
+#[Scalar(use_type_description = true)]
+impl ScalarType for DateTimeTZGQL {
+    fn parse(value: async_graphql::Value) -> async_graphql::InputValueResult<Self> {
+        match value {
+            async_graphql::Value::String(s) => {
+                let rfc9587 = s.parse::<jiff::Zoned>().map_err(|e| {
+                    async_graphql::InputValueError::custom(e.to_string())
+                        .with_extension("value", &s)
+                })?;
+
+                Ok(DateTimeTZGQL(rfc9587))
+            }
+            _ => Err(async_graphql::InputValueError::expected_type(value)),
+        }
+    }
+
+    fn to_value(&self) -> async_graphql::Value {
+        async_graphql::Value::String(self.0.to_string())
+    }
+}
+
+impl From<jiff::Zoned> for DateTimeTZGQL {
+    fn from(dt: jiff::Zoned) -> Self {
+        DateTimeTZGQL(dt)
+    }
+}
+
+impl From<&jiff::Zoned> for DateTimeTZGQL {
+    fn from(dt: &jiff::Zoned) -> Self {
+        DateTimeTZGQL(dt.clone())
     }
 }
 

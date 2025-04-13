@@ -154,8 +154,8 @@ impl SessionManager {
                     Some(session_exp) => {
                         if session_exp != -1 {
                             let current_time = jiff::Timestamp::now()
-                                .checked_add(2.minutes())
-                                .unwrap_or(jiff::Timestamp::MAX);
+                                .saturating_add(2.minutes())
+                                .expect("This should never fail when using 2 minutes");
 
                             if session_exp < current_time.as_second() {
                                 // Delete the session
