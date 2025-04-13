@@ -234,7 +234,7 @@ impl ServerGQL {
 
         let loader = ctx.data_unchecked::<DataLoader<ServerPremiumLoader>>();
 
-        let current_time = jiff::Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC);
+        let current_time = jiff::Timestamp::now();
         let results = loader
             .load_one(ServerPremiumServer::from(self.id))
             .await?
@@ -262,7 +262,7 @@ impl ServerGQL {
 pub struct ServerPremiumGQL {
     id: showtimes_shared::ulid::Ulid,
     target: showtimes_shared::ulid::Ulid,
-    ends_at: jiff::Zoned,
+    ends_at: jiff::Timestamp,
     created: jiff::Timestamp,
     updated: jiff::Timestamp,
     disable_server: bool,
@@ -311,8 +311,8 @@ impl ServerPremiumGQL {
     }
 
     /// The server premium ends at
-    async fn ends_at(&self) -> DateTimeTZGQL {
-        self.ends_at.clone().into()
+    async fn ends_at(&self) -> DateTimeGQL {
+        self.ends_at.into()
     }
 
     /// The server premium created at
@@ -345,7 +345,7 @@ impl From<&showtimes_db::m::ServerPremium> for ServerPremiumGQL {
         ServerPremiumGQL {
             id: premium.id,
             target: premium.target,
-            ends_at: premium.ends_at.clone(),
+            ends_at: premium.ends_at,
             created: premium.created,
             updated: premium.updated,
             disable_server: false,

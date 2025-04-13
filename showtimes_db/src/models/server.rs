@@ -368,14 +368,9 @@ pub struct ServerPremium {
     /// The target server
     #[serde(with = "ulid_serializer")]
     pub target: showtimes_shared::ulid::Ulid,
-    /// The premium end date, this has Timezone support
-    /// but this will always be converted to UTC at the end.
-    ///
-    /// Since `bson` only support UTC datetime in their `date` format.
-    ///
-    /// TODO: Create a custom struct that can be used to serialize and deserialize date with timezone
-    #[serde(with = "showtimes_shared::bson_datetime_jiff_utc")]
-    pub ends_at: jiff::Zoned,
+    /// The premium end date
+    #[serde(with = "showtimes_shared::bson_datetime_jiff_timestamp")]
+    pub ends_at: jiff::Timestamp,
     #[serde(skip_serializing_if = "Option::is_none")]
     _id: Option<mongodb::bson::oid::ObjectId>,
     #[serde(
@@ -392,9 +387,8 @@ pub struct ServerPremium {
 
 impl ServerPremium {
     /// Create a new instance of [`ServerPremium`].
-    pub fn new(target: showtimes_shared::ulid::Ulid, ends_at: jiff::Zoned) -> Self {
+    pub fn new(target: showtimes_shared::ulid::Ulid, ends_at: jiff::Timestamp) -> Self {
         let cur_time = jiff::Timestamp::now();
-        let ends_at = ends_at.with_time_zone(jiff::tz::TimeZone::UTC);
         ServerPremium {
             id: ulid_serializer::default(),
             target,
@@ -406,16 +400,22 @@ impl ServerPremium {
     }
 
     /// Extend the end date to the given date.
-    pub fn extend_at(mut self, ends_at: jiff::Zoned) -> Self {
-        self.ends_at = ends_at.with_time_zone(jiff::tz::TimeZone::UTC);
+    pub fn extend_at(mut self, ends_at: jiff::Timestamp) -> Self {
+        self.ends_at = ends_at;
         self
     }
 
     /// Extend the end date by the given duration.
     ///
     /// Returns `self` for chainability.
+    ///
+    /// # Note
+    ///
+    /// Please do remember that this can panic if there is unit duration larger than hours.
     pub fn extend_by(mut self, duration: jiff::Span) -> Self {
-        self.ends_at = self.ends_at.saturating_add(duration);
+        // Set zoned to avoid errors when adding the duration
+        let ends_at = self.ends_at.to_zoned(jiff::tz::TimeZone::UTC);
+        self.ends_at = ends_at.saturating_add(duration).timestamp();
         self
     }
 }
