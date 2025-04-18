@@ -16,7 +16,8 @@ pub(crate) use common::*;
 
 use showtimes_db::m::APIKeyCapability;
 use showtimes_gql_common::{
-    DateTimeGQL, GQLErrorCode, GQLErrorExt, OkResponse, Orchestrator, UserKindGQL,
+    APIKeyCapabilityGQL, DateTimeGQL, GQLErrorCode, GQLErrorExt, OkResponse, Orchestrator,
+    UserKindGQL,
     data_loader::UserDataLoader,
     errors::GQLError,
     guard::{APIKeyVerify, AuthUserAndAPIKeyGuard, AuthUserMinimumGuard},
@@ -27,7 +28,7 @@ use showtimes_gql_models::{
     projects::ProjectGQL,
     rss::RSSFeedGQL,
     servers::{ServerGQL, ServerPremiumGQL},
-    users::{UserGQL, UserSessionGQL},
+    users::{APIKeyDataGQL, UserGQL, UserSessionGQL},
 };
 use showtimes_session::{ShowtimesUserSession, manager::SharedSessionManager};
 
@@ -169,6 +170,29 @@ impl MutationRoot {
         };
 
         users::mutate_users_update(ctx, requested, input).await
+    }
+
+    /// Create a new API key for the user
+    #[graphql(
+        name = "createAPIKey",
+        guard = "AuthUserMinimumGuard::new(UserKindGQL::User)"
+    )]
+    async fn create_api_key(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(desc = "The user ID to update, when NOT provided will use the current user")] id: Option<showtimes_gql_common::UlidGQL>,
+        #[graphql(desc = "The API key capabilities")] input: Option<Vec<APIKeyCapabilityGQL>>,
+    ) -> async_graphql::Result<APIKeyDataGQL> {
+        let user = ctx.data_unchecked::<showtimes_db::m::User>();
+
+        let requested = users::UserRequester::new(user.clone());
+        let requested = if let Some(id) = id {
+            requested.with_id(*id)
+        } else {
+            requested
+        };
+
+        users::mutate_users_create_api_key(ctx, requested, input).await
     }
 
     /// Update server information

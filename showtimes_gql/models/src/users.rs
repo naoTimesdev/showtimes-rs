@@ -183,6 +183,19 @@ impl From<&showtimes_db::m::User> for UserGQL {
     }
 }
 
+impl APIKeyDataGQL {
+    /// Create a new API key data object
+    pub fn new(
+        api_key: showtimes_shared::APIKey,
+        capabilities: Vec<showtimes_db::m::APIKeyCapability>,
+    ) -> Self {
+        APIKeyDataGQL {
+            api_key: Some(api_key.into()),
+            capabilities: capabilities.iter().map(|&c| c.into()).collect(),
+        }
+    }
+}
+
 impl From<showtimes_db::m::APIKey> for APIKeyDataGQL {
     fn from(key: showtimes_db::m::APIKey) -> Self {
         APIKeyDataGQL {

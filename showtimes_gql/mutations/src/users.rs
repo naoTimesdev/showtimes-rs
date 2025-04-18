@@ -12,7 +12,7 @@ use showtimes_gql_common::{
     data_loader::{DiscordIdLoad, UserDataLoader},
     errors::GQLError,
 };
-use showtimes_gql_models::users::{UserGQL, UserSessionGQL};
+use showtimes_gql_models::users::{APIKeyDataGQL, UserGQL, UserSessionGQL};
 
 use crate::{execute_search_events, is_string_set};
 
@@ -443,6 +443,110 @@ pub async fn mutate_users_update(
     let user_gql: UserGQL = user_info.into();
 
     Ok(user_gql.with_requester(user.requester.into()))
+}
+
+pub async fn mutate_users_create_api_key(
+    ctx: &async_graphql::Context<'_>,
+    user: UserRequester,
+    capabilities: Option<Vec<APIKeyCapabilityGQL>>,
+) -> async_graphql::Result<APIKeyDataGQL> {
+    let remapped_caps = match capabilities {
+        Some(capabilities) => {
+            if capabilities.is_empty() {
+                return GQLError::new("Capabilities cannot be empty", GQLErrorCode::InvalidRequest)
+                    .into();
+            }
+
+            capabilities
+                .iter()
+                .map(|d| (*d).into())
+                .collect::<Vec<showtimes_db::m::APIKeyCapability>>()
+        }
+        _ => showtimes_db::m::APIKeyCapability::queries().to_vec(),
+    };
+
+    let loader = ctx.data_unchecked::<DataLoader<UserDataLoader>>();
+    let db = ctx.data_unchecked::<DatabaseShared>();
+    let meili = ctx.data_unchecked::<SearchClientShared>();
+
+    let user_info = match user.id {
+        Some(id) => loader.load_one(id).await?.ok_or_else(|| {
+            GQLError::new("User not found", GQLErrorCode::UserNotFound)
+                .extend(|e| e.set("id", id.to_string()))
+        })?,
+        None => user.requester.clone(),
+    };
+
+    if user_info.kind == UserKind::Owner {
+        // Fails, Owner cannot be updated
+        return GQLError::new(
+            "Unable to update owner information",
+            GQLErrorCode::UserSuperuserMode,
+        )
+        .extend(|e| {
+            e.set("id", user_info.id.to_string());
+        })
+        .into();
+    }
+
+    if user.requester.kind == UserKind::User && user_info.id != user.requester.id {
+        // Fails, User cannot be updated by another user
+        return GQLError::new(
+            "Unable to update user information",
+            GQLErrorCode::UserUnauthorized,
+        )
+        .extend(|e| {
+            e.set("id", user_info.id.to_string());
+            e.set("requester", user.requester.id.to_string());
+        })
+        .into();
+    }
+
+    let mut user_info = user_info.clone();
+
+    let mut user_before = showtimes_events::m::UserUpdatedDataEvent::default();
+    let mut user_after = showtimes_events::m::UserUpdatedDataEvent::default();
+
+    user_before.set_api_key(&user_info.api_key);
+
+    // generate new key
+    let new_key = showtimes_shared::APIKey::new();
+    user_info
+        .api_key
+        .push(showtimes_db::m::APIKey::new(new_key, remapped_caps.clone()));
+    user_after.set_api_key(&user_info.api_key);
+
+    // Update the user
+    let user_handler = UserHandler::new(db);
+    user_handler.save(&mut user_info, None).await.extend_error(
+        GQLErrorCode::UserUpdateError,
+        |f_m| {
+            f_m.set("id", user_info.id.to_string());
+            f_m.set("actor", user.requester.id.to_string());
+        },
+    )?;
+
+    let search_arc = meili.clone();
+    let user_clone = user_info.clone();
+    let task_search = tokio::task::spawn(async move {
+        let user_search = showtimes_search::models::User::from(user_clone);
+        user_search.update_document(&search_arc).await
+    });
+    let task_events = ctx
+        .data_unchecked::<showtimes_events::SharedSHClickHouse>()
+        .create_event_async(
+            showtimes_events::m::EventKind::UserUpdated,
+            showtimes_events::m::UserUpdatedEvent::new(user_info.id, user_before, user_after),
+            if user.requester.kind == UserKind::Owner {
+                None
+            } else {
+                Some(user.requester.id.to_string())
+            },
+        );
+
+    execute_search_events(task_search, task_events).await?;
+
+    Ok(APIKeyDataGQL::new(new_key, remapped_caps))
 }
 
 pub async fn mutate_users_authenticate(
