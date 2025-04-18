@@ -3536,6 +3536,7 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "jiff",
+ "jwt-lc-rs",
  "mongodb",
  "serde",
  "showtimes-derive",

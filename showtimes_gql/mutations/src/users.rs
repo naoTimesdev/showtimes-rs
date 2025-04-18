@@ -289,7 +289,7 @@ pub async fn mutate_users_update(
                         // Reset API key
                         if let Some(reset) = api_key.reset {
                             if reset {
-                                matched.key = showtimes_shared::APIKey::new();
+                                matched.update_key(showtimes_shared::APIKey::new());
                                 any_api_changes = true;
                             }
                         }

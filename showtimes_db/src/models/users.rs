@@ -1,3 +1,4 @@
+use jwt_lc_rs::SigningAlgorithm;
 use serde::{Deserialize, Serialize};
 use showtimes_derive::EnumName;
 use showtimes_shared::ulid_serializer;
@@ -140,7 +141,7 @@ impl APIKeyCapability {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct APIKey {
     /// The API key itself
-    pub key: showtimes_shared::APIKey,
+    pub key: APIKeyHashed,
     /// The API key capabilities
     pub capabilities: Vec<APIKeyCapability>,
 }
@@ -151,7 +152,10 @@ impl APIKey {
     /// The provided capabilities should be a subset of the capabilities
     /// returned by `APIKeyCapability::all()`.
     pub fn new(key: showtimes_shared::APIKey, capabilities: Vec<APIKeyCapability>) -> Self {
-        APIKey { key, capabilities }
+        APIKey {
+            key: key.into(),
+            capabilities,
+        }
     }
 
     /// Check if API key has specific capability
@@ -172,16 +176,21 @@ impl APIKey {
     /// Stub an API key
     pub fn stub() -> Self {
         APIKey {
-            key: showtimes_shared::APIKey::new(),
+            key: showtimes_shared::APIKey::new().into(),
             capabilities: Vec::new(),
         }
+    }
+
+    /// Update API key
+    pub fn update_key<T: Into<APIKeyHashed>>(&mut self, key: T) {
+        self.key = key.into();
     }
 }
 
 impl Default for APIKey {
     fn default() -> Self {
         APIKey {
-            key: showtimes_shared::APIKey::new(),
+            key: showtimes_shared::APIKey::new().into(),
             capabilities: APIKeyCapability::all().to_vec(),
         }
     }
@@ -376,4 +385,74 @@ impl User {
             ..self.clone()
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum APIKeyHashed {
+    Unhashed(showtimes_shared::APIKey),
+    MaybeHashed(String),
+}
+
+impl Serialize for APIKeyHashed {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            APIKeyHashed::Unhashed(key) => {
+                let hashed_key = hash_api_key(key).map_err(serde::ser::Error::custom)?;
+                serializer.serialize_str(&hashed_key)
+            }
+            APIKeyHashed::MaybeHashed(key) => serializer.serialize_str(key),
+        }
+    }
+}
+
+impl From<showtimes_shared::APIKey> for APIKeyHashed {
+    fn from(key: showtimes_shared::APIKey) -> Self {
+        APIKeyHashed::Unhashed(key)
+    }
+}
+
+impl<'de> Deserialize<'de> for APIKeyHashed {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let key = String::deserialize(deserializer)?;
+        // check if startswith nsh_
+        if key.starts_with("nsh_") {
+            // try parsing as UUID
+            let api_key =
+                showtimes_shared::APIKey::from_string(key).map_err(serde::de::Error::custom)?;
+            Ok(APIKeyHashed::Unhashed(api_key))
+        } else {
+            // if not, just return the string as is
+            Ok(APIKeyHashed::MaybeHashed(key))
+        }
+    }
+}
+
+impl PartialEq<showtimes_shared::APIKey> for APIKeyHashed {
+    fn eq(&self, other: &showtimes_shared::APIKey) -> bool {
+        match self {
+            APIKeyHashed::Unhashed(key) => key == other,
+            APIKeyHashed::MaybeHashed(key) => {
+                let hashed_key = hash_api_key(other).unwrap_or_default();
+                hashed_key == *key
+            }
+        }
+    }
+}
+
+/// Hash the API key using SHA-384 with HMAC
+///
+/// The HMAC key is derived from the API key (a.k.a the UUID)
+/// then both the `nsh_[uuid]` will get hashed with SHA-384
+fn hash_api_key(api_key: &showtimes_shared::APIKey) -> Result<String, jwt_lc_rs::errors::Error> {
+    let key = api_key.as_uuid().to_bytes_le();
+
+    let hmac = jwt_lc_rs::HmacAlgorithm::new(jwt_lc_rs::SHALevel::SHA384, &key);
+
+    hmac.sign(api_key.as_api_key().as_bytes())
 }

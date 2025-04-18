@@ -29,8 +29,10 @@ pub struct UserGQL {
 #[derive(SimpleObject)]
 #[graphql(name = "APIKeyDataGQL")]
 pub struct APIKeyDataGQL {
-    /// The API key
-    key: APIKeyGQL,
+    /// The API key, when you just reset or create a new API key
+    ///
+    /// This will be available.
+    api_key: Option<APIKeyGQL>,
     /// The capabilities associated with the API key
     capabilities: Vec<APIKeyCapabilityGQL>,
 }
@@ -184,7 +186,10 @@ impl From<&showtimes_db::m::User> for UserGQL {
 impl From<showtimes_db::m::APIKey> for APIKeyDataGQL {
     fn from(key: showtimes_db::m::APIKey) -> Self {
         APIKeyDataGQL {
-            key: APIKeyGQL::from(key.key),
+            api_key: match key.key {
+                showtimes_db::m::APIKeyHashed::Unhashed(api_key) => Some(APIKeyGQL::from(api_key)),
+                _ => None,
+            },
             capabilities: key.capabilities.iter().map(|&c| c.into()).collect(),
         }
     }
@@ -193,7 +198,10 @@ impl From<showtimes_db::m::APIKey> for APIKeyDataGQL {
 impl From<&showtimes_db::m::APIKey> for APIKeyDataGQL {
     fn from(key: &showtimes_db::m::APIKey) -> Self {
         APIKeyDataGQL {
-            key: APIKeyGQL::from(key.key),
+            api_key: match key.key {
+                showtimes_db::m::APIKeyHashed::Unhashed(api_key) => Some(APIKeyGQL::from(api_key)),
+                _ => None,
+            },
             capabilities: key.capabilities.iter().map(|&c| c.into()).collect(),
         }
     }

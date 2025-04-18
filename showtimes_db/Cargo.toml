@@ -17,6 +17,7 @@ url.workspace = true
 futures-util.workspace = true
 
 mongodb.workspace = true
+jwt-lc-rs.workspace = true
 
 showtimes-shared = { path = "../showtimes_shared" }
 showtimes-derive = { path = "../showtimes_derive" }
