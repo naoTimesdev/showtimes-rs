@@ -23,6 +23,9 @@ config.toml.development
 config.toml.production
 !/.cargo/config.toml
 
+# macOS
+.DS_Store
+
 # Others
 _dumps/
 _tests/

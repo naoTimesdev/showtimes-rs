@@ -41,7 +41,7 @@ rust-version = "1.85"
 # Essential stuff
 anyhow = "1"
 ahash = "0.8.11"
-jiff = { version = "0.2.6", default-features = false, features = [
+jiff = { version = "0.2.11", default-features = false, features = [
     "std",
     "alloc",
     "serde",
@@ -61,7 +61,7 @@ serde_repr = "0.1.20"
 
 # Parsing data
 nom = "8.0.0"
-toml = { version = "0.8.20", default-features = false, features = ["parse", "preserve_order"] }
+toml = { version = "0.8.22", default-features = false, features = ["parse", "preserve_order"] }
 fastnomicon = { git = "https://github.com/naoTimesdev/fastnomicon.git", version = "0.2.0", default-features = false }
 
 # Async/Futures
@@ -83,7 +83,7 @@ kmeans_colors = { version = "0.7.0", default-features = false, features = ["pale
 palette = { version = "0.7.6", default-features = false, features = ["std"] }
 
 # Web server
-axum = { version = "0.8.3", default-features = false, features = [
+axum = { version = "0.8.4", default-features = false, features = [
     "http1",
     "json",
     "matched-path",
@@ -114,10 +114,10 @@ urlencoding = "2.1.3"
 # Database
 mongodb = { version = "3.2.3", default-features = false, features = ["compat-3-0-0", "rustls-tls"] }
 bson = { version = "2.14.0" }
-redis = { version = "0.29.5", default-features = false, features = ["acl", "keep-alive", "tokio-comp"] }
+redis = { version = "0.30.0", default-features = false, features = ["acl", "keep-alive", "tokio-comp"] }
 clickhouse = { version = "0.13.2", default-features = false, features = ["lz4", "uuid"] }
 meilisearch-sdk = "0.28.0"
-jwt-lc-rs = { git = "https://github.com/noaione/jwt-lc-rs.git", rev = "fdfe6a36330acd46f60d41e42bfe942dd62f5a5e", features = [
+jwt-lc-rs = { git = "https://github.com/noaione/jwt-lc-rs.git", rev = "11285b07d2c9610e6526dd38108d0c5883248fdd", features = [
     "pem"
 ] }
 
@@ -139,7 +139,7 @@ htmd = "0.1.6"
 fluent-templates = { version = "0.13.0", features = ["macros"] }
 
 # CLI
-clap = { version = "4.5.36", features = ["derive"] }
+clap = { version = "4.5.37", features = ["derive"] }
 dotenvy = "0.15.7"
 
 [profile.dev]
