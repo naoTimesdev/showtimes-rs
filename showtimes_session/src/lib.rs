@@ -323,7 +323,7 @@ pub fn verify_session(
             expect_audience,
         ])),
         Box::new(jwt_lc_rs::validator::IssuerValidator::new(&[ISSUER])),
-        Box::new(jwt_lc_rs::validator::ExpiryValidator::now().with_grace_period(60 * 2)), // 2 min grace
+        Box::new(jwt_lc_rs::validator::ExpiryValidator::new(2u64 * 60)), // 2 min grace
     ];
 
     jwt_lc_rs::decode(token, secret, &Validator::new(validators)).map(|data| data.into_claims())
@@ -340,7 +340,7 @@ pub fn refresh_session(
             REFRESH_AUDIENCE,
         ])),
         Box::new(jwt_lc_rs::validator::IssuerValidator::new(&[ISSUER])),
-        Box::new(jwt_lc_rs::validator::ExpiryValidator::now().with_grace_period(30)), // 30s grace
+        Box::new(jwt_lc_rs::validator::ExpiryValidator::new(30u64)), // 30s grace
     ];
 
     match jwt_lc_rs::decode::<ShowtimesRefreshClaims>(token, secret, &Validator::new(validators)) {
@@ -362,7 +362,7 @@ pub(crate) fn verify_refresh_session(
             REFRESH_AUDIENCE,
         ])),
         Box::new(jwt_lc_rs::validator::IssuerValidator::new(&[ISSUER])),
-        Box::new(jwt_lc_rs::validator::ExpiryValidator::now().with_grace_period(30)), // 30s grace
+        Box::new(jwt_lc_rs::validator::ExpiryValidator::new(30u64)), // 30s grace
     ];
 
     jwt_lc_rs::decode(token, secret, &Validator::new(validators)).map(|data| data.into_claims())

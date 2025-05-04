@@ -117,7 +117,7 @@ bson = { version = "2.14.0" }
 redis = { version = "0.30.0", default-features = false, features = ["acl", "keep-alive", "tokio-comp"] }
 clickhouse = { version = "0.13.2", default-features = false, features = ["lz4", "uuid"] }
 meilisearch-sdk = "0.28.0"
-jwt-lc-rs = { git = "https://github.com/noaione/jwt-lc-rs.git", rev = "11285b07d2c9610e6526dd38108d0c5883248fdd", features = [
+jwt-lc-rs = { git = "https://github.com/noaione/jwt-lc-rs.git", rev = "97fad60b561991619abe9f22b3ef8d79a035a8d3", features = [
     "pem"
 ] }
 
