@@ -1,8 +1,19 @@
+import os
 import platform
 import shutil
 from pathlib import Path
+import subprocess
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
+
+def fix_rpath_mac(artifact: Path):
+    subprocess.run([
+        "install_name_tool",
+        "-add_rpath",
+        "@loader_path",
+        str(artifact),
+    ])
+
 
 def find_aws_lc_fips_sys():
     # Check if building on Windows or macOS
@@ -49,6 +60,10 @@ def find_aws_lc_fips_sys():
 
             print(f"Copying: {artifact.name}")
             shutil.copy(artifact, output_area)
+        if platform.system() == "Darwin":
+            # Fix rpath for macOS
+            print("Fixing rpath for macOS")
+            fix_rpath_mac(target_dir / "showtimes")
 
 # Example usage
 if __name__ == "__main__":
