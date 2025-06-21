@@ -1,9 +1,8 @@
-use crate::ShowModelHandler;
+use crate::{ShowModelHandler, impl_trait_model};
 use serde::{Deserialize, Serialize};
 
 /// A model to hold migrations information
-#[derive(Debug, Clone, Serialize, Deserialize, showtimes_derive::ShowModelHandler)]
-#[col_name("ShowtimesMigrations")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Migration {
     /// The migration's ID described
     pub name: String,
@@ -21,6 +20,8 @@ pub struct Migration {
     pub updated: jiff::Timestamp,
     pub is_current: bool,
 }
+
+impl_trait_model!(Migration, "ShowtimesMigrations", _id, updated);
 
 impl Migration {
     pub fn new(name: &str, ts: jiff::Timestamp) -> Self {

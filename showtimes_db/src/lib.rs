@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod errors;
+mod macros;
 pub mod models;
 
 use std::sync::Arc;

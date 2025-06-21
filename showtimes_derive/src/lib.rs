@@ -8,26 +8,6 @@ mod events;
 mod search;
 mod shows;
 
-/// Derive the `DbModel` trait for a struct
-///
-/// # Examples
-/// ```
-/// #[derive(ShowModelHandler)]
-/// #[col_name = "ShowtimesProject"]
-/// pub struct Project {
-///     _id: Option<bson::oid::ObjectId>,
-///     name: String,
-/// }
-/// ```
-#[proc_macro_derive(ShowModelHandler, attributes(col_name, handler_name))]
-pub fn derive_show_model_handler(input: TokenStream) -> TokenStream {
-    // Parse the input tokens into a syntax tree
-    let input = syn::parse_macro_input!(input as syn::DeriveInput);
-
-    // Generate the implementation of the trait
-    shows::expand_showmodel(&input)
-}
-
 /// Create a handler for a model
 ///
 /// # Examples

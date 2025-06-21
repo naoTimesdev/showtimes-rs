@@ -3,7 +3,10 @@ use std::sync::LazyLock;
 use serde::{Deserialize, Serialize};
 use showtimes_shared::{ulid_opt_serializer, ulid_serializer};
 
-use crate::errors::{SHDbResult, StringValidationError, StringValidationErrorKind};
+use crate::{
+    errors::{SHDbResult, StringValidationError, StringValidationErrorKind},
+    impl_trait_model,
+};
 
 use super::{ImageMetadata, IntegrationId, ShowModelHandler};
 
@@ -624,8 +627,7 @@ pub enum ProjectStatus {
 }
 
 /// The model holding project information.
-#[derive(Debug, Clone, Serialize, Deserialize, Default, showtimes_derive::ShowModelHandler)]
-#[col_name("ShowtimesProjects")]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Project {
     /// The ID of the project.
     #[serde(with = "ulid_serializer", default = "ulid_serializer::default")]
@@ -666,6 +668,8 @@ pub struct Project {
     )]
     pub updated: jiff::Timestamp,
 }
+
+impl_trait_model!(Project, "ShowtimesProjects", _id, updated);
 
 impl Project {
     /// Create a new project.

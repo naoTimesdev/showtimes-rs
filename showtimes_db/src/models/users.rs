@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use showtimes_derive::EnumName;
 use showtimes_shared::ulid_serializer;
 
+use crate::impl_trait_model;
+
 use super::{ImageMetadata, ShowModelHandler};
 
 /// Enum to hold user kinds
@@ -248,8 +250,7 @@ impl DiscordUser {
 /// A model to hold user authentication information
 ///
 /// User is logged in via Discord OAuth2
-#[derive(Debug, Clone, Serialize, Deserialize, showtimes_derive::ShowModelHandler)]
-#[col_name("ShowtimesUsers")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     /// The user's ID
     #[serde(with = "ulid_serializer", default = "ulid_serializer::default")]
@@ -284,6 +285,8 @@ pub struct User {
     )]
     pub updated: jiff::Timestamp,
 }
+
+impl_trait_model!(User, "ShowtimesUsers", _id, updated);
 
 impl User {
     /// Create a new user

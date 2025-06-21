@@ -1,3 +1,5 @@
+use crate::impl_trait_model;
+
 use super::{IntegrationId, ShowModelHandler};
 use serde::{Deserialize, Serialize};
 use showtimes_shared::ulid_serializer;
@@ -106,8 +108,7 @@ impl Default for RSSFeedDisplay {
 }
 
 /// A model to hold RSS information for a server.
-#[derive(Debug, Clone, Serialize, Deserialize, showtimes_derive::ShowModelHandler)]
-#[col_name("ShowtimesRSSFeed")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RSSFeed {
     /// The RSS feed ID
     #[serde(with = "ulid_serializer")]
@@ -140,6 +141,8 @@ pub struct RSSFeed {
     )]
     pub updated: jiff::Timestamp,
 }
+
+impl_trait_model!(RSSFeed, "ShowtimesRSSFeed", _id, updated);
 
 impl RSSFeed {
     /// Create a new simple RSS feed

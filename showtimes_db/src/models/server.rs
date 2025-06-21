@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use showtimes_derive::EnumName;
 use showtimes_shared::{ulid_opt_serializer, ulid_serializer};
 
+use crate::impl_trait_model;
+
 use super::{ImageMetadata, IntegrationId, ShowModelHandler};
 
 /// Enum to hold user privileges on a server.
@@ -84,8 +86,7 @@ impl ServerUser {
 ///
 /// The original account is called "server" as a caddy over from the original
 /// project. This is a server in the sense of a project server, not a physical
-#[derive(Debug, Clone, Serialize, Deserialize, showtimes_derive::ShowModelHandler)]
-#[col_name("ShowtimesServers")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Server {
     /// The server's ID
     #[serde(with = "ulid_serializer")]
@@ -197,8 +198,7 @@ impl From<&super::Project> for ServerCollaborationSyncTarget {
 }
 
 /// A model to hold server synchronization information on a project
-#[derive(Debug, Clone, Serialize, Deserialize, showtimes_derive::ShowModelHandler)]
-#[col_name("ShowtimesCollaborationSync")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerCollaborationSync {
     /// The collaboration ID
     #[serde(with = "ulid_serializer")]
@@ -317,8 +317,7 @@ impl ServerCollaborationInviteTarget {
 }
 
 /// A model to hold server collaboration invite on a project
-#[derive(Debug, Clone, Serialize, Deserialize, showtimes_derive::ShowModelHandler)]
-#[col_name("ShowtimesCollaborationInvite")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerCollaborationInvite {
     /// The collab invite ID (unique, and used as invite code too)
     #[serde(with = "ulid_serializer")]
@@ -359,8 +358,7 @@ impl ServerCollaborationInvite {
 }
 
 /// A model to hold premium usages informaiton
-#[derive(Debug, Clone, Serialize, Deserialize, showtimes_derive::ShowModelHandler)]
-#[col_name("ShowtimesServerPremium")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerPremium {
     /// The premium ID
     #[serde(with = "ulid_serializer")]
@@ -419,3 +417,18 @@ impl ServerPremium {
         self
     }
 }
+
+impl_trait_model!(Server, "ShowtimesServers", _id, updated);
+impl_trait_model!(
+    ServerCollaborationSync,
+    "ShowtimesCollaborationSync",
+    _id,
+    updated
+);
+impl_trait_model!(
+    ServerCollaborationInvite,
+    "ShowtimesCollaborationInvite",
+    _id,
+    updated
+);
+impl_trait_model!(ServerPremium, "ShowtimesServerPremium", _id, updated);

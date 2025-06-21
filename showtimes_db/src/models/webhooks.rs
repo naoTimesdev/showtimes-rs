@@ -1,7 +1,10 @@
 use serde::{Deserialize, Serialize};
 use showtimes_shared::ulid_serializer;
 
-use crate::errors::{StringValidationError, StringValidationErrorKind};
+use crate::{
+    errors::{StringValidationError, StringValidationErrorKind},
+    impl_trait_model,
+};
 
 use super::ShowModelHandler;
 
@@ -45,8 +48,7 @@ impl WebhookAction {
 }
 
 /// The webhook model
-#[derive(Debug, Clone, Serialize, Deserialize, showtimes_derive::ShowModelHandler)]
-#[col_name("ShowtimesWebhooks")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Webhook {
     /// The ID of the webhook
     #[serde(with = "ulid_serializer", default = "ulid_serializer::default")]
@@ -88,6 +90,8 @@ pub struct Webhook {
     )]
     pub updated: jiff::Timestamp,
 }
+
+impl_trait_model!(Webhook, "ShowtimesWebhooks", _id, updated);
 
 impl Webhook {
     /// Create a new webhook instances
