@@ -163,7 +163,7 @@ dependencies = [
 [[package]]
 name = "async-graphql"
 version = "7.0.17"
-source = "git+https://github.com/naoTimesdev/async-graphql.git?rev=5d275c589914da34cf7e88343ba472b6b1b7474d#5d275c589914da34cf7e88343ba472b6b1b7474d"
+source = "git+https://github.com/naoTimesdev/async-graphql.git?rev=79a833e1ec4ded8512a7ebd5c71cc32c8967e23a#79a833e1ec4ded8512a7ebd5c71cc32c8967e23a"
 dependencies = [
  "ahash",
  "async-graphql-derive",
@@ -200,7 +200,7 @@ dependencies = [
 [[package]]
 name = "async-graphql-axum"
 version = "7.0.17"
-source = "git+https://github.com/naoTimesdev/async-graphql.git?rev=5d275c589914da34cf7e88343ba472b6b1b7474d#5d275c589914da34cf7e88343ba472b6b1b7474d"
+source = "git+https://github.com/naoTimesdev/async-graphql.git?rev=79a833e1ec4ded8512a7ebd5c71cc32c8967e23a#79a833e1ec4ded8512a7ebd5c71cc32c8967e23a"
 dependencies = [
  "async-graphql",
  "axum",
@@ -216,7 +216,7 @@ dependencies = [
 [[package]]
 name = "async-graphql-derive"
 version = "7.0.17"
-source = "git+https://github.com/naoTimesdev/async-graphql.git?rev=5d275c589914da34cf7e88343ba472b6b1b7474d#5d275c589914da34cf7e88343ba472b6b1b7474d"
+source = "git+https://github.com/naoTimesdev/async-graphql.git?rev=79a833e1ec4ded8512a7ebd5c71cc32c8967e23a#79a833e1ec4ded8512a7ebd5c71cc32c8967e23a"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -232,7 +232,7 @@ dependencies = [
 [[package]]
 name = "async-graphql-parser"
 version = "7.0.17"
-source = "git+https://github.com/naoTimesdev/async-graphql.git?rev=5d275c589914da34cf7e88343ba472b6b1b7474d#5d275c589914da34cf7e88343ba472b6b1b7474d"
+source = "git+https://github.com/naoTimesdev/async-graphql.git?rev=79a833e1ec4ded8512a7ebd5c71cc32c8967e23a#79a833e1ec4ded8512a7ebd5c71cc32c8967e23a"
 dependencies = [
  "async-graphql-value",
  "pest",
@@ -243,7 +243,7 @@ dependencies = [
 [[package]]
 name = "async-graphql-value"
 version = "7.0.17"
-source = "git+https://github.com/naoTimesdev/async-graphql.git?rev=5d275c589914da34cf7e88343ba472b6b1b7474d#5d275c589914da34cf7e88343ba472b6b1b7474d"
+source = "git+https://github.com/naoTimesdev/async-graphql.git?rev=79a833e1ec4ded8512a7ebd5c71cc32c8967e23a#79a833e1ec4ded8512a7ebd5c71cc32c8967e23a"
 dependencies = [
  "bytes",
  "indexmap 2.9.0",
@@ -1098,7 +1098,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "976dd42dc7e85965fe702eb8164f21f450704bdde31faefd6471dba214cb594e"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
