@@ -40,8 +40,8 @@ rust-version = "1.85"
 [workspace.dependencies]
 # Essential stuff
 anyhow = "1"
-ahash = "0.8.11"
-jiff = { version = "0.2.11", default-features = false, features = [
+ahash = "0.8.12"
+jiff = { version = "0.2.15", default-features = false, features = [
     "std",
     "alloc",
     "serde",
@@ -51,7 +51,7 @@ jiff = { version = "0.2.11", default-features = false, features = [
     "tzdb-zoneinfo",
 ] }
 ulid = "1.2.1"
-uuid = { version = "1.16.0", default-features = false, features = ["v4", "v7", "fast-rng"] }
+uuid = { version = "1.17.0", default-features = false, features = ["v4", "v7", "fast-rng"] }
 rustc-hash = { version = "2.1.1", features = ["std"] }
 
 # Serde
@@ -61,13 +61,13 @@ serde_repr = "0.1.20"
 
 # Parsing data
 nom = "8.0.0"
-toml = { version = "0.8.22", default-features = false, features = ["parse", "preserve_order"] }
+toml = { version = "0.8.23", default-features = false, features = ["parse", "preserve_order"] }
 fastnomicon = { git = "https://github.com/naoTimesdev/fastnomicon.git", version = "0.2.0", default-features = false }
 
 # Async/Futures
-tokio = { version = "1.44.2", features = ["full", "tracing"] }
+tokio = { version = "1.45.1", features = ["full", "tracing"] }
 tokio-stream = "0.1.17"
-tokio-cron-scheduler = "0.13.0"
+tokio-cron-scheduler = "0.14.0"
 futures-util = { version = "0.3.31", default-features = false, features = ["std"] }
 futures-channel = { version = "0.3.31", default-features = false, features = ["std"] }
 async-trait = "0.1.88"
@@ -75,7 +75,7 @@ async-trait = "0.1.88"
 # File server
 mime_guess = "2.0.5"
 rusty-s3 = { version = "0.7.0", features = ["full"] }
-slab = "0.4.9"
+slab = "0.4.10"
 
 # Image related
 image = { version = "0.25.6", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
@@ -94,7 +94,7 @@ axum = { version = "0.8.4", default-features = false, features = [
     "ws",
 ] }
 axum-extra = { version = "0.10.1", default-features = false, features = ["tracing", "async-read-body"] }
-async-graphql = { version = "7.0.16", default-features = false, features = [
+async-graphql = { version = "7.0.17", default-features = false, features = [
     "tracing",
     "unblock",
     "dataloader",
@@ -102,20 +102,20 @@ async-graphql = { version = "7.0.16", default-features = false, features = [
     "graphiql",
     "tempfile",
 ] }
-async-graphql-axum = "7.0.16"
+async-graphql-axum = "7.0.17"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tracing-appender = "0.2.3"
-tower-http = { version = "0.6.2", features = ["cors", "trace"] }
+tower-http = { version = "0.6.6", features = ["cors", "trace"] }
 tower-service = "0.3.3"
 tower-layer = "0.3.3"
 urlencoding = "2.1.3"
 
 # Database
 mongodb = { version = "3.2.3", default-features = false, features = ["compat-3-0-0", "rustls-tls"] }
-bson = { version = "2.14.0" }
-redis = { version = "0.30.0", default-features = false, features = ["acl", "keep-alive", "tokio-comp"] }
-clickhouse = { version = "0.13.2", default-features = false, features = ["lz4", "uuid"] }
+bson = { version = "2.15.0" }
+redis = { version = "0.32.2", default-features = false, features = ["acl", "keep-alive", "tokio-comp"] }
+clickhouse = { version = "0.13.3", default-features = false, features = ["lz4", "uuid"] }
 meilisearch-sdk = "0.28.0"
 jwt-lc-rs = { git = "https://github.com/noaione/jwt-lc-rs.git", rev = "97fad60b561991619abe9f22b3ef8d79a035a8d3", features = [
     "pem"
@@ -123,7 +123,7 @@ jwt-lc-rs = { git = "https://github.com/noaione/jwt-lc-rs.git", rev = "97fad60b5
 
 # FansubRSS/Network
 url = { version = "2.5.4", features = ["serde"] }
-reqwest = { version = "0.12.15", default-features = false, features = [
+reqwest = { version = "0.12.20", default-features = false, features = [
     "charset",
     "macos-system-configuration",
     "rustls-tls",
@@ -133,13 +133,13 @@ reqwest = { version = "0.12.15", default-features = false, features = [
 feed-rs = { version = "2.3.1", features = ["sanitize"] }
 pulldown-cmark = { version = "0.13.0", default-features = false, features = ["html"] }
 pulldown-cmark-escape = "0.11.0"
-htmd = "0.1.6"
+htmd = "0.2.2"
 
 # i18n
 fluent-templates = { version = "0.13.0", features = ["macros"] }
 
 # CLI
-clap = { version = "4.5.37", features = ["derive"] }
+clap = { version = "4.5.40", features = ["derive"] }
 dotenvy = "0.15.7"
 
 [profile.dev]
@@ -241,5 +241,5 @@ opt-level = "s"
 codegen-units = 1
 
 [patch.crates-io]
-async-graphql = { git = "https://github.com/naoTimesdev/async-graphql.git", rev = "60d6baa0475b507623cb518780b2b13d5d97ae96" }
-async-graphql-axum = { git = "https://github.com/naoTimesdev/async-graphql.git", rev = "60d6baa0475b507623cb518780b2b13d5d97ae96" }
+async-graphql = { git = "https://github.com/naoTimesdev/async-graphql.git", rev = "5d275c589914da34cf7e88343ba472b6b1b7474d" }
+async-graphql-axum = { git = "https://github.com/naoTimesdev/async-graphql.git", rev = "5d275c589914da34cf7e88343ba472b6b1b7474d" }

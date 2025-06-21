@@ -79,9 +79,22 @@ pub trait WebhookEnginePayload: WebhookEngine {
 }
 
 /// An error that can happen when generating a payload
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum WebhookEnginePayloadError {
     /// The payload is invalid
-    #[error("Invalid payload")]
-    InvalidPayload(#[from] serde_json::Error),
+    InvalidPayload(serde_json::Error),
+}
+
+impl std::fmt::Display for WebhookEnginePayloadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WebhookEnginePayloadError::InvalidPayload(err) => write!(f, "Invalid payload: {}", err),
+        }
+    }
+}
+
+impl From<serde_json::Error> for WebhookEnginePayloadError {
+    fn from(err: serde_json::Error) -> Self {
+        WebhookEnginePayloadError::InvalidPayload(err)
+    }
 }
