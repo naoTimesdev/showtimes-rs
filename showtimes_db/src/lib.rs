@@ -13,7 +13,6 @@ pub use models as m;
 /// Re-export the mongodb crate
 pub use mongodb;
 use mongodb::options::ClientOptions;
-use showtimes_derive::create_handler;
 
 /// A type alias for a shared [`mongodb::Client`] wrapped in an [`Arc`]
 pub type ClientShared = Arc<mongodb::Client>;
@@ -58,11 +57,19 @@ pub async fn create_connection(url: &str) -> Result<Connection, mongodb::error::
     })
 }
 
-create_handler!(m::Project, ProjectHandler);
-create_handler!(m::User, UserHandler);
-create_handler!(m::Server, ServerHandler);
-create_handler!(m::ServerPremium, ServerPremiumHandler);
-create_handler!(m::ServerCollaborationSync, CollaborationSyncHandler);
-create_handler!(m::ServerCollaborationInvite, CollaborationInviteHandler);
-create_handler!(m::RSSFeed, RSSFeedHandler);
-create_handler!(m::Migration, MigrationHandler);
+impl_handler_model!(m::Project, ProjectHandler, "m::Project");
+impl_handler_model!(m::User, UserHandler, "m::User");
+impl_handler_model!(m::Server, ServerHandler, "m::Server");
+impl_handler_model!(m::ServerPremium, ServerPremiumHandler, "m::ServerPremium");
+impl_handler_model!(
+    m::ServerCollaborationSync,
+    CollaborationSyncHandler,
+    "m::ServerCollaborationSync"
+);
+impl_handler_model!(
+    m::ServerCollaborationInvite,
+    CollaborationInviteHandler,
+    "m::ServerCollaborationInvite"
+);
+impl_handler_model!(m::RSSFeed, RSSFeedHandler, "m::RSSFeed");
+impl_handler_model!(m::Migration, MigrationHandler, "m::Migration");

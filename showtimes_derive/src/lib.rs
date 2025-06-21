@@ -6,31 +6,12 @@ use proc_macro::TokenStream;
 mod enums;
 mod events;
 mod search;
-mod shows;
-
-/// Create a handler for a model
-///
-/// # Examples
-/// ```
-/// #[derive(ShowModelHandler)]
-/// #[col_name("ShowtimesProject")]
-/// pub struct Project {
-///     _id: Option<bson::oid::ObjectId>,
-/// }
-/// create_handler!(m::Project, ProjectHandler);
-/// ```
-#[proc_macro]
-pub fn create_handler(input: TokenStream) -> TokenStream {
-    // Parse the input tokens into a syntax tree
-    let input = syn::parse_macro_input!(input as shows::CreateHandler);
-
-    shows::expand_handler(&input)
-}
 
 /// Derive the `SearchModel` trait for a struct
 ///
 /// # Examples
 /// ```
+/// # use showtimes_derive::SearchModel;
 /// #[derive(SearchModel)]
 /// #[search(name = "Project", filterable = ["id"], searchable = ["name"], sortable = ["created"])]
 /// pub struct Project {
@@ -53,6 +34,7 @@ pub fn derive_search_model(input: TokenStream) -> TokenStream {
 ///
 /// # Examples
 /// ```
+/// # use showtimes_derive::EventModel;
 /// #[derive(EventModel)]
 /// pub struct UserCreatedEvent {
 ///     id: String,
@@ -72,6 +54,7 @@ pub fn derive_event_model(input: TokenStream) -> TokenStream {
 ///
 /// # Examples
 /// ```
+/// # use showtimes_derive::EnumName;
 /// #[derive(EnumName)]
 /// pub enum ProjectStatus {
 ///     Active,
@@ -94,6 +77,7 @@ pub fn derive_enum_name(input: TokenStream) -> TokenStream {
 ///
 /// # Examples
 /// ```
+/// # use showtimes_derive::SerdeAutomata;
 /// #[derive(SerdeAutomata)]
 /// pub enum ProjectStatus {
 ///     Active,
