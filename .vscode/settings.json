@@ -25,4 +25,6 @@
         "**/target/debug/.fingerprint": true,
         "**/target/doc": true,
     },
+    "rust-analyzer.cargo.targetDir": true,
+    "rust-analyzer.check.command": "clippy"
 }

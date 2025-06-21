@@ -224,7 +224,7 @@ pub async fn query_projects_paginated(
                 .into();
             }
 
-            let document_fetchs = user_methods
+            user_methods
                 .iter()
                 .map(|(s, m)| {
                     if m.privilege == UserPrivilege::ProjectManager {
@@ -269,9 +269,7 @@ pub async fn query_projects_paginated(
                         }
                     }
                 })
-                .collect::<Vec<Document>>();
-
-            document_fetchs
+                .collect::<Vec<Document>>()
         }
         _ => {
             // If not provided with allowed servers, then fetch all projects

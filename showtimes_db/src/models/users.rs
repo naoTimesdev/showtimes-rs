@@ -452,7 +452,7 @@ impl PartialEq<showtimes_shared::APIKey> for APIKeyHashed {
 fn hash_api_key(api_key: &showtimes_shared::APIKey) -> Result<String, jwt_lc_rs::errors::Error> {
     let key = api_key.as_uuid().to_bytes_le();
 
-    let hmac = jwt_lc_rs::HmacAlgorithm::new(jwt_lc_rs::SHALevel::SHA384, &key);
+    let hmac = jwt_lc_rs::HmacAlgorithm::new(jwt_lc_rs::SHALevel::SHA384, key);
 
     hmac.sign(api_key.as_api_key().as_bytes())
 }

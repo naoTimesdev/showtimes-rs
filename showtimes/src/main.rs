@@ -72,10 +72,9 @@ async fn entrypoint() -> anyhow::Result<()> {
             tracing_subscriber::EnvFilter::try_from_default_env()
                 .map(|filter| {
                     let split_filter = merged_env_trace.split(',').collect::<Vec<&str>>();
-                    let directives = split_filter
+                    split_filter
                         .iter()
-                        .fold(filter, |acc, &x| acc.add_directive(x.parse().unwrap()));
-                    directives
+                        .fold(filter, |acc, &x| acc.add_directive(x.parse().unwrap()))
                 })
                 .unwrap_or_else(|_| merged_env_trace.parse().unwrap()),
         )

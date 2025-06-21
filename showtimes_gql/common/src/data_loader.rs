@@ -142,14 +142,11 @@ impl Loader<showtimes_shared::APIKey> for UserDataLoader {
 
         let mapped_res: HashMap<showtimes_shared::APIKey, showtimes_db::m::User> =
             all_results.iter().fold(HashMap::new(), |mut acc, item| {
-                item.api_key
-                    .iter()
-                    .for_each(|k| match keys.iter().find(|&key| k.key == *key) {
-                        Some(matched) => {
-                            acc.entry(*matched).or_insert(item.clone());
-                        }
-                        None => (),
-                    });
+                item.api_key.iter().for_each(|k| {
+                    if let Some(matched) = keys.iter().find(|&key| k.key == *key) {
+                        acc.entry(*matched).or_insert(item.clone());
+                    }
+                });
                 acc
             });
 
