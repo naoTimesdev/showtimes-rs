@@ -1,3 +1,5 @@
+# cargo-features = ["codegen-backend"]
+
 [workspace]
 resolver = "2"
 members = [
@@ -160,6 +162,12 @@ inherits = "release"
 opt-level = "s"
 codegen-units = 1
 incremental = false
+
+# [profile.cranelift]
+# inherits = "production"
+# codegen-backend = "cranelift"
+# panic = "abort"
+# lto = "off"
 
 # Package specific configuration
 ## Showtimes Shared
