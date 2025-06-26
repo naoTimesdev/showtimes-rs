@@ -34,7 +34,6 @@ static GRAPHQL_SDL: OnceLock<String> = OnceLock::new();
 /// Create the GraphQL schema
 pub fn create_schema(db_pool: &DatabaseShared) -> ShowtimesGQLSchema {
     showtimes_gql_common::Schema::build(QueryRoot, MutationRoot, SubscriptionRoot)
-        .extension(showtimes_gql_common::Tracing)
         .data(showtimes_gql_common::DataLoader::new(
             data_loader::UserDataLoader::new(db_pool),
             tokio::spawn,

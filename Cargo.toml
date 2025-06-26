@@ -97,7 +97,6 @@ axum = { version = "0.8.4", default-features = false, features = [
 ] }
 axum-extra = { version = "0.10.1", default-features = false, features = ["tracing", "async-read-body"] }
 async-graphql = { version = "7.0.17", default-features = false, features = [
-    "tracing",
     "unblock",
     "dataloader",
     "dataloader_ahash",

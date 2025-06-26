@@ -17,7 +17,7 @@ pub use async_graphql::Response as GQLResponse;
 pub use async_graphql::ServerError as GQLServerError;
 /// Re-exports of the async_graphql crate
 pub use async_graphql::http::{ALL_WEBSOCKET_PROTOCOLS, GraphiQLSource, graphiql_plugin_explorer};
-pub use async_graphql::{Data, Error, Schema, dataloader::DataLoader, extensions::Tracing};
+pub use async_graphql::{Data, Error, Schema, dataloader::DataLoader};
 /// Re-exports of the errors enums
 pub use errors::{GQLDataLoaderWhere, GQLErrorCode, GQLErrorExt};
 pub use image::MAX_IMAGE_SIZE;
