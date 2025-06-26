@@ -105,7 +105,7 @@ async fn main() {
     let migrations_dir = Path::new(manifest_path).join("src").join("migrations");
 
     if !migrations_dir.exists() {
-        eprintln!("Migrations directory does not exist: {:?}", migrations_dir);
+        eprintln!("Migrations directory does not exist: {migrations_dir:?}");
         std::process::exit(1);
     }
 
@@ -130,9 +130,9 @@ async fn main() {
     // format YYYYMMDDHHMMSS
     let timestamp = current_time.strftime("%Y%m%d%H%M%S").to_string();
 
-    let migration_file = migrations_dir.join(format!("m{}_{}.rs", timestamp, original_name));
+    let migration_file = migrations_dir.join(format!("m{timestamp}_{original_name}.rs"));
 
-    let struct_name = format!("M{}{}", timestamp, name);
+    let struct_name = format!("M{timestamp}{name}");
     let template = MIGRATION_TEMPLATE
         .replace("{{name}}", &struct_name)
         .replace("{{timestamp}}", &current_time.as_second().to_string());

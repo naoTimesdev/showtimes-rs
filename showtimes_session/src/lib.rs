@@ -408,10 +408,10 @@ mod tests {
                     // Expected
                 }
                 _ => {
-                    panic!("Expected an error of InvalidAudience, got {:?}", e);
+                    panic!("Expected an error of InvalidAudience, got {e:?}");
                 }
             },
-            Ok(r) => panic!("Expected an error of InvalidAudience, got {:?}", r),
+            Ok(r) => panic!("Expected an error of InvalidAudience, got {r:?}"),
         }
     }
 
@@ -438,10 +438,10 @@ mod tests {
                     // Expected
                 }
                 _ => {
-                    panic!("Expected an error of InvalidAudience, got {:?}", e);
+                    panic!("Expected an error of InvalidAudience, got {e:?}");
                 }
             },
-            Ok(r) => panic!("Expected an error of InvalidAudience, got {:?}", r),
+            Ok(r) => panic!("Expected an error of InvalidAudience, got {r:?}"),
         }
     }
 

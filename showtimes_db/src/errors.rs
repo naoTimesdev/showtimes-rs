@@ -57,7 +57,7 @@ pub enum StringValidationErrorKind {
 
 impl std::fmt::Debug for StringValidationErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 
@@ -67,7 +67,7 @@ impl std::fmt::Display for StringValidationErrorKind {
             StringValidationErrorKind::Empty => write!(f, "cannot be empty"),
             StringValidationErrorKind::TooLong => write!(f, "is too long"),
             StringValidationErrorKind::TooShort => write!(f, "is too short"),
-            StringValidationErrorKind::Contains(chars) => write!(f, "can only contains {}", chars),
+            StringValidationErrorKind::Contains(chars) => write!(f, "can only contains {chars}"),
             StringValidationErrorKind::ASCIIOnly => write!(f, "can only contains ASCII"),
         }
     }
@@ -95,9 +95,9 @@ impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::Unknown => write!(f, "An unknown error has occurred"),
-            Error::StringError(err) => write!(f, "{}", err),
+            Error::StringError(err) => write!(f, "{err}"),
             Error::TimeConversionError(number) => {
-                write!(f, "Failed to convert timestamp: {}", number)
+                write!(f, "Failed to convert timestamp: {number}")
             }
         }
     }
@@ -107,9 +107,9 @@ impl std::fmt::Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::Unknown => write!(f, "An unknown error has occurred"),
-            Error::StringError(err) => write!(f, "{:?}", err),
+            Error::StringError(err) => write!(f, "{err:?}"),
             Error::TimeConversionError(number) => {
-                write!(f, "Failed to convert timestamp: {:?}", number)
+                write!(f, "Failed to convert timestamp: {number:?}")
             }
         }
     }

@@ -306,8 +306,7 @@ async fn on_ws_init(
                 Err(err) => {
                     tracing::error!("[WS] Error getting session (from payload): {:?}", err);
                     return Err(GQLError::new(format!(
-                        "Error validating token session: {}",
-                        err
+                        "Error validating token session: {err}"
                     )));
                 }
             }
@@ -324,8 +323,7 @@ async fn on_ws_init(
                         Err(err) => {
                             tracing::error!("[WS] Error getting session (from header): {:?}", err);
                             return Err(GQLError::new(format!(
-                                "Error validating token session: {}",
-                                err
+                                "Error validating token session: {err}"
                             )));
                         }
                     }

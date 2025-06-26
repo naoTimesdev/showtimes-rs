@@ -309,9 +309,9 @@ impl From<TMDbErrorResponse> for TMDbError {
 impl std::fmt::Display for TMDbError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TMDbError::Response(err) => write!(f, "{}", err),
-            TMDbError::Request(err) => write!(f, "{}", err),
-            TMDbError::Serde(err) => write!(f, "{}", err),
+            TMDbError::Response(err) => write!(f, "{err}"),
+            TMDbError::Request(err) => write!(f, "{err}"),
+            TMDbError::Serde(err) => write!(f, "{err}"),
         }
     }
 }

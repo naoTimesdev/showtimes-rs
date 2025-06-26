@@ -193,17 +193,17 @@ impl From<reqwest::Error> for VNDBError {
 impl std::fmt::Display for VNDBError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            VNDBError::Response(e) => write!(f, "{}", e),
-            VNDBError::Request(e) => write!(f, "{}", e),
-            VNDBError::Serde(e) => write!(f, "{}", e),
+            VNDBError::Response(e) => write!(f, "{e}"),
+            VNDBError::Request(e) => write!(f, "{e}"),
+            VNDBError::Serde(e) => write!(f, "{e}"),
             VNDBError::InvalidId(c) => {
-                write!(f, "invalid id provided: {}", c)
+                write!(f, "invalid id provided: {c}")
             }
             VNDBError::HeaderToString(c) => {
-                write!(f, "failed to convert `{}` header value into string", c)
+                write!(f, "failed to convert `{c}` header value into string")
             }
             VNDBError::NotFound(item) => {
-                write!(f, "no result found for `{}`", item)
+                write!(f, "no result found for `{item}`")
             }
         }
     }

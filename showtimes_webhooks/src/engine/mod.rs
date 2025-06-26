@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 pub(crate) mod discord;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -88,7 +89,7 @@ pub enum WebhookEnginePayloadError {
 impl std::fmt::Display for WebhookEnginePayloadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            WebhookEnginePayloadError::InvalidPayload(err) => write!(f, "Invalid payload: {}", err),
+            WebhookEnginePayloadError::InvalidPayload(err) => write!(f, "Invalid payload: {err}"),
         }
     }
 }

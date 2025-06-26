@@ -39,7 +39,7 @@ async fn entrypoint() -> anyhow::Result<()> {
     let config = match Config::async_load(cwd.join("config.toml")).await {
         Ok(config) => config,
         Err(e) => {
-            eprintln!("Failed to load configuration: {}", e);
+            eprintln!("Failed to load configuration: {e}");
             anyhow::bail!("Failed to load configuration");
         }
     };

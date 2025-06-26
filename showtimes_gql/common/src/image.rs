@@ -97,7 +97,7 @@ pub async fn detect_upload_data(
                 .map_err(|e| {
                     std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
-                        format!("Invalid image format: {}", e),
+                        format!("Invalid image format: {e}"),
                     )
                 })?;
 

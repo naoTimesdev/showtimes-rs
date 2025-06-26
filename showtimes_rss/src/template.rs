@@ -27,7 +27,7 @@ impl std::error::Error for TemplateError {}
 impl std::fmt::Display for TemplateError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            TemplateError::NomError(e) => write!(f, "Nom error: {}", e),
+            TemplateError::NomError(e) => write!(f, "Nom error: {e}"),
         }
     }
 }
@@ -49,12 +49,12 @@ fn throw_nom_error(error: nom::Err<nom::error::Error<&str>>) -> TemplateError {
         }
         nom::Err::Incomplete(e) => {
             let need_amount = if let nom::Needed::Size(amount) = e {
-                format!("{} bytes", amount)
+                format!("{amount} bytes")
             } else {
                 "unknown amount".to_string()
             };
 
-            TemplateError::NomError(format!("Incomplete data, need: {}", need_amount))
+            TemplateError::NomError(format!("Incomplete data, need: {need_amount}"))
         }
     }
 }
@@ -217,7 +217,7 @@ pub(crate) fn format_template<T: ToString>(
                 let value = match t {
                     Template::Indexed(i) => {
                         let res = args.get(*i as usize).map(ToString::to_string);
-                        res.unwrap_or(format!("{{{}}}", i))
+                        res.unwrap_or(format!("{{{i}}}"))
                     }
                     Template::Empty => {
                         let res = args
@@ -230,7 +230,7 @@ pub(crate) fn format_template<T: ToString>(
                     Template::Named(key) => {
                         let k_str = key.to_string();
                         let res = kwargs.get(k_str.as_str()).map(ToString::to_string);
-                        res.unwrap_or(format!("{{{}}}", key))
+                        res.unwrap_or(format!("{{{key}}}"))
                     }
                 };
 
@@ -317,10 +317,10 @@ impl std::fmt::Display for VecString {
                     .collect::<Vec<_>>()
                     .join(", ");
 
-                &format!("{}, and {}", before_last_one, last_one)
+                &format!("{before_last_one}, and {last_one}")
             };
 
-            write!(f, "{}", joined_letters)
+            write!(f, "{joined_letters}")
         }
     }
 }

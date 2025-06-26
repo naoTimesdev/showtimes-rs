@@ -99,8 +99,8 @@ pub enum DiscordClientError {
 impl std::fmt::Display for DiscordClientError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DiscordClientError::Reqwest(e) => write!(f, "Reqwest error: {}", e),
-            DiscordClientError::Serde(e) => write!(f, "Serde error: {}", e),
+            DiscordClientError::Reqwest(e) => write!(f, "Reqwest error: {e}"),
+            DiscordClientError::Serde(e) => write!(f, "Serde error: {e}"),
         }
     }
 }
@@ -133,7 +133,7 @@ impl DiscordClient {
     ) -> Result<DiscordToken, DiscordClientError> {
         let res = self
             .client
-            .post(format!("{}/oauth2/token", BASE_URL))
+            .post(format!("{BASE_URL}/oauth2/token"))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .form(&[
                 ("client_id", &self.client_id),
@@ -149,8 +149,8 @@ impl DiscordClient {
         let raw_resp = res.text().await.map_err(DiscordClientError::Reqwest)?;
 
         serde_json::from_str::<DiscordToken>(&raw_resp).map_err(|e| {
-            println!("Error: {:?}", e);
-            println!("Body: {:?}", raw_resp);
+            println!("Error: {e:?}");
+            println!("Body: {raw_resp:?}");
 
             DiscordClientError::Serde(e)
         })
@@ -163,7 +163,7 @@ impl DiscordClient {
     ) -> Result<DiscordToken, reqwest::Error> {
         let res = self
             .client
-            .post(format!("{}/oauth2/token", BASE_URL))
+            .post(format!("{BASE_URL}/oauth2/token"))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .form(&[
                 ("client_id", &self.client_id),
@@ -181,7 +181,7 @@ impl DiscordClient {
     pub async fn get_user(&self, token: impl Into<String>) -> Result<DiscordUser, reqwest::Error> {
         let res = self
             .client
-            .get(format!("{}/users/@me", BASE_URL))
+            .get(format!("{BASE_URL}/users/@me"))
             .header("Authorization", format!("Bearer {}", token.into()))
             .send()
             .await?;
@@ -196,7 +196,7 @@ impl DiscordClient {
     ) -> Result<Vec<DiscordPartialGuild>, reqwest::Error> {
         let res = self
             .client
-            .get(format!("{}/users/@me/guilds", BASE_URL))
+            .get(format!("{BASE_URL}/users/@me/guilds"))
             .header("Authorization", format!("Bearer {}", token.into()))
             .send()
             .await?;

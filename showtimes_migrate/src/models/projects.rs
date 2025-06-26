@@ -104,12 +104,12 @@ impl TryFrom<LastUpdate> for jiff::Timestamp {
     fn try_from(value: LastUpdate) -> Result<Self, Self::Error> {
         match value {
             LastUpdate::Flat(v) => {
-                jiff::Timestamp::from_second(v).map_err(|_| format!("Invalid timestamp: {}", v))
+                jiff::Timestamp::from_second(v).map_err(|_| format!("Invalid timestamp: {v}"))
             }
             LastUpdate::Comma(v) => {
                 // Round the float to the nearest second
                 let secs = v as i64;
-                jiff::Timestamp::from_second(secs).map_err(|_| format!("Invalid timestamp: {}", v))
+                jiff::Timestamp::from_second(secs).map_err(|_| format!("Invalid timestamp: {v}"))
             }
         }
     }

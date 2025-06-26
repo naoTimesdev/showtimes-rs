@@ -63,7 +63,7 @@ impl std::fmt::Display for SessionError {
             Self::InvalidSessionFormat => write!(f, "Invalid session format"),
             Self::ExpiredSession => write!(f, "Expired session"),
             Self::SessionNotFound => write!(f, "Session not found"),
-            Self::RedisError(e) => write!(f, "Redis error: {}", e),
+            Self::RedisError(e) => write!(f, "Redis error: {e}"),
         }
     }
 }

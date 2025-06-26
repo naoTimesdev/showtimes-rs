@@ -156,8 +156,8 @@ impl<'de> Deserialize<'de> for FeedValue {
 impl std::fmt::Display for FeedValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FeedValue::String(s) => write!(f, "{}", s),
-            FeedValue::Collection(s) => write!(f, "{}", s),
+            FeedValue::String(s) => write!(f, "{s}"),
+            FeedValue::Collection(s) => write!(f, "{s}"),
             FeedValue::Timestamp(s) => {
                 // Use similar format to RFC3339
                 let zone = s.to_zoned(TimeZone::UTC);

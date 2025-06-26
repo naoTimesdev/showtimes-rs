@@ -49,7 +49,7 @@ impl SHClickHouse {
 
         // Create the database if not exists
         client
-            .query(&format!("CREATE DATABASE IF NOT EXISTS {}", DATABASE_NAME))
+            .query(&format!("CREATE DATABASE IF NOT EXISTS {DATABASE_NAME}"))
             .execute()
             .await?;
 
@@ -64,7 +64,7 @@ impl SHClickHouse {
         self.client
             .query(&format!(
                 r#"
-                CREATE TABLE IF NOT EXISTS {} (
+                CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
                     id UUID,
                     kind Enum8(
                         'user_created' = 1,
@@ -88,8 +88,7 @@ impl SHClickHouse {
                     timestamp DateTime
                 ) ENGINE = MergeTree()
                 ORDER BY (timestamp)
-            "#,
-                TABLE_NAME
+            "#
             ))
             .execute()
             .await?;
@@ -98,7 +97,7 @@ impl SHClickHouse {
         self.client
             .query(&format!(
                 r#"
-                CREATE TABLE IF NOT EXISTS {} (
+                CREATE TABLE IF NOT EXISTS {RSS_TABLE_NAME} (
                     id UUID,
                     feed_id UUID,
                     server_id UUID,
@@ -108,7 +107,6 @@ impl SHClickHouse {
                 ) ENGINE = MergeTree()
                 ORDER BY (timestamp)
                 "#,
-                RSS_TABLE_NAME,
             ))
             .execute()
             .await
@@ -117,12 +115,12 @@ impl SHClickHouse {
     /// Drop all tables in the database
     pub async fn drop_tables(&self) -> Result<(), clickhouse::error::Error> {
         self.client
-            .query(&format!("DROP TABLE IF EXISTS {}", TABLE_NAME))
+            .query(&format!("DROP TABLE IF EXISTS {TABLE_NAME}"))
             .execute()
             .await?;
 
         self.client
-            .query(&format!("DROP TABLE IF EXISTS {}", RSS_TABLE_NAME))
+            .query(&format!("DROP TABLE IF EXISTS {RSS_TABLE_NAME}"))
             .execute()
             .await
     }
@@ -277,13 +275,12 @@ impl SHClickHouse {
         let results = self
             .client
             .query(&format!(
-                r#"SELECT ?fields FROM {}
+                r#"SELECT ?fields FROM {RSS_TABLE_NAME}
                    WHERE (
                        feed_id = toUUID(?)
                    )
                    ORDER BY toUInt128(id) DESC
                    LIMIT 1"#,
-                RSS_TABLE_NAME,
             ))
             .bind(feed_id.to_string())
             .fetch_all::<models::RSSEvent>()

@@ -36,11 +36,11 @@ pub enum MetadataImageError {
 impl std::fmt::Display for MetadataError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::CommonError(e) => write!(f, "An error has occurred: {}", e),
-            Self::AnilistError(err) => write!(f, "Anilist error: {}", err),
-            Self::TMDbError(err) => write!(f, "TMDb error: {}", err),
-            Self::VNDBError(err) => write!(f, "VNDB error: {}", err),
-            Self::ImageError(e) => write!(f, "{}", e),
+            Self::CommonError(e) => write!(f, "An error has occurred: {e}"),
+            Self::AnilistError(err) => write!(f, "Anilist error: {err}"),
+            Self::TMDbError(err) => write!(f, "TMDb error: {err}"),
+            Self::VNDBError(err) => write!(f, "VNDB error: {err}"),
+            Self::ImageError(e) => write!(f, "{e}"),
         }
     }
 }
@@ -48,9 +48,9 @@ impl std::fmt::Display for MetadataError {
 impl std::fmt::Display for MetadataImageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::LoadError(e) => write!(f, "Failed to load image: {}", e),
+            Self::LoadError(e) => write!(f, "Failed to load image: {e}"),
             Self::NoDominantColor => write!(f, "No dominant color found on the image"),
-            Self::InvalidHexColor(s) => write!(f, "Invalid hex color string: {}", s),
+            Self::InvalidHexColor(s) => write!(f, "Invalid hex color string: {s}"),
         }
     }
 }

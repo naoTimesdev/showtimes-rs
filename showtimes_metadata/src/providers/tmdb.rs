@@ -56,7 +56,7 @@ impl TMDbProvider {
     where
         T: serde::de::DeserializeOwned,
     {
-        let mut req = self.client.get(format!("{}/{}", TMDB_API_URL, path));
+        let mut req = self.client.get(format!("{TMDB_API_URL}/{path}"));
 
         for (key, value) in query_params {
             req = req.query(&[(*key, *value)]);
@@ -122,7 +122,7 @@ impl TMDbProvider {
     /// # Arguments
     /// * `id` - The movie ID
     pub async fn get_movie_details(&self, id: i32) -> MetadataResult<TMDbMovieResult> {
-        let response: TMDbMovieResult = self.request(&format!("movie/{}", id), &[]).await?;
+        let response: TMDbMovieResult = self.request(&format!("movie/{id}"), &[]).await?;
 
         Ok(response)
     }

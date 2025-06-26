@@ -144,7 +144,7 @@ impl Migration for M20240726055250UpdateCovers {
                 .next_back()
                 .ok_or_else(|| anyhow::anyhow!("No cover format found"))?;
 
-            let cover_key = format!("cover.{}", cover_format);
+            let cover_key = format!("cover.{cover_format}");
             for project in &mut projects {
                 let image_meta = showtimes_db::m::ImageMetadata::new(
                     FsFileKind::Images.to_name(),

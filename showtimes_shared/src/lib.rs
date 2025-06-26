@@ -84,7 +84,7 @@ impl std::fmt::Display for APIKeyParseError {
             APIKeyParseError::InvalidFormat => write!(f, "Invalid API Key format"),
             APIKeyParseError::InvalidUUID => write!(f, "Invalid UUID"),
             APIKeyParseError::IncompleteUUID(pos) => {
-                write!(f, "Invalid UUID, incomplete part {}", pos)
+                write!(f, "Invalid UUID, incomplete part {pos}")
             }
         }
     }
@@ -112,7 +112,7 @@ impl APIKey {
     /// Convert the internal UUID into an API key string
     pub fn as_api_key(&self) -> String {
         let inner_str = self.inner.to_string().replace("-", "");
-        format!("{}{}", API_KEY_PREFIX, inner_str)
+        format!("{API_KEY_PREFIX}{inner_str}")
     }
 
     /// Get the inner UUID
@@ -144,7 +144,7 @@ impl APIKey {
         let uuid_e = input
             .get(20..32)
             .ok_or(APIKeyParseError::IncompleteUUID(4))?;
-        let rfmt_s = format!("{}-{}-{}-{}-{}", uuid_a, uuid_b, uuid_c, uuid_d, uuid_e);
+        let rfmt_s = format!("{uuid_a}-{uuid_b}-{uuid_c}-{uuid_d}-{uuid_e}");
 
         let inner = uuid::Uuid::parse_str(&rfmt_s).map_err(|_| APIKeyParseError::InvalidUUID)?;
         Ok(APIKey { inner })
@@ -427,9 +427,9 @@ mod tests {
         let ulid = uuid_to_ulid(uuid_act);
         let uuid = ulid_to_uuid(ulid);
 
-        println!("{:?}", uuid_act);
-        println!("{:?}", ulid);
-        println!("{:?}", uuid);
+        println!("{uuid_act:?}");
+        println!("{ulid:?}");
+        println!("{uuid:?}");
 
         assert_eq!(uuid.get_version(), Some(uuid::Version::SortRand));
         assert_eq!(uuid.get_variant(), uuid::Variant::RFC4122);

@@ -514,9 +514,9 @@ impl From<ConfigVerifyError> for ConfigError {
 impl std::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConfigError::LoadError(e) => write!(f, "Failed to load config: {}", e),
-            ConfigError::ParseError(e) => write!(f, "Failed to parse config: {}", e),
-            ConfigError::VerifyError(e) => write!(f, "Failed to verify config: {}", e),
+            ConfigError::LoadError(e) => write!(f, "Failed to load config: {e}"),
+            ConfigError::ParseError(e) => write!(f, "Failed to parse config: {e}"),
+            ConfigError::VerifyError(e) => write!(f, "Failed to verify config: {e}"),
         }
     }
 }
@@ -524,27 +524,23 @@ impl std::fmt::Display for ConfigError {
 impl std::fmt::Display for ConfigVerifyError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConfigVerifyError::Required(item) => write!(f, "{} is required and not set!", item),
+            ConfigVerifyError::Required(item) => write!(f, "{item} is required and not set!"),
             ConfigVerifyError::NoDefault(item) => {
-                write!(f, "{} is not changed from default, please change it!", item)
+                write!(f, "{item} is not changed from default, please change it!")
             }
             ConfigVerifyError::NoDefaultOrNull(item) => write!(
                 f,
-                "{} is not changed from default, please change it or set to `null` if not used!",
-                item
+                "{item} is not changed from default, please change it or set to `null` if not used!"
             ),
             ConfigVerifyError::MinimumAmount(item, amount) => write!(
                 f,
-                "Minimum amount of '{}' {} is not satisfied, please change it!",
-                item, amount
+                "Minimum amount of '{item}' {amount} is not satisfied, please change it!"
             ),
-            ConfigVerifyError::MissingFile(item) => write!(
-                f,
-                "File `{}` does not exist, please ensure it exists!",
-                item
-            ),
+            ConfigVerifyError::MissingFile(item) => {
+                write!(f, "File `{item}` does not exist, please ensure it exists!")
+            }
             ConfigVerifyError::IOError(item, e) => {
-                write!(f, "IO error occurred for {}: {}", item, e)
+                write!(f, "IO error occurred for {item}: {e}")
             }
         }
     }

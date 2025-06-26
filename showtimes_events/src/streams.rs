@@ -82,13 +82,12 @@ where
             Some(start_after) => self
                 .client
                 .query(&format!(
-                    r#"SELECT count() AS ?fields FROM {}
+                    r#"SELECT count() AS ?fields FROM {TABLE_NAME}
                     WHERE (
                         toUInt128(id) > toUInt128(toUUID(?)) AND
                         kind = ?
                     )
                     "#,
-                    TABLE_NAME,
                 ))
                 .bind(start_after.to_string())
                 .bind(self.kind as u8)
@@ -96,12 +95,11 @@ where
             None => self
                 .client
                 .query(&format!(
-                    r#"SELECT count() AS ?fields FROM {}
+                    r#"SELECT count() AS ?fields FROM {TABLE_NAME}
                     WHERE (
                         kind = ?
                     )
                     "#,
-                    TABLE_NAME,
                 ))
                 .bind(self.kind as u8)
                 .fetch_one::<InternalCounter>(),
@@ -131,14 +129,13 @@ where
             Some(start_after) => {
                 self.client
                     .query(&format!(
-                        r#"SELECT ?fields FROM {}
+                        r#"SELECT ?fields FROM {TABLE_NAME}
                            WHERE (
                                toUInt128(id) > toUInt128(toUUID(?)) AND
                                kind = ?
                            )
                            ORDER BY toUInt128(id) ASC
                            OFFSET ? ROW FETCH FIRST ? ROWS ONLY"#,
-                        TABLE_NAME,
                     ))
                     .bind(start_after.to_string())
                     .bind(self.kind as u8)
@@ -150,13 +147,12 @@ where
             None => {
                 self.client
                     .query(&format!(
-                        r#"SELECT ?fields FROM {}
+                        r#"SELECT ?fields FROM {TABLE_NAME}
                            WHERE (
                                kind = ?
                            )
                            ORDER BY toUInt128(id) ASC
                            OFFSET ? ROW FETCH FIRST ? ROWS ONLY"#,
-                        TABLE_NAME,
                     ))
                     .bind(self.kind as u8)
                     .bind(offset)
@@ -320,13 +316,12 @@ impl SHRSSClickStream {
             Some(start_after) => self
                 .client
                 .query(&format!(
-                    r#"SELECT count() AS ?fields FROM {}
+                    r#"SELECT count() AS ?fields FROM {RSS_TABLE_NAME}
                     WHERE (
                         toUInt128(id) > toUInt128(toUUID(?)) AND
                         feed_id = toUUID(?)
                     )
                     "#,
-                    RSS_TABLE_NAME,
                 ))
                 .bind(start_after.to_string())
                 .bind(self.feed_id.to_string())
@@ -334,12 +329,11 @@ impl SHRSSClickStream {
             None => self
                 .client
                 .query(&format!(
-                    r#"SELECT count() AS ?fields FROM {}
+                    r#"SELECT count() AS ?fields FROM {RSS_TABLE_NAME}
                     WHERE (
                         feed_id = toUUID(?)
                     )
                     "#,
-                    RSS_TABLE_NAME,
                 ))
                 .bind(self.feed_id.to_string())
                 .fetch_one::<InternalCounter>(),
@@ -369,14 +363,13 @@ impl SHRSSClickStream {
             Some(start_after) => {
                 self.client
                     .query(&format!(
-                        r#"SELECT ?fields FROM {}
+                        r#"SELECT ?fields FROM {RSS_TABLE_NAME}
                            WHERE (
                                toUInt128(id) > toUInt128(toUUID(?)) AND
                                feed_id = toUUID(?)
                            )
                            ORDER BY toUInt128(id) ASC
                            OFFSET ? ROW FETCH FIRST ? ROWS ONLY"#,
-                        RSS_TABLE_NAME,
                     ))
                     .bind(start_after.to_string())
                     .bind(self.feed_id.to_string())
@@ -388,13 +381,12 @@ impl SHRSSClickStream {
             None => {
                 self.client
                     .query(&format!(
-                        r#"SELECT ?fields FROM {}
+                        r#"SELECT ?fields FROM {RSS_TABLE_NAME}
                            WHERE (
                                feed_id = toUUID(?)
                            )
                            ORDER BY toUInt128(id) ASC
                            OFFSET ? ROW FETCH FIRST ? ROWS ONLY"#,
-                        RSS_TABLE_NAME,
                     ))
                     .bind(self.feed_id.to_string())
                     .bind(offset)

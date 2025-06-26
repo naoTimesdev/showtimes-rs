@@ -146,14 +146,14 @@ fn expand_option_field(
     main_type: &syn::Type,
     attrs_config: EventModelAttr,
 ) -> proc_macro2::TokenStream {
-    let set_field_name = format!("set_{}", field_name);
+    let set_field_name = format!("set_{field_name}");
     let set_field_ident = syn::Ident::new(&set_field_name, field_name.span());
 
-    let clear_field_name = format!("clear_{}", field_name);
+    let clear_field_name = format!("clear_{field_name}");
     let clear_field_ident = syn::Ident::new(&clear_field_name, field_name.span());
 
     let (doc_get, doc_set) = make_field_comment(field_name, true);
-    let doc_clear = format!("Clear the value of `{}` to [`None`]", field_name);
+    let doc_clear = format!("Clear the value of `{field_name}` to [`None`]");
 
     // If string, we can use as_deref
     if is_string_field(main_type) {
@@ -268,7 +268,7 @@ fn expand_regular_field(
     let field_ty = &field.ty;
     let field_ty_name = field_ty.clone().into_token_stream().to_string();
 
-    let set_field_name = format!("set_{}", field_name);
+    let set_field_name = format!("set_{field_name}");
     let set_field_ident = syn::Ident::new(&set_field_name, field_name.span());
 
     let (doc_get, doc_set) = make_field_comment(field_name, false);
@@ -403,8 +403,8 @@ fn has_event_copy_ident(field: &syn::Field) -> bool {
 /// If `option_mode` use the "if it exists" comment
 fn make_field_comment(field: &syn::Ident, option_mode: bool) -> (String, String) {
     let if_it_exists = if option_mode { " if it exists" } else { "" };
-    let doc_get = format!("Get the value of `{}`{}", field, if_it_exists);
-    let doc_set = format!("Set the value of `{}` to the given value", field);
+    let doc_get = format!("Get the value of `{field}`{if_it_exists}");
+    let doc_set = format!("Set the value of `{field}` to the given value");
 
     (doc_get, doc_set)
 }

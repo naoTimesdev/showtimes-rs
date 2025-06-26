@@ -273,7 +273,7 @@ pub(crate) async fn execute_search_events(
             tracing::debug!("Events task failed: {}", e2);
             // Combine
             GQLError::new(
-                format!("Search task failed: {}\nEvents task failed: {}", e1, e2),
+                format!("Search task failed: {e1}\nEvents task failed: {e2}"),
                 showtimes_gql_common::GQLErrorCode::TaskSchedulerError,
             )
             .extend(|e| {

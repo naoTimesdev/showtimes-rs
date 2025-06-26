@@ -80,8 +80,8 @@ impl std::fmt::Display for AnilistFuzzyDate {
             f,
             "{}{}{}",
             self.year.map_or(String::new(), |y| y.to_string()),
-            self.month.map_or(String::new(), |m| format!("-{:02}", m)),
-            self.day.map_or(String::new(), |d| format!("-{:02}", d)),
+            self.month.map_or(String::new(), |m| format!("-{m:02}")),
+            self.day.map_or(String::new(), |d| format!("-{d:02}")),
         )
     }
 }
@@ -331,7 +331,7 @@ impl std::fmt::Display for AnilistGraphQLError {
                 .map(|v| v.to_string())
                 .collect::<Vec<String>>()
                 .join(".");
-            write!(f, " in {}", path_str)?;
+            write!(f, " in {path_str}")?;
         }
         // newline
         writeln!(f)
@@ -396,14 +396,14 @@ impl From<AnilistGraphQLResponseError> for AnilistError {
 impl std::fmt::Display for AnilistError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AnilistError::GraphQL(e) => write!(f, "{}", e),
-            AnilistError::Request(e) => write!(f, "{}", e),
-            AnilistError::Serde(e) => write!(f, "{}", e),
+            AnilistError::GraphQL(e) => write!(f, "{e}"),
+            AnilistError::Request(e) => write!(f, "{e}"),
+            AnilistError::Serde(e) => write!(f, "{e}"),
             AnilistError::HeaderToString(c) => {
-                write!(f, "failed to convert `{}` header value into string", c)
+                write!(f, "failed to convert `{c}` header value into string")
             }
             AnilistError::StringToNumber(c) => {
-                write!(f, "failed to convert `{}` header value into number", c)
+                write!(f, "failed to convert `{c}` header value into number")
             }
         }
     }

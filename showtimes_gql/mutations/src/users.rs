@@ -660,7 +660,7 @@ pub async fn mutate_users_authenticate(
                 user.id,
                 expiry_u64.try_into().map_err(|_| {
                     GQLError::new(
-                        format!("Failed to convert {} into timestamp", expiry_u64),
+                        format!("Failed to convert {expiry_u64} into timestamp"),
                         GQLErrorCode::SessionCreateError,
                     )
                     .extend(|f| {
@@ -775,7 +775,7 @@ pub async fn mutate_users_authenticate(
                 user.id,
                 expiry_u64.try_into().map_err(|_| {
                     GQLError::new(
-                        format!("Failed to convert {} into timestamp", expiry_u64),
+                        format!("Failed to convert {expiry_u64} into timestamp"),
                         GQLErrorCode::SessionCreateError,
                     )
                     .extend(|f| {

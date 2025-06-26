@@ -37,7 +37,7 @@ pub async fn oauth2_discord_authorize(
         .collect::<Vec<String>>()
         .join("&");
 
-    let discord_authorize = format!("https://discord.com/oauth2/authorize?{}", query);
+    let discord_authorize = format!("https://discord.com/oauth2/authorize?{query}");
 
     (
         axum::http::StatusCode::FOUND,

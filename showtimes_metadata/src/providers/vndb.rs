@@ -60,7 +60,7 @@ impl VndbProvider {
         // json POST
         let req = self
             .client
-            .post(format!("{}{}", VNDB_API_URL, endpoint))
+            .post(format!("{VNDB_API_URL}{endpoint}"))
             .json(&params)
             .send()
             .await

@@ -32,7 +32,7 @@ where
             .extend(|e| {
                 e.set("id", id.to_string());
                 e.set("kind", kind.to_name());
-                e.set("original", format!("{}", err));
+                e.set("original", format!("{err}"));
             })
         })?;
 
@@ -77,7 +77,7 @@ where
             .extend(|e| {
                 e.set("id", id.to_string());
                 e.set("kind", kind.to_name());
-                e.set("original", format!("{}", err));
+                e.set("original", format!("{err}"));
                 e.set("user", user_query.id().to_string());
                 e.set("user_kind", user_query.kind().to_name());
             })
@@ -120,7 +120,7 @@ pub(crate) async fn query_rss_events(
             .extend(|e| {
                 e.set("id", id.to_string());
                 e.set("feed_id", feed_id.to_string());
-                e.set("original", format!("{}", err));
+                e.set("original", format!("{err}"));
             })
         })?;
 

@@ -195,7 +195,7 @@ pub(crate) fn expand_searchmodel(ast: &syn::DeriveInput) -> TokenStream {
     let pk_field_type = pk_field.ty.clone();
 
     let name_str_upper = name.to_string().to_uppercase();
-    let static_lock_name_str = format!("{}_INDEX_LOCK", name_str_upper);
+    let static_lock_name_str = format!("{name_str_upper}_INDEX_LOCK");
     let static_lock_ident = syn::Ident::new(&static_lock_name_str, name.span());
 
     let expanded = quote::quote! {

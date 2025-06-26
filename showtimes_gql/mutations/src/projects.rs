@@ -1011,8 +1011,8 @@ impl From<showtimes_events::ClickHouseError> for ProjectEventsError {
 impl std::fmt::Debug for ProjectEventsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ProjectEventsError::SearchError(e) => write!(f, "{:?}", e),
-            ProjectEventsError::EventsError(e) => write!(f, "{:?}", e),
+            ProjectEventsError::SearchError(e) => write!(f, "{e:?}"),
+            ProjectEventsError::EventsError(e) => write!(f, "{e:?}"),
         }
     }
 }
@@ -1020,8 +1020,8 @@ impl std::fmt::Debug for ProjectEventsError {
 impl std::fmt::Display for ProjectEventsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ProjectEventsError::SearchError(e) => write!(f, "{}", e),
-            ProjectEventsError::EventsError(e) => write!(f, "{}", e),
+            ProjectEventsError::SearchError(e) => write!(f, "{e}"),
+            ProjectEventsError::EventsError(e) => write!(f, "{e}"),
         }
     }
 }
@@ -1407,7 +1407,7 @@ pub async fn mutate_projects_create(
 
             let cover_format = poster.split('.').next_back().unwrap_or("jpg");
 
-            let cover_key = format!("cover.{}", cover_format);
+            let cover_key = format!("cover.{cover_format}");
 
             let stream = std::io::Cursor::new(cover_bytes);
 
@@ -1529,7 +1529,7 @@ async fn download_cover(url: &str) -> async_graphql::Result<Vec<u8>> {
             )
             .extend(|f| {
                 f.set("url", url);
-                f.set("original", format!("{}", e));
+                f.set("original", format!("{e}"));
             })
         })?;
 
@@ -1540,13 +1540,13 @@ async fn download_cover(url: &str) -> async_graphql::Result<Vec<u8>> {
         )
         .extend(|f| {
             f.set("url", url);
-            f.set("original", format!("{}", e));
+            f.set("original", format!("{e}"));
         })
     })?;
 
     if !resp.status().is_success() {
         return Err(GQLError::new(
-            format!("Failed to download cover: {}", url),
+            format!("Failed to download cover: {url}"),
             GQLErrorCode::MetadataPosterError,
         )
         .extend(|f| {
@@ -1558,12 +1558,12 @@ async fn download_cover(url: &str) -> async_graphql::Result<Vec<u8>> {
 
     let bytes = resp.bytes().await.map_err(|e| {
         GQLError::new(
-            format!("Failed to process cover bytes: {}", url),
+            format!("Failed to process cover bytes: {url}"),
             GQLErrorCode::MetadataPosterError,
         )
         .extend(|f| {
             f.set("url", url);
-            f.set("original", format!("{}", e));
+            f.set("original", format!("{e}"));
         })
     })?;
     let bytes_map = bytes.to_vec();

@@ -7,7 +7,7 @@ fn main() {
         Ok(output) => {
             let commit = String::from_utf8_lossy(&output.stdout);
 
-            println!("cargo:rustc-env=GIT_COMMIT={}", commit);
+            println!("cargo:rustc-env=GIT_COMMIT={commit}");
         }
         Err(_) => {
             println!("cargo:rustc-env=GIT_COMMIT=unknown");
