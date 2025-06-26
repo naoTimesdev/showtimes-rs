@@ -1271,12 +1271,10 @@ pub async fn mutate_projects_create(
     project.roles = all_roles;
     project.assignees = assignees;
     project.progress = all_progress;
-    if let Some(aliases) = &input.aliases {
-        if aliases.is_empty() {
-            project.aliases = metadata.aliases;
-        } else {
-            project.aliases = aliases.clone();
-        }
+    if let Some(aliases) = &input.aliases
+        && !aliases.is_empty()
+    {
+        project.aliases = aliases.clone();
     } else {
         project.aliases = metadata.aliases;
     }
@@ -1335,13 +1333,12 @@ pub async fn mutate_projects_create(
                 })?;
 
             let mut copy_target = Vec::new();
-            if (tokio::io::copy(&mut file_target, &mut copy_target).await).is_ok() {
+            if (tokio::io::copy(&mut file_target, &mut copy_target).await).is_ok()
+                && let Ok(colors) = showtimes_metadata::image::get_dominant_colors(&copy_target)
+                && let Some(color) = colors.first()
+            {
                 // Read the colors
-                if let Ok(colors) = showtimes_metadata::image::get_dominant_colors(&copy_target) {
-                    if let Some(color) = colors.first() {
-                        poster_color_collect = Some(*color);
-                    }
-                }
+                poster_color_collect = Some(*color);
             }
 
             // Seek back to the start of the file
@@ -2203,11 +2200,28 @@ async fn update_single_project(
     }
 
     // Update poster
-    if is_main {
-        if let Some(poster_upload) = input.poster {
-            let info_up = poster_upload.value(ctx).map_err(|err| {
+    if is_main && let Some(poster_upload) = input.poster {
+        let info_up = poster_upload.value(ctx).map_err(|err| {
+            GQLError::new(
+                format!("Failed to read image upload: {err}"),
+                GQLErrorCode::IOError,
+            )
+            .extend(|e| {
+                e.set("id", prj_id.to_string());
+                e.set("server", prj_srv_id.to_string());
+                e.set("where", "project");
+                e.set("original", format!("{err}"));
+                e.set("original_code", format!("{}", err.kind()));
+            })
+        })?;
+        let mut file_target = tokio::fs::File::from_std(info_up.content);
+
+        // Get format
+        let format = showtimes_gql_common::image::detect_upload_data(&mut file_target)
+            .await
+            .map_err(|err| {
                 GQLError::new(
-                    format!("Failed to read image upload: {err}"),
+                    format!("Failed to detect image format: {err}"),
                     GQLErrorCode::IOError,
                 )
                 .extend(|e| {
@@ -2218,83 +2232,64 @@ async fn update_single_project(
                     e.set("original_code", format!("{}", err.kind()));
                 })
             })?;
-            let mut file_target = tokio::fs::File::from_std(info_up.content);
-
-            // Get format
-            let format = showtimes_gql_common::image::detect_upload_data(&mut file_target)
-                .await
-                .map_err(|err| {
-                    GQLError::new(
-                        format!("Failed to detect image format: {err}"),
-                        GQLErrorCode::IOError,
-                    )
-                    .extend(|e| {
-                        e.set("id", prj_id.to_string());
-                        e.set("server", prj_srv_id.to_string());
-                        e.set("where", "project");
-                        e.set("original", format!("{err}"));
-                        e.set("original_code", format!("{}", err.kind()));
-                    })
-                })?;
-            // Seek back to the start of the file
-            file_target
-                .seek(std::io::SeekFrom::Start(0))
-                .await
-                .map_err(|err| {
-                    GQLError::new(
-                        format!("Failed to seek to image to start: {err}"),
-                        GQLErrorCode::IOError,
-                    )
-                    .extend(|e| {
-                        e.set("id", prj_id.to_string());
-                        e.set("server", prj_srv_id.to_string());
-                        e.set("where", "project");
-                        e.set("original", format!("{err}"));
-                        e.set("original_code", format!("{}", err.kind()));
-                    })
-                })?;
-
-            let filename = format!("cover.{}", format.as_extension());
-
-            storages
-                .file_stream_upload(
-                    prj_id,
-                    &filename,
-                    file_target,
-                    Some(&project.creator.to_string()),
-                    Some(showtimes_fs::FsFileKind::Images),
+        // Seek back to the start of the file
+        file_target
+            .seek(std::io::SeekFrom::Start(0))
+            .await
+            .map_err(|err| {
+                GQLError::new(
+                    format!("Failed to seek to image to start: {err}"),
+                    GQLErrorCode::IOError,
                 )
-                .await
-                .map_err(|err| {
-                    GQLError::new(
-                        format!("Failed to upload image: {err}"),
-                        GQLErrorCode::ImageUploadError,
-                    )
-                    .extend(|e| {
-                        e.set("id", prj_id.to_string());
-                        e.set("server", prj_srv_id.to_string());
-                        e.set("where", "project");
-                        e.set("original", format!("{err}"));
-                    })
-                })?;
+                .extend(|e| {
+                    e.set("id", prj_id.to_string());
+                    e.set("server", prj_srv_id.to_string());
+                    e.set("where", "project");
+                    e.set("original", format!("{err}"));
+                    e.set("original_code", format!("{}", err.kind()));
+                })
+            })?;
 
-            let image_meta = showtimes_db::m::ImageMetadata::new(
-                showtimes_fs::FsFileKind::Images.to_name(),
+        let filename = format!("cover.{}", format.as_extension());
+
+        storages
+            .file_stream_upload(
                 prj_id,
                 &filename,
-                format.as_extension(),
-                Some(project.creator.to_string()),
-            );
+                file_target,
+                Some(&project.creator.to_string()),
+                Some(showtimes_fs::FsFileKind::Images),
+            )
+            .await
+            .map_err(|err| {
+                GQLError::new(
+                    format!("Failed to upload image: {err}"),
+                    GQLErrorCode::ImageUploadError,
+                )
+                .extend(|e| {
+                    e.set("id", prj_id.to_string());
+                    e.set("server", prj_srv_id.to_string());
+                    e.set("where", "project");
+                    e.set("original", format!("{err}"));
+                })
+            })?;
 
-            before_project.set_poster_image(&project.poster.image);
-            project.poster.image = image_meta;
-            after_project.set_poster_image(&project.poster.image);
-        }
+        let image_meta = showtimes_db::m::ImageMetadata::new(
+            showtimes_fs::FsFileKind::Images.to_name(),
+            prj_id,
+            &filename,
+            format.as_extension(),
+            Some(project.creator.to_string()),
+        );
 
-        // Update poster color
-        if let Some(poster_color) = input.poster_color {
-            project.poster.color = Some(poster_color);
-        }
+        before_project.set_poster_image(&project.poster.image);
+        project.poster.image = image_meta;
+        after_project.set_poster_image(&project.poster.image);
+    }
+
+    // Update poster color
+    if is_main && let Some(poster_color) = input.poster_color {
+        project.poster.color = Some(poster_color);
     }
 
     Ok((

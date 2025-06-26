@@ -162,19 +162,19 @@ pub(crate) fn expand_enumname(input: &syn::DeriveInput) -> TokenStream {
             None => var_name.to_case(root_attrs.rename_all),
         };
 
-        if let Some(dupe_ident) = registered_names.get(&arm_str) {
-            if root_attrs.strict {
-                let dupe_name = dupe_ident.to_string();
-                return syn::Error::new_spanned(
-                    vardent,
-                    format!(
-                        "Duplicate name value: `{}`, conflict with `{}`",
-                        &arm_str, &dupe_name
-                    ),
-                )
-                .to_compile_error()
-                .into();
-            }
+        if let Some(dupe_ident) = registered_names.get(&arm_str)
+            && root_attrs.strict
+        {
+            let dupe_name = dupe_ident.to_string();
+            return syn::Error::new_spanned(
+                vardent,
+                format!(
+                    "Duplicate name value: `{}`, conflict with `{}`",
+                    &arm_str, &dupe_name
+                ),
+            )
+            .to_compile_error()
+            .into();
         }
         registered_names.insert(arm_str.clone(), vardent);
 
@@ -498,19 +498,19 @@ pub(crate) fn serde_automata_expand(input: &syn::DeriveInput) -> TokenStream {
             };
 
         for ser_arm in serialize_str.iter() {
-            if let Some(dupe_ident) = registered_ser.get(ser_arm) {
-                if root_attrs.strict {
-                    let dupe_name = dupe_ident.to_string();
-                    return syn::Error::new_spanned(
-                        vardent,
-                        format!(
-                            "Duplicate name value for serialization: `{}`, conflict with `{}`",
-                            &ser_arm, &dupe_name
-                        ),
-                    )
-                    .to_compile_error()
-                    .into();
-                }
+            if let Some(dupe_ident) = registered_ser.get(ser_arm)
+                && root_attrs.strict
+            {
+                let dupe_name = dupe_ident.to_string();
+                return syn::Error::new_spanned(
+                    vardent,
+                    format!(
+                        "Duplicate name value for serialization: `{}`, conflict with `{}`",
+                        &ser_arm, &dupe_name
+                    ),
+                )
+                .to_compile_error()
+                .into();
             }
 
             registered_ser.insert(ser_arm.clone(), vardent);
@@ -549,19 +549,19 @@ pub(crate) fn serde_automata_expand(input: &syn::DeriveInput) -> TokenStream {
             };
 
         for deser_arm in deserialize_str.iter() {
-            if let Some(dupe_ident) = registered_deser.get(deser_arm) {
-                if root_attrs.strict {
-                    let dupe_name = dupe_ident.to_string();
-                    return syn::Error::new_spanned(
-                        vardent,
-                        format!(
-                            "Duplicate name value for deserialization: `{}`, conflict with `{}`",
-                            &deser_arm, &dupe_name
-                        ),
-                    )
-                    .to_compile_error()
-                    .into();
-                }
+            if let Some(dupe_ident) = registered_deser.get(deser_arm)
+                && root_attrs.strict
+            {
+                let dupe_name = dupe_ident.to_string();
+                return syn::Error::new_spanned(
+                    vardent,
+                    format!(
+                        "Duplicate name value for deserialization: `{}`, conflict with `{}`",
+                        &deser_arm, &dupe_name
+                    ),
+                )
+                .to_compile_error()
+                .into();
             }
 
             registered_deser.insert(deser_arm.clone(), vardent);

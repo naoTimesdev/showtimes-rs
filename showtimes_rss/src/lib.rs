@@ -285,33 +285,32 @@ pub async fn parse_feed<'a>(
                 hash_entries.insert("links", parsed_links.into());
             }
 
-            if let Some(content) = &entry.content {
-                if let Some(content_body) = &content.body {
-                    let parsed = markdown::html_to_markdown(content_body, &base_url);
+            if let Some(content) = &entry.content
+                && let Some(content_body) = &content.body
+            {
+                let parsed = markdown::html_to_markdown(content_body, &base_url);
 
-                    match parsed {
-                        Ok(parsed) => {
-                            hash_entries.insert("content", parsed.into());
-                        }
-                        Err(_) => {
-                            hash_entries.insert("content", content_body.clone().into());
-                        }
+                match parsed {
+                    Ok(parsed) => {
+                        hash_entries.insert("content", parsed.into());
+                    }
+                    Err(_) => {
+                        hash_entries.insert("content", content_body.clone().into());
                     }
                 }
             }
 
-            if let Some(summary) = &entry.summary {
-                let content_body = &summary.content;
-                if !content_body.is_empty() {
-                    let parsed = markdown::html_to_markdown(content_body, &base_url);
+            if let Some(summary) = &entry.summary
+                && !summary.content.is_empty()
+            {
+                let parsed = markdown::html_to_markdown(&summary.content, &base_url);
 
-                    match parsed {
-                        Ok(parsed) => {
-                            hash_entries.insert("summary", parsed.into());
-                        }
-                        Err(_) => {
-                            hash_entries.insert("summary", content_body.clone().into());
-                        }
+                match parsed {
+                    Ok(parsed) => {
+                        hash_entries.insert("summary", parsed.into());
+                    }
+                    Err(_) => {
+                        hash_entries.insert("summary", summary.content.clone().into());
                     }
                 }
             }
@@ -365,10 +364,10 @@ pub async fn parse_feed<'a>(
                 hash_entries.insert("contributors", contributors.into());
             }
 
-            if let Some(rights) = &entry.rights {
-                if !rights.content.is_empty() {
-                    hash_entries.insert("rights", rights.content.clone().into());
-                }
+            if let Some(rights) = &entry.rights
+                && !rights.content.is_empty()
+            {
+                hash_entries.insert("rights", rights.content.clone().into());
             }
 
             let mut media_content = entry

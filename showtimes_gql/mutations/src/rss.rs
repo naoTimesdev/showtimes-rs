@@ -475,70 +475,68 @@ pub async fn mutate_rss_feed_update(
 
     let server = check_permissions(ctx, rss_feed.creator, user).await?;
 
-    if let Some(enabled) = input.enable {
-        if enabled {
-            let db = ctx.data_unchecked::<DatabaseShared>().clone();
+    if let Some(true) = input.enable {
+        let db = ctx.data_unchecked::<DatabaseShared>().clone();
 
-            let premi_handler = showtimes_db::ServerPremiumHandler::new(&db);
-            let current_time_bson = showtimes_db::mongodb::bson::DateTime::now();
+        let premi_handler = showtimes_db::ServerPremiumHandler::new(&db);
+        let current_time_bson = showtimes_db::mongodb::bson::DateTime::now();
 
-            let premium_status = premi_handler
-                .find_all_by(doc! {
-                    "target": server.id.to_string(),
-                    "ends_at": { "$gte": current_time_bson }
-                })
-                .await
-                .extend_error(GQLErrorCode::ServerPremiumRequestFails, |e| {
-                    e.set("id", id.to_string());
-                    e.set("server", server.id.to_string());
-                    e.set("at", "premium_status_query");
-                    input.dump_query(e);
-                })?;
+        let premium_status = premi_handler
+            .find_all_by(doc! {
+                "target": server.id.to_string(),
+                "ends_at": { "$gte": current_time_bson }
+            })
+            .await
+            .extend_error(GQLErrorCode::ServerPremiumRequestFails, |e| {
+                e.set("id", id.to_string());
+                e.set("server", server.id.to_string());
+                e.set("at", "premium_status_query");
+                input.dump_query(e);
+            })?;
 
-            // Check how much enabled feeds the server has
-            let rss_count = rss_loader
-                .loader()
-                .get_inner()
-                .get_collection()
-                .count_documents(doc! { "creator": server.id.to_string(), "enabled": true })
-                .await
-                .extend_error(GQLErrorCode::RSSFeedRequestFails, |e| {
-                    e.set("id", id.to_string());
-                    e.set("server", server.id.to_string());
-                    e.set("at", "count_enabled_query");
-                    input.dump_query(e);
-                })?;
+        // Check how much enabled feeds the server has
+        let rss_count = rss_loader
+            .loader()
+            .get_inner()
+            .get_collection()
+            .count_documents(doc! { "creator": server.id.to_string(), "enabled": true })
+            .await
+            .extend_error(GQLErrorCode::RSSFeedRequestFails, |e| {
+                e.set("id", id.to_string());
+                e.set("server", server.id.to_string());
+                e.set("at", "count_enabled_query");
+                input.dump_query(e);
+            })?;
 
-            let config = ctx.data_unchecked::<Arc<showtimes_shared::Config>>();
-            if !can_enable_rss(config, rss_count, &premium_status) {
-                let has_premium = has_valid_premium(&premium_status);
-                // Cannot enable more feeds
-                return GQLError::new(
-                    "Unable to enable more RSS feeds",
-                    GQLErrorCode::RSSFeedLimitReached,
-                )
-                .extend(|f| {
-                    f.set("id", id.to_string());
-                    f.set("server", server.id.to_string());
-                    f.set("rss_count", rss_count);
-                    f.set("has_premium", has_premium);
-                    f.set(
-                        "limit",
-                        if has_premium {
-                            config.rss.premium_limit.unwrap_or(5)
-                        } else {
-                            config.rss.standard_limit.unwrap_or(2)
-                        },
-                    );
-                    input.dump_query(f);
-                })
-                .into();
-            }
-
-            rss_feed.set_enabled(true);
-        } else {
-            rss_feed.set_enabled(false);
+        let config = ctx.data_unchecked::<Arc<showtimes_shared::Config>>();
+        if !can_enable_rss(config, rss_count, &premium_status) {
+            let has_premium = has_valid_premium(&premium_status);
+            // Cannot enable more feeds
+            return GQLError::new(
+                "Unable to enable more RSS feeds",
+                GQLErrorCode::RSSFeedLimitReached,
+            )
+            .extend(|f| {
+                f.set("id", id.to_string());
+                f.set("server", server.id.to_string());
+                f.set("rss_count", rss_count);
+                f.set("has_premium", has_premium);
+                f.set(
+                    "limit",
+                    if has_premium {
+                        config.rss.premium_limit.unwrap_or(5)
+                    } else {
+                        config.rss.standard_limit.unwrap_or(2)
+                    },
+                );
+                input.dump_query(f);
+            })
+            .into();
         }
+
+        rss_feed.set_enabled(true);
+    } else if let Some(false) = input.enable {
+        rss_feed.set_enabled(false);
     }
 
     if let Some(url) = &input.url {

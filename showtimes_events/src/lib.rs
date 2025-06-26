@@ -286,11 +286,10 @@ impl SHClickHouse {
             .fetch_all::<models::RSSEvent>()
             .await?;
 
-        if let Some(result) = results.first() {
-            Ok(Some(result.clone()))
-        } else {
-            Ok(None)
-        }
+        Ok(results
+            .first()
+            .map(|result| Some(result.clone()))
+            .unwrap_or(None))
     }
 }
 

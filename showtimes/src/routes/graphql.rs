@@ -180,66 +180,63 @@ pub async fn graphql_handler(
 
     // Check for x-refresh-token header
     let mut active_refresh = None;
-    if let Some(refresh_token) = headers.get("x-refresh-token") {
-        if let Ok(refresh_token) = refresh_token.to_str() {
-            let session = state
-                .session
-                .lock()
-                .await
-                .get_refresh_session(refresh_token)
-                .await;
+    if let Some(refresh_token) = headers.get("x-refresh-token")
+        && let Ok(real_token) = refresh_token.to_str()
+    {
+        let session = state
+            .session
+            .lock()
+            .await
+            .get_refresh_session(real_token)
+            .await;
 
-            match session {
-                Ok((refresh_session, current_token)) => {
-                    tracing::debug!("Got refresh session: {:?}", &refresh_session);
-                    req = req.data(refresh_session.clone());
-                    active_refresh = Some((refresh_session, current_token));
-                }
-                Err(err) => {
-                    tracing::error!("Error getting refresh session: {:?}", err);
-                }
+        match session {
+            Ok((refresh_session, current_token)) => {
+                tracing::debug!("Got refresh session: {:?}", &refresh_session);
+                req = req.data(refresh_session.clone());
+                active_refresh = Some((refresh_session, current_token));
+            }
+            Err(err) => {
+                tracing::error!("Error getting refresh session: {:?}", err);
             }
         }
     }
 
     let mut resp = state.schema.execute(req).await;
-    if resp.is_ok() {
-        if let Some((refresh_session, _)) = active_refresh {
-            let refreshed_data = showtimes_session::refresh_session(
-                refresh_session.get_token(),
-                &state.jwt,
-                state.config.jwt.get_expiration() as i64,
-            );
+    if resp.is_ok()
+        && let Some((refresh_session, _)) = active_refresh
+    {
+        let refreshed_data = showtimes_session::refresh_session(
+            refresh_session.get_token(),
+            &state.jwt,
+            state.config.jwt.get_expiration() as i64,
+        );
 
-            match refreshed_data {
-                Ok(session_claims) => {
-                    match state
-                        .session
-                        .lock()
-                        .await
-                        .set_refresh_session(
-                            refresh_session.get_token(),
-                            session_claims.get_token(),
-                        )
-                        .await
-                    {
-                        Err(err) => {
-                            tracing::error!("Failed to save refresh session: {}", err);
-                        }
-                        Ok(_) => {
-                            resp.http_headers.append(
-                                "x-refreshed-token",
-                                axum::http::HeaderValue::from_str(session_claims.get_token())
-                                    .expect("Failed to serialize header value for refreshed token"),
-                            );
-                        }
+        match refreshed_data {
+            Ok(session_claims) => {
+                match state
+                    .session
+                    .lock()
+                    .await
+                    .set_refresh_session(refresh_session.get_token(), session_claims.get_token())
+                    .await
+                {
+                    Err(err) => {
+                        tracing::error!("Failed to save refresh session: {}", err);
+                    }
+                    Ok(_) => {
+                        resp.http_headers.append(
+                            "x-refreshed-token",
+                            axum::http::HeaderValue::from_str(session_claims.get_token())
+                                .expect("Failed to serialize header value for refreshed token"),
+                        );
                     }
                 }
-                Err(e) => {
-                    tracing::error!("Failed to refresh session: {}", e);
-                }
-            };
-        }
+            }
+            Err(e) => {
+                tracing::error!("Failed to refresh session: {}", e);
+            }
+        };
     }
 
     resp.into()

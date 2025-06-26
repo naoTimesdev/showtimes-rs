@@ -150,11 +150,11 @@ pub async fn query_servers_paginated(
         None => Document::new(),
     };
 
-    if let Some(user) = &queries.current_user {
-        if user.kind() == UserKind::User {
-            doc_query.insert("owners.id", user.id().to_string());
-            count_query.insert("owners.id", user.id().to_string());
-        }
+    if let Some(user) = &queries.current_user
+        && user.kind() == UserKind::User
+    {
+        doc_query.insert("owners.id", user.id().to_string());
+        count_query.insert("owners.id", user.id().to_string());
     }
 
     let cursor = srv_handler

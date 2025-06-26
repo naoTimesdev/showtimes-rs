@@ -274,24 +274,20 @@ pub async fn mutate_users_update(
                     // find
                     let matched = user_info.api_key.iter_mut().find(|d| d.key == **key);
                     if let Some(matched) = matched {
-                        if let Some(remove) = api_key.remove {
-                            if remove {
-                                let current_len = user_info.api_key.len();
-                                user_info.api_key.retain(|d| d.key != **key);
-                                if current_len != user_info.api_key.len() {
-                                    any_api_changes = true;
-                                }
-                                // Jump!
-                                continue;
+                        if let Some(true) = api_key.remove {
+                            let current_len = user_info.api_key.len();
+                            user_info.api_key.retain(|d| d.key != **key);
+                            if current_len != user_info.api_key.len() {
+                                any_api_changes = true;
                             }
+                            // Jump!
+                            continue;
                         }
 
                         // Reset API key
-                        if let Some(reset) = api_key.reset {
-                            if reset {
-                                matched.update_key(showtimes_shared::APIKey::new());
-                                any_api_changes = true;
-                            }
+                        if let Some(true) = api_key.reset {
+                            matched.update_key(showtimes_shared::APIKey::new());
+                            any_api_changes = true;
                         }
                         if let Some(capabilities) = &api_key.capabilities() {
                             matched.capabilities = capabilities.to_vec();

@@ -56,13 +56,11 @@ impl UserGQL {
 
     /// The user's API key, this will be `null` if you're not *this* user.
     async fn api_key(&self) -> Option<Vec<APIKeyDataGQL>> {
-        if let Some(requester) = self.requester {
-            // Only return the API key if the requester is the same user or the requester is not a user
-            if requester.id() == self.id || requester.kind() != showtimes_db::m::UserKind::User {
-                Some(self.api_key.iter().map(APIKeyDataGQL::from).collect())
-            } else {
-                None
-            }
+        // Only return the API key if the requester is the same user or the requester is not a user
+        if let Some(requester) = self.requester
+            && (requester.id() == self.id || requester.kind() != showtimes_db::m::UserKind::User)
+        {
+            Some(self.api_key.iter().map(APIKeyDataGQL::from).collect())
         } else {
             None
         }

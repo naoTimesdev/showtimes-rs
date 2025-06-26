@@ -237,11 +237,7 @@ impl ServerCollaborationSync {
         project: showtimes_shared::ulid::Ulid,
     ) -> Option<ServerCollaborationSyncTarget> {
         let index = self.projects.iter().position(|p| p.project == project);
-        if let Some(index) = index {
-            Some(self.projects.remove(index))
-        } else {
-            None
-        }
+        index.map(|index| self.projects.remove(index))
     }
 
     /// Get a specific server and remove it from the list
@@ -250,11 +246,7 @@ impl ServerCollaborationSync {
         server: showtimes_shared::ulid::Ulid,
     ) -> Option<ServerCollaborationSyncTarget> {
         let index = self.projects.iter().position(|p| p.server == server);
-        if let Some(index) = index {
-            Some(self.projects.remove(index))
-        } else {
-            None
-        }
+        index.map(|index| self.projects.remove(index))
     }
 
     /// Get the length of the projects or synchronization list

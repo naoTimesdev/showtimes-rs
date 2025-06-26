@@ -246,6 +246,20 @@ pub struct AnilistAiringSchedulePaged {
     pub page_info: AnilistPageInfo,
 }
 
+impl Default for AnilistAiringSchedulePaged {
+    fn default() -> Self {
+        AnilistAiringSchedulePaged {
+            airing_schedules: Vec::new(),
+            page_info: AnilistPageInfo {
+                total: 0,
+                per_page: 50,
+                current_page: 1,
+                has_next_page: false,
+            },
+        }
+    }
+}
+
 /// The inner data of the Anilist page result
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct AnilistPageInnerData {

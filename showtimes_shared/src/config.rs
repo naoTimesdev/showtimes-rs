@@ -421,40 +421,34 @@ impl Config {
 
         // Verify RSS
         if self.rss.enabled {
-            if let Some(standard) = &self.rss.standard {
-                if *standard < 30 {
-                    return Err(
-                        ConfigVerifyError::MinimumAmount("Standard RSS".to_string(), 30).into(),
-                    );
-                }
+            if let Some(standard) = self.rss.standard
+                && standard < 30
+            {
+                return Err(
+                    ConfigVerifyError::MinimumAmount("Standard RSS".to_string(), 30).into(),
+                );
             }
 
-            if let Some(premium) = &self.rss.premium {
-                if *premium < 30 {
-                    return Err(
-                        ConfigVerifyError::MinimumAmount("Premium RSS".to_string(), 30).into(),
-                    );
-                }
+            if let Some(premium) = self.rss.premium
+                && premium < 30
+            {
+                return Err(ConfigVerifyError::MinimumAmount("Premium RSS".to_string(), 30).into());
             }
 
-            if let Some(standard_limit) = &self.rss.standard_limit {
-                if *standard_limit < 1 {
-                    return Err(ConfigVerifyError::MinimumAmount(
-                        "Standard RSS limit".to_string(),
-                        1,
-                    )
-                    .into());
-                }
+            if let Some(standard_limit) = self.rss.standard_limit
+                && standard_limit < 1
+            {
+                return Err(
+                    ConfigVerifyError::MinimumAmount("Standard RSS limit".to_string(), 1).into(),
+                );
             }
 
-            if let Some(premium_limit) = &self.rss.premium_limit {
-                if *premium_limit < 1 {
-                    return Err(ConfigVerifyError::MinimumAmount(
-                        "Premium RSS limit".to_string(),
-                        1,
-                    )
-                    .into());
-                }
+            if let Some(premium_limit) = self.rss.premium_limit
+                && premium_limit < 1
+            {
+                return Err(
+                    ConfigVerifyError::MinimumAmount("Premium RSS limit".to_string(), 1).into(),
+                );
             }
         }
 

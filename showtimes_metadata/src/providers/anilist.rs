@@ -10,7 +10,7 @@ use crate::{
     errors::{DetailedSerdeError, MetadataResult},
     models::{
         AnilistAiringSchedulePaged, AnilistError, AnilistGraphQLResponseError, AnilistMedia,
-        AnilistPageInfo, AnilistPagedData, AnilistResponse, AnilistSingleMedia,
+        AnilistPagedData, AnilistResponse, AnilistSingleMedia,
     },
 };
 
@@ -210,11 +210,13 @@ impl AnilistProvider {
         });
 
         let res = self.query::<AnilistPagedData>(queries, &variables).await?;
-        if let Some(media) = res.data.page.nodes.media() {
-            Ok(media.to_vec())
-        } else {
-            Ok(vec![])
-        }
+        Ok(res
+            .data
+            .page
+            .nodes
+            .media()
+            .map(|media| media.to_vec())
+            .unwrap_or(Vec::new()))
     }
 
     /// Get specific media information
@@ -304,22 +306,16 @@ impl AnilistProvider {
 
         let res = self.query::<AnilistPagedData>(queries, &variables).await?;
 
-        if let Some(air_schedules) = res.data.page.nodes.airing_schedules() {
-            Ok(AnilistAiringSchedulePaged {
-                airing_schedules: air_schedules.to_vec(),
+        Ok(res
+            .data
+            .page
+            .nodes
+            .airing_schedules()
+            .map(|schedules| AnilistAiringSchedulePaged {
+                airing_schedules: schedules.to_vec(),
                 page_info: res.data.page.page_info,
             })
-        } else {
-            Ok(AnilistAiringSchedulePaged {
-                airing_schedules: vec![],
-                page_info: AnilistPageInfo {
-                    total: 0,
-                    per_page: 50,
-                    current_page: 1,
-                    has_next_page: false,
-                },
-            })
-        }
+            .unwrap_or(AnilistAiringSchedulePaged::default()))
     }
 }
 
